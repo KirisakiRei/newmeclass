@@ -26,7 +26,19 @@ NestJS + Prisma + MySQL backend for NEWME SaaS platform.
 - Unit tests: `npm test`
 
 ## Docker
-- `docker compose up -d --build`
+- Local backend infra only: `docker compose -f docker-compose.dev.yml up -d`
+
+## Production VPS
+1. Use [backend/.env.production.example](/c:/Users/LENOVO/Documents/Project/2026/newme/backend/.env.production.example) as the reference for production variables.
+2. For CI/CD deployment, GitHub Actions writes the real `/opt/newme/.env.production` file on the VPS from repository Secrets and Variables.
+3. The VPS pulls images from GHCR and runs [docker-compose.prod.yml](/c:/Users/LENOVO/Documents/Project/2026/newme/docker-compose.prod.yml).
+4. Server setup and CI/CD parameter mapping are documented in [deploy/vps/README.md](/c:/Users/LENOVO/Documents/Project/2026/newme/deploy/vps/README.md).
+
+Production notes:
+- Frontend image is built from the static `frontend/dist` output and served by Nginx.
+- Backend image runs the compiled `dist/src/main.js` output.
+- `/api` and `/uploads` are proxied through the frontend container on the same domain.
+- MySQL, Redis, and backend uploads use named Docker volumes.
 
 ## API Docs
 - `http://localhost:5000/api/docs`

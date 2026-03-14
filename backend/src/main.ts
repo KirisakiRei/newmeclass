@@ -11,7 +11,12 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   const uploadsDir = join(process.cwd(), 'uploads');
+  const trustProxy = String(process.env.TRUST_PROXY || '').toLowerCase();
   mkdirSync(uploadsDir, { recursive: true });
+
+  if (['1', 'true', 'yes', 'on'].includes(trustProxy)) {
+    app.set('trust proxy', 1);
+  }
 
   app.setGlobalPrefix(process.env.API_PREFIX || 'api');
   app.use(helmet());

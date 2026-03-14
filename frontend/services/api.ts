@@ -3,8 +3,8 @@ import axios from 'axios';
 import { setupInstanceAxiosNormalizer } from './http-normalizer';
 import { normalizeSiteSettings } from '../lib/site-settings';
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
-const API_URL = `${API_BASE_URL}/api`;
+const API_BASE_URL = String(process.env.REACT_APP_BACKEND_URL || '').trim().replace(/\/+$/, '');
+const API_URL = API_BASE_URL ? `${API_BASE_URL}/api` : '/api';
 const getStoredToken = (...keys) => keys.map((key) => localStorage.getItem(key)).find(Boolean);
 const isAdminEndpoint = (url = '') => (
   url.startsWith('/admin/')

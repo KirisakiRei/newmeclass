@@ -1,3 +1,4 @@
+# Local legacy stack. Use ../docker-compose.prod.yml for VPS/production deployments.
 services:
   api:
     build: .
@@ -23,7 +24,6 @@ services:
       MYSQL_PASSWORD: newme_pass
     ports:
       - "3306:3306"
-    command: --default-authentication-plugin=mysql_native_password
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:

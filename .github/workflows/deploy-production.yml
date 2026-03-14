@@ -1,0 +1,311 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Git ref to build and deploy"
+        required: true
+        default: "main"
+      run_seed:
+        description: "Run optional production seed after deploy"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  FRONTEND_IMAGE: ghcr.io/kirisakirei/newmeclass-frontend
+  BACKEND_IMAGE: ghcr.io/kirisakirei/newmeclass-backend
+  BACKEND_TOOLS_IMAGE: ghcr.io/kirisakirei/newmeclass-backend-tools
+  DEPLOY_PATH: /opt/newme
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      git_commit: ${{ steps.meta.outputs.git_commit }}
+    steps:
+      - name: Checkout target ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Set build metadata
+        id: meta
+        shell: bash
+        run: |
+          GIT_COMMIT="$(git rev-parse HEAD)"
+          echo "git_commit=${GIT_COMMIT}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=sha-${GIT_COMMIT}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: runtime
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.image_tag }}
+            ${{ env.BACKEND_IMAGE }}:prod-latest
+
+      - name: Build and push backend tools image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: build
+          push: true
+          tags: |
+            ${{ env.BACKEND_TOOLS_IMAGE }}:${{ steps.meta.outputs.image_tag }}
+            ${{ env.BACKEND_TOOLS_IMAGE }}:prod-latest
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          build-args: |
+            REACT_APP_BACKEND_URL=
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.image_tag }}
+            ${{ env.FRONTEND_IMAGE }}:prod-latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Checkout target ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Prepare SSH key
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Render production env file
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          BACKEND_TOOLS_IMAGE: ${{ env.BACKEND_TOOLS_IMAGE }}
+          FRONTEND_PORT_RAW: ${{ vars.FRONTEND_PORT }}
+          APP_URL: ${{ vars.APP_URL }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+          CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+          UPLOAD_PUBLIC_BASE_URL: ${{ vars.UPLOAD_PUBLIC_BASE_URL }}
+          NODE_ENV: production
+          PORT: 5000
+          API_PREFIX: api
+          APP_NAME: NEWME Backend
+          TZ: Asia/Jakarta
+          LOG_LEVEL: info
+          TRUST_PROXY: "true"
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          DB_TX_TIMEOUT_MS: 8000
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          JWT_ACCESS_EXPIRES: 15m
+          JWT_REFRESH_EXPIRES: 30d
+          BCRYPT_ROUNDS: 12
+          RATE_LIMIT_TTL: 60
+          RATE_LIMIT_LIMIT: 120
+          AUTH_RATE_LIMIT_TTL: 60
+          AUTH_RATE_LIMIT_REGISTER_LIMIT: 20
+          AUTH_RATE_LIMIT_LOGIN_LIMIT: 20
+          AUTH_RATE_LIMIT_ADMIN_LOGIN_LIMIT: 8
+          AUTH_RATE_LIMIT_PASSWORD_RECOVERY_LIMIT: 8
+          CERT_DOWNLOAD_RATE_LIMIT_TTL: 60
+          CERT_DOWNLOAD_RATE_LIMIT: 30
+          CERT_AI_DOWNLOAD_RATE_LIMIT: 20
+          CERT_GENERATE_RATE_LIMIT: 15
+          REDIS_HOST: redis
+          REDIS_PORT: 6379
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_DB: 0
+          BULLMQ_PREFIX: newme
+          BULLMQ_DEFAULT_REMOVE_ON_COMPLETE: 1000
+          BULLMQ_DEFAULT_REMOVE_ON_FAIL: 5000
+          QUEUE_CONCURRENCY_PAYMENT: 10
+          QUEUE_CONCURRENCY_SCORING: 20
+          MIDTRANS_IS_PRODUCTION: "false"
+          MIDTRANS_SERVER_KEY: ${{ secrets.MIDTRANS_SERVER_KEY }}
+          MIDTRANS_CLIENT_KEY: ${{ secrets.MIDTRANS_CLIENT_KEY }}
+          MIDTRANS_MERCHANT_ID: ${{ secrets.MIDTRANS_MERCHANT_ID }}
+          MIDTRANS_SANITIZED: "true"
+          MIDTRANS_3DS: "true"
+          MIDTRANS_WEBHOOK_PATH: /api/payments/midtrans/webhook
+          PAYMENT_RECONCILE_CRON: "*/5 * * * *"
+          PAYMENT_RECONCILE_WINDOW_MINUTES: 120
+          STORAGE_DRIVER: local
+          UPLOAD_DIR: ./uploads
+          MAX_FILE_SIZE_MB: 10
+          ALLOWED_IMAGE_EXT: jpg,jpeg,png,webp
+          ALLOWED_DOC_EXT: pdf
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT_RAW: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM_NAME: NEWME
+          SMTP_FROM_EMAIL: ${{ secrets.SMTP_FROM_EMAIL }}
+          SMTP_SECURE: "false"
+          CERT_TEMPLATE_DIR: ./uploads/certificates/templates
+          CERT_OUTPUT_DIR: ./uploads/certificates/generated
+          CERT_NUMBER_PREFIX: NEWME
+          CERT_TIMEZONE: Asia/Jakarta
+          CRON_ANALYTICS_CLEANUP: "0 */6 * * *"
+          CRON_TEMP_FILES_CLEANUP: "0 3 * * *"
+          SEED_SUPERADMIN_EMAIL: admin@newme.id
+          SEED_SUPERADMIN_PASSWORD: ${{ secrets.SEED_SUPERADMIN_PASSWORD }}
+          SEED_SUPERADMIN_NAME: Super Admin
+        run: |
+          FRONTEND_PORT="${FRONTEND_PORT_RAW:-80}"
+          SMTP_PORT="${SMTP_PORT_RAW:-2525}"
+          cat > .env.production.rendered <<EOF
+          FRONTEND_IMAGE=${FRONTEND_IMAGE}
+          BACKEND_IMAGE=${BACKEND_IMAGE}
+          BACKEND_TOOLS_IMAGE=${BACKEND_TOOLS_IMAGE}
+          IMAGE_TAG=${IMAGE_TAG}
+          FRONTEND_PORT=${FRONTEND_PORT}
+          REACT_APP_BACKEND_URL=
+          APP_URL=${APP_URL}
+          FRONTEND_URL=${FRONTEND_URL}
+          CORS_ORIGINS=${CORS_ORIGINS}
+          UPLOAD_PUBLIC_BASE_URL=${UPLOAD_PUBLIC_BASE_URL}
+          NODE_ENV=${NODE_ENV}
+          PORT=${PORT}
+          API_PREFIX=${API_PREFIX}
+          APP_NAME=${APP_NAME}
+          TZ=${TZ}
+          LOG_LEVEL=${LOG_LEVEL}
+          TRUST_PROXY=${TRUST_PROXY}
+          MYSQL_DATABASE=${MYSQL_DATABASE}
+          MYSQL_USER=${MYSQL_USER}
+          MYSQL_PASSWORD=${MYSQL_PASSWORD}
+          MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+          DATABASE_URL=${DATABASE_URL}
+          DIRECT_URL=${DIRECT_URL}
+          DB_TX_TIMEOUT_MS=${DB_TX_TIMEOUT_MS}
+          JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+          JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+          JWT_ACCESS_EXPIRES=${JWT_ACCESS_EXPIRES}
+          JWT_REFRESH_EXPIRES=${JWT_REFRESH_EXPIRES}
+          BCRYPT_ROUNDS=${BCRYPT_ROUNDS}
+          RATE_LIMIT_TTL=${RATE_LIMIT_TTL}
+          RATE_LIMIT_LIMIT=${RATE_LIMIT_LIMIT}
+          AUTH_RATE_LIMIT_TTL=${AUTH_RATE_LIMIT_TTL}
+          AUTH_RATE_LIMIT_REGISTER_LIMIT=${AUTH_RATE_LIMIT_REGISTER_LIMIT}
+          AUTH_RATE_LIMIT_LOGIN_LIMIT=${AUTH_RATE_LIMIT_LOGIN_LIMIT}
+          AUTH_RATE_LIMIT_ADMIN_LOGIN_LIMIT=${AUTH_RATE_LIMIT_ADMIN_LOGIN_LIMIT}
+          AUTH_RATE_LIMIT_PASSWORD_RECOVERY_LIMIT=${AUTH_RATE_LIMIT_PASSWORD_RECOVERY_LIMIT}
+          CERT_DOWNLOAD_RATE_LIMIT_TTL=${CERT_DOWNLOAD_RATE_LIMIT_TTL}
+          CERT_DOWNLOAD_RATE_LIMIT=${CERT_DOWNLOAD_RATE_LIMIT}
+          CERT_AI_DOWNLOAD_RATE_LIMIT=${CERT_AI_DOWNLOAD_RATE_LIMIT}
+          CERT_GENERATE_RATE_LIMIT=${CERT_GENERATE_RATE_LIMIT}
+          REDIS_HOST=${REDIS_HOST}
+          REDIS_PORT=${REDIS_PORT}
+          REDIS_PASSWORD=${REDIS_PASSWORD}
+          REDIS_DB=${REDIS_DB}
+          BULLMQ_PREFIX=${BULLMQ_PREFIX}
+          BULLMQ_DEFAULT_REMOVE_ON_COMPLETE=${BULLMQ_DEFAULT_REMOVE_ON_COMPLETE}
+          BULLMQ_DEFAULT_REMOVE_ON_FAIL=${BULLMQ_DEFAULT_REMOVE_ON_FAIL}
+          QUEUE_CONCURRENCY_PAYMENT=${QUEUE_CONCURRENCY_PAYMENT}
+          QUEUE_CONCURRENCY_SCORING=${QUEUE_CONCURRENCY_SCORING}
+          MIDTRANS_IS_PRODUCTION=${MIDTRANS_IS_PRODUCTION}
+          MIDTRANS_SERVER_KEY=${MIDTRANS_SERVER_KEY}
+          MIDTRANS_CLIENT_KEY=${MIDTRANS_CLIENT_KEY}
+          MIDTRANS_MERCHANT_ID=${MIDTRANS_MERCHANT_ID}
+          MIDTRANS_SANITIZED=${MIDTRANS_SANITIZED}
+          MIDTRANS_3DS=${MIDTRANS_3DS}
+          MIDTRANS_WEBHOOK_PATH=${MIDTRANS_WEBHOOK_PATH}
+          PAYMENT_RECONCILE_CRON=${PAYMENT_RECONCILE_CRON}
+          PAYMENT_RECONCILE_WINDOW_MINUTES=${PAYMENT_RECONCILE_WINDOW_MINUTES}
+          STORAGE_DRIVER=${STORAGE_DRIVER}
+          UPLOAD_DIR=${UPLOAD_DIR}
+          MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB}
+          ALLOWED_IMAGE_EXT=${ALLOWED_IMAGE_EXT}
+          ALLOWED_DOC_EXT=${ALLOWED_DOC_EXT}
+          SMTP_HOST=${SMTP_HOST}
+          SMTP_PORT=${SMTP_PORT}
+          SMTP_USER=${SMTP_USER}
+          SMTP_PASS=${SMTP_PASS}
+          SMTP_FROM_NAME=${SMTP_FROM_NAME}
+          SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL}
+          SMTP_SECURE=${SMTP_SECURE}
+          CERT_TEMPLATE_DIR=${CERT_TEMPLATE_DIR}
+          CERT_OUTPUT_DIR=${CERT_OUTPUT_DIR}
+          CERT_NUMBER_PREFIX=${CERT_NUMBER_PREFIX}
+          CERT_TIMEZONE=${CERT_TIMEZONE}
+          CRON_ANALYTICS_CLEANUP=${CRON_ANALYTICS_CLEANUP}
+          CRON_TEMP_FILES_CLEANUP=${CRON_TEMP_FILES_CLEANUP}
+          SEED_SUPERADMIN_EMAIL=${SEED_SUPERADMIN_EMAIL}
+          SEED_SUPERADMIN_PASSWORD=${SEED_SUPERADMIN_PASSWORD}
+          SEED_SUPERADMIN_NAME=${SEED_SUPERADMIN_NAME}
+          EOF
+
+      - name: Validate rendered compose config
+        shell: bash
+        run: docker compose --env-file .env.production.rendered -f docker-compose.prod.yml config > /dev/null
+
+      - name: Create deploy directory on VPS
+        shell: bash
+        run: ssh "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}" "mkdir -p '${{ env.DEPLOY_PATH }}'"
+
+      - name: Copy deployment files to VPS
+        shell: bash
+        run: |
+          scp docker-compose.prod.yml "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_PATH }}/docker-compose.prod.yml"
+          scp .env.production.rendered "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_PATH }}/.env.production"
+
+      - name: Deploy on VPS
+        shell: bash
+        env:
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          RUN_SEED: ${{ inputs.run_seed }}
+        run: |
+          ssh "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}" "
+            set -e
+            cd '${{ env.DEPLOY_PATH }}'
+            if [ -n '${GHCR_READ_TOKEN}' ] && [ -n '${GHCR_USERNAME}' ]; then
+              echo '${GHCR_READ_TOKEN}' | docker login ghcr.io -u '${GHCR_USERNAME}' --password-stdin
+            fi
+            docker compose --env-file .env.production -f docker-compose.prod.yml pull
+            docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+            if [ '${RUN_SEED}' = 'true' ]; then
+              docker compose --env-file .env.production -f docker-compose.prod.yml --profile ops run --rm seed
+            fi
+            docker image prune -f
+          "

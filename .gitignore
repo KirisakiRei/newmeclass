@@ -3,6 +3,7 @@
 
 
 backend/.env
+backend/.env.production
 backend/dist/
 backend/node_modules/
 
@@ -10,7 +11,10 @@ code demo frontend/
 
 frontend/node_modules/
 frontend/.env
+frontend/.env.production
 frontend/dist/
+deploy/vps/*.local.env
+deploy/vps/*.local.md
 
 old code/
 CON
