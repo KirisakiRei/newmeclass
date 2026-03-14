@@ -150,6 +150,57 @@ ufw --force enable
 - Jalankan workflow `Deploy Production`.
 - Isi `git_ref` dan pilih apakah `run_seed` perlu dijalankan.
 
+## Tanpa GitHub Actions
+Kalau Anda tidak ingin memakai GitHub Actions, pakai jalur manual dari VPS.
+
+1. Pastikan code terbaru sudah ada di GitHub branch yang ingin dipakai.
+
+2. Di VPS, install `git` bila belum ada.
+```bash
+apt-get update
+apt-get install -y git
+```
+
+3. Buat file env production di server.
+```bash
+nano /opt/newme/.env.production
+```
+- Isi file ini khusus untuk runtime aplikasi, bukan credential CI/CD.
+- Jangan masukkan `VPS_SSH_KEY`, `VPS_HOST`, `VPS_USERNAME`, atau `GHCR_*`.
+- Gunakan file lokal ini sebagai sumber yang sudah siap:
+  - [deploy/vps/runtime-production.local.env](/c:/Users/LENOVO/Documents/Project/2026/newme/deploy/vps/runtime-production.local.env)
+
+4. Clone repo dan deploy manual.
+```bash
+cd /opt/newme
+git clone --branch dev --single-branch https://github.com/KirisakiRei/newmeclass.git app
+cd app
+docker compose --env-file /opt/newme/.env.production -f docker-compose.vps.yml up -d --build
+```
+
+5. Untuk deploy berikutnya cukup pull lalu rebuild.
+```bash
+cd /opt/newme/app
+git pull --ff-only origin dev
+docker compose --env-file /opt/newme/.env.production -f docker-compose.vps.yml up -d --build
+```
+
+6. Untuk seed awal production jalankan sekali saja.
+```bash
+cd /opt/newme/app
+docker compose --env-file /opt/newme/.env.production -f docker-compose.vps.yml --profile ops run --rm seed
+```
+
+7. Alternatif yang lebih ringkas, pakai script:
+```bash
+bash /opt/newme/app/deploy/vps/manual-deploy.sh dev true
+```
+
+Catatan:
+- Jalur ini tetap production, karena Dockerfile backend/frontend adalah multi-stage build.
+- Yang berjalan di container tetap hasil build, bukan dev server.
+- File compose untuk mode ini ada di [docker-compose.vps.yml](/c:/Users/LENOVO/Documents/Project/2026/newme/docker-compose.vps.yml).
+
 ## Rollback
 - Jalankan workflow yang sama dengan `git_ref` ke commit atau branch release sebelumnya.
 - Workflow akan build ulang image dari ref tersebut, push tag SHA baru, lalu redeploy ke VPS.
