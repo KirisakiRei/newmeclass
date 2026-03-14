@@ -9,24 +9,32 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const enableCompressedAssets = String(env.GENERATE_COMPRESSED_ASSETS || 'true').toLowerCase() !== 'false';
 
-  return {
-    plugins: [
-      // Treat .js files that contain JSX as jsx
-      {
-        name: 'treat-js-as-jsx',
-        async transform(code, id) {
-          if (!id.match(/\.js$/)) return null;
-          return transformWithEsbuild(code, id, { loader: 'jsx', jsx: 'automatic' });
-        },
+  const plugins = [
+    // Treat .js files that contain JSX as jsx
+    {
+      name: 'treat-js-as-jsx',
+      async transform(code, id) {
+        if (!id.match(/\.js$/)) return null;
+        return transformWithEsbuild(code, id, { loader: 'jsx', jsx: 'automatic' });
       },
-      react(),
+    },
+    react(),
+  ];
+
+  if (enableCompressedAssets) {
+    plugins.push(
       // Generate .gz and .br files alongside JS/CSS assets for VPS serving
       compression({
         algorithms: ['gzip', 'brotliCompress'],
         exclude: [/\.(png|jpg|webp|svg|ico)$/],
       }),
-    ],
+    );
+  }
+
+  return {
+    plugins,
     optimizeDeps: {
       esbuildOptions: {
         loader: {

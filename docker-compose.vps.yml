@@ -171,6 +171,7 @@ services:
       dockerfile: Dockerfile
       args:
         REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL:-}
+        GENERATE_COMPRESSED_ASSETS: ${GENERATE_COMPRESSED_ASSETS:-false}
     image: newme-frontend:local
     depends_on:
       backend:

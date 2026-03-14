@@ -200,6 +200,7 @@ Catatan:
 - Jalur ini tetap production, karena Dockerfile backend/frontend adalah multi-stage build.
 - Yang berjalan di container tetap hasil build, bukan dev server.
 - File compose untuk mode ini ada di [docker-compose.vps.yml](/c:/Users/LENOVO/Documents/Project/2026/newme/docker-compose.vps.yml).
+- Untuk VPS kecil, `GENERATE_COMPRESSED_ASSETS=false` direkomendasikan agar build frontend tidak terlalu berat. Opsi ini sudah disiapkan di [deploy/vps/runtime-production.local.env](/c:/Users/LENOVO/Documents/Project/2026/newme/deploy/vps/runtime-production.local.env).
 
 ## Rollback
 - Jalankan workflow yang sama dengan `git_ref` ke commit atau branch release sebelumnya.
