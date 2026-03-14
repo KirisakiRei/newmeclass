@@ -1,0 +1,19 @@
+.tmp-admin-ui-smoke/
+.tmp-admin-ui-smoke/**
+
+
+backend/.env
+backend/dist/
+backend/node_modules/
+
+code demo frontend/
+
+frontend/node_modules/
+frontend/.env
+frontend/dist/
+
+old code/
+CON
+
+test-results/
+dump.rdb
