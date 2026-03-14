@@ -1,0 +1,1 @@
+const i=e=>Array.isArray(e)?e.map(s=>String(s)).filter(Boolean).join(". "):typeof e=="string"?e:"",n=(e,s="Terjadi kesalahan. Silakan coba lagi.")=>{if(!e)return s;const t=i(e.response.data.detail);if(t.trim())return t;const a=i(e.userMessage||e.response.data.message||e.message);return a.trim()?a:s};export{n as g};
