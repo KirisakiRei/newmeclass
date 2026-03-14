@@ -1,0 +1,1828 @@
+{
+  "generatedAt": "2026-03-13T20:30:23.448Z",
+  "users": 100,
+  "healthBefore": {
+    "ok": true,
+    "status": 200,
+    "durationMs": 60.259299999999996,
+    "body": {
+      "success": true,
+      "message": "OK",
+      "data": {
+        "status": "ok",
+        "timestamp": "2026-03-13T20:30:23.502Z",
+        "database": {
+          "ok": true
+        },
+        "redis": {
+          "ok": true,
+          "ping": "PONG",
+          "queue": {
+            "waiting": 0,
+            "active": 0,
+            "completed": 7,
+            "failed": 0,
+            "delayed": 0,
+            "paused": 0
+          }
+        }
+      }
+    },
+    "data": {
+      "status": "ok",
+      "timestamp": "2026-03-13T20:30:23.502Z",
+      "database": {
+        "ok": true
+      },
+      "redis": {
+        "ok": true,
+        "ping": "PONG",
+        "queue": {
+          "waiting": 0,
+          "active": 0,
+          "completed": 7,
+          "failed": 0,
+          "delayed": 0,
+          "paused": 0
+        }
+      }
+    },
+    "headers": {
+      "access-control-allow-credentials": "true",
+      "connection": "keep-alive",
+      "content-length": "231",
+      "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "content-type": "application/json; charset=utf-8",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "date": "Fri, 13 Mar 2026 20:30:23 GMT",
+      "etag": "W/\"e7-KiSr2luiMCywZB86E0yqb256Lps\"",
+      "keep-alive": "timeout=5",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; includeSubDomains",
+      "vary": "Origin",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "SAMEORIGIN",
+      "x-permitted-cross-domain-policies": "none",
+      "x-ratelimit-limit": "120",
+      "x-ratelimit-remaining": "117",
+      "x-ratelimit-reset": "60",
+      "x-xss-protection": "0"
+    }
+  },
+  "stages": {
+    "registration": {
+      "count": 100
+    },
+    "login": {
+      "total": 100,
+      "success": 0,
+      "errors": 100,
+      "minMs": 22.26,
+      "avgMs": 50.63,
+      "p95Ms": 77.65,
+      "maxMs": 81.51,
+      "statusCounts": {
+        "429": 100
+      }
+    },
+    "exam": {
+      "total": 100,
+      "success": 100,
+      "errors": 0,
+      "minMs": 526.67,
+      "avgMs": 539.97,
+      "p95Ms": 550.81,
+      "maxMs": 555.13,
+      "statusCounts": {
+        "201": 100
+      }
+    },
+    "issueCertificate": {
+      "requested": 100,
+      "issued": 100
+    },
+    "downloadCertificate": {
+      "total": 100,
+      "success": 85,
+      "errors": 15,
+      "minMs": 15.91,
+      "avgMs": 84.69,
+      "p95Ms": 103.68,
+      "maxMs": 104.52,
+      "statusCounts": {
+        "200": 85,
+        "429": 15
+      },
+      "pdfSuccessCount": 85
+    },
+    "errorHandling": {
+      "total": 100,
+      "success": 0,
+      "errors": 100,
+      "minMs": 9.33,
+      "avgMs": 25.81,
+      "p95Ms": 50.29,
+      "maxMs": 52.76,
+      "statusCounts": {
+        "401": 35,
+        "429": 65
+      },
+      "expectedClientErrors": 35,
+      "unexpectedStatuses": [
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429,
+        429
+      ]
+    }
+  },
+  "healthAfter": {
+    "ok": true,
+    "status": 200,
+    "durationMs": 3.189100000000053,
+    "body": {
+      "success": true,
+      "message": "OK",
+      "data": {
+        "status": "ok",
+        "timestamp": "2026-03-13T20:30:24.798Z",
+        "database": {
+          "ok": true
+        },
+        "redis": {
+          "ok": true,
+          "ping": "PONG",
+          "queue": {
+            "waiting": 0,
+            "active": 0,
+            "completed": 7,
+            "failed": 0,
+            "delayed": 0,
+            "paused": 0
+          }
+        }
+      }
+    },
+    "data": {
+      "status": "ok",
+      "timestamp": "2026-03-13T20:30:24.798Z",
+      "database": {
+        "ok": true
+      },
+      "redis": {
+        "ok": true,
+        "ping": "PONG",
+        "queue": {
+          "waiting": 0,
+          "active": 0,
+          "completed": 7,
+          "failed": 0,
+          "delayed": 0,
+          "paused": 0
+        }
+      }
+    },
+    "headers": {
+      "access-control-allow-credentials": "true",
+      "connection": "keep-alive",
+      "content-length": "231",
+      "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "content-type": "application/json; charset=utf-8",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "date": "Fri, 13 Mar 2026 20:30:24 GMT",
+      "etag": "W/\"e7-BbAxb8tey49JqRdu1jHbTX8RTWs\"",
+      "keep-alive": "timeout=5",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; includeSubDomains",
+      "vary": "Origin",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "SAMEORIGIN",
+      "x-permitted-cross-domain-policies": "none",
+      "x-ratelimit-limit": "120",
+      "x-ratelimit-remaining": "116",
+      "x-ratelimit-reset": "58",
+      "x-xss-protection": "0"
+    }
+  },
+  "failures": {
+    "login": [
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.689Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.691Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.691Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.692Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.692Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.693Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.693Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.694Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.694Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.695Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.695Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.696Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.696Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.697Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.698Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.699Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.700Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.700Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.701Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.701Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.702Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.702Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.703Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.706Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.706Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.707Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.708Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.708Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.709Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.709Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.711Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.712Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.713Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.713Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.714Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.714Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.715Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.715Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.716Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.717Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.717Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.718Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.720Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.721Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.721Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.722Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.722Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.723Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.723Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.724Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.725Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.726Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.727Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.727Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.728Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.728Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.729Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.729Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.730Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.730Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.731Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.732Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.734Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.734Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.735Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.736Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.737Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.738Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.738Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.739Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.739Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.740Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.742Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.742Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.743Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.744Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.744Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.746Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.747Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.748Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.748Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.749Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.750Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.750Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.751Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.751Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.751Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.752Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.753Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.754Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.755Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.756Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.757Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.758Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.758Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.758Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.760Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.761Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.762Z"
+        }
+      },
+      {
+        "status": 429,
+        "body": {
+          "success": false,
+          "error": "RATE_LIMIT_EXCEEDED",
+          "message": "TOO_MANY_REQUESTS",
+          "detail": "Terlalu banyak percobaan. Silakan tunggu sebentar lalu coba lagi.",
+          "statusCode": 429,
+          "messages": [
+            "ThrottlerException: Too Many Requests"
+          ],
+          "path": "/api/auth/login",
+          "timestamp": "2026-03-13T20:30:23.763Z"
+        }
+      }
+    ],
+    "exam": [],
+    "download": [
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      },
+      {
+        "status": 429
+      }
+    ]
+  }
+}

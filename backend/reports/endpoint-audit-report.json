@@ -1,0 +1,2584 @@
+{
+  "generatedAt": "2026-03-14T09:32:27.599Z",
+  "swaggerSource": "http://localhost:5000/api/docs-json",
+  "summary": {
+    "backendRouteCount": 194,
+    "wrapperRouteCount": 159,
+    "directFrontendRouteCount": 49,
+    "usedFrontendRouteCount": 176,
+    "matchedRouteCount": 173,
+    "mismatchedRouteCount": 3,
+    "unusedBackendRouteCount": 22
+  },
+  "wrapperRoutes": [
+    {
+      "route": "/api/admin/dashboard/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/admin/login",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/admin/me",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/admin/users",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/admin/users/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/admin/users/:param/change-password",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/admin/users/create",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/ai-analysis/analyze",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/ai-analysis/latest",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/ai-analysis/my-analyses",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/analytics/cleanup",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/analytics/online-users",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/analytics/pageview",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/analytics/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/articles",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/articles/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/articles/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/auth/change-password",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/auth/login",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/auth/me",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/auth/profile",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/auth/referral-link",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/auth/register",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/banners",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/banners/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/banners/reorder",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/certificates/check-eligibility",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/certificates/detail/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/certificates/download-ai-certificate",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/certificates/generate-newme/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/certificates/issue",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/certificates/issued",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/certificates/template",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/certificates/template/upload/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/certificates/verify/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/contacts",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/contacts/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/contacts/:param/status",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/contacts/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/health",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/institutions",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/institutions/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/institutions/:param/status",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/institutions/inquiry",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/institutions/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/media",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/media/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/:param/detail",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/:param/reset-password",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/:param/toggle-active",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/:param/verify",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/list",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/price-change-requests",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/price-change-requests/:param/review",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/withdrawals",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/withdrawals/:param/approve",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/withdrawals/:param/reject",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/dashboard/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/login",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/me",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/price-change-requests",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/register",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/wallet",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/withdraw",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/yayasan",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/yayasan/:param/approve",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/yayasan/:param/detail",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/yayasan/:param/price",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/mitra/yayasan/:param/price-change-requests",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/payments",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/payments/:param/approve",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/payments/registration/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/payments/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/payments/upload-proof",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/personality-results",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/personality-results/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/personality-tests/descriptions/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/personality-tests/my-results",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/personality-tests/questions/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/personality-tests/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/personality-tests/submit",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/products",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/products/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/products/categories/list",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/products/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/products/upload-image",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/questions",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/questions/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/questions/categories/list",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/questions/reorder",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/questions/seed-questions",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/referrals/leaderboard",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/referrals/settings",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/referrals/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/referrals/transactions",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/registrations",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/registrations/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/registrations/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/running-info",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/running-info/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/running-info/all",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/settings",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/settings/banner/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/settings/jenjang-config",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/settings/test-price",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/settings/upload/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/test-access/check",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/test-access/record-free-test",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/test-results",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/test-results/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/test-results/admin/premium-results",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/test-results/admin/premium-results/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/test-results/admin/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/test-results/check-free-test/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/transactions",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/transactions/:param/status",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/transactions/create",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/transactions/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/user-payments/check-payment/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/user-payments/check-qris/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/user-payments/create-qris",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/user-payments/create-snap",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/user-payments/my-payments",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/user-payments/status/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/user-payments/test-price",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/user-payments/upload-proof",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/users",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/users/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/users/:param/status",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/users/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/wallet/balance/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/wallet/check-status/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/wallet/pay-test",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/wallet/topup",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/wallet/transactions/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/activities",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/activities/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/hero-slides",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/hero-slides/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/products",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/products/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/testimonials",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/testimonials/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/:param/detail",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/:param/toggle-active",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/:param/verify",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/list",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/withdrawals",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/withdrawals/:param/approve",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/withdrawals/:param/reject",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/dashboard/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/login",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/me",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/register",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/test-results",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/users",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/users/:param/detail",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/wallet",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/yayasan/wallet/withdraw",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    }
+  ],
+  "directFrontendRoutes": [
+    {
+      "route": "/api/articles",
+      "sources": [
+        "frontend\\pages\\landingpage\\ArticleDetail.tsx",
+        "frontend\\pages\\landingpage\\ArticlesPage.tsx"
+      ]
+    },
+    {
+      "route": "/api/articles/:param",
+      "sources": [
+        "frontend\\pages\\landingpage\\ArticleDetail.tsx"
+      ]
+    },
+    {
+      "route": "/api/auth/forgot-password",
+      "sources": [
+        "frontend\\pages\\auth\\ForgotPassword.tsx"
+      ]
+    },
+    {
+      "route": "/api/auth/reset-password",
+      "sources": [
+        "frontend\\pages\\auth\\ResetPassword.tsx"
+      ]
+    },
+    {
+      "route": "/api/certificates/download/:param",
+      "sources": [
+        "frontend\\pages\\landingpage\\CertificateVerify.tsx"
+      ]
+    },
+    {
+      "route": "/api/finance/disbursements",
+      "sources": [
+        "frontend\\pages\\admin\\Transaksi.tsx"
+      ]
+    },
+    {
+      "route": "/api/finance/disbursements/:param/process",
+      "sources": [
+        "frontend\\pages\\admin\\Transaksi.tsx"
+      ]
+    },
+    {
+      "route": "/api/finance/disbursements/developer",
+      "sources": [
+        "frontend\\pages\\admin\\LaporanPendapatan.tsx"
+      ]
+    },
+    {
+      "route": "/api/finance/revenue",
+      "sources": [
+        "frontend\\pages\\admin\\LaporanPendapatan.tsx"
+      ]
+    },
+    {
+      "route": "/api/finance/transactions",
+      "sources": [
+        "frontend\\pages\\admin\\LaporanPendapatan.tsx",
+        "frontend\\pages\\admin\\Transaksi.tsx"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/:param/detail",
+      "sources": [
+        "frontend\\pages\\admin\\AdminMitra.tsx"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/:param/reset-password",
+      "sources": [
+        "frontend\\pages\\admin\\AdminMitra.tsx"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/:param/toggle-active",
+      "sources": [
+        "frontend\\pages\\admin\\AdminMitra.tsx"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/:param/verify",
+      "sources": [
+        "frontend\\pages\\admin\\AdminMitra.tsx"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/list",
+      "sources": [
+        "frontend\\pages\\admin\\AdminMitra.tsx"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/withdrawals",
+      "sources": [
+        "frontend\\pages\\admin\\AdminMitraWithdrawals.tsx"
+      ]
+    },
+    {
+      "route": "/api/mitra/admin/withdrawals/:param/approve",
+      "sources": [
+        "frontend\\pages\\admin\\AdminMitraWithdrawals.tsx"
+      ]
+    },
+    {
+      "route": "/api/payments",
+      "sources": [
+        "frontend\\pages\\admin\\Payments.tsx"
+      ]
+    },
+    {
+      "route": "/api/payments/:param/approve",
+      "sources": [
+        "frontend\\pages\\admin\\Payments.tsx"
+      ]
+    },
+    {
+      "route": "/api/payments/stats/summary",
+      "sources": [
+        "frontend\\pages\\admin\\Payments.tsx"
+      ]
+    },
+    {
+      "route": "/api/personality-tests/questions/:param",
+      "sources": [
+        "frontend\\pages\\landingpage\\PersonalityTest.tsx"
+      ]
+    },
+    {
+      "route": "/api/personality-tests/submit",
+      "sources": [
+        "frontend\\pages\\landingpage\\PersonalityTest.tsx"
+      ]
+    },
+    {
+      "route": "/api/settings",
+      "sources": [
+        "frontend\\contexts\\ThemeContext.tsx",
+        "frontend\\pages\\admin\\LaporanPendapatan.tsx",
+        "frontend\\pages\\admin\\Settings.tsx",
+        "frontend\\pages\\admin\\TeamManagement.tsx",
+        "frontend\\pages\\landingpage\\CompanyProfile.tsx",
+        "frontend\\pages\\landingpage\\Contact.tsx",
+        "frontend\\pages\\landingpage\\Home.tsx",
+        "frontend\\pages\\landingpage\\KelasGaliBakat.tsx",
+        "frontend\\pages\\landingpage\\Services.tsx"
+      ]
+    },
+    {
+      "route": "/api/settings/upload/:param",
+      "sources": [
+        "frontend\\pages\\admin\\Settings.tsx"
+      ]
+    },
+    {
+      "route": "/api/settings/upload/team",
+      "sources": [
+        "frontend\\pages\\admin\\TeamManagement.tsx"
+      ]
+    },
+    {
+      "route": "/api/test-results/admin/premium-results",
+      "sources": [
+        "frontend\\pages\\admin\\PremiumResults.tsx"
+      ]
+    },
+    {
+      "route": "/api/test-results/admin/premium-results/:param",
+      "sources": [
+        "frontend\\pages\\admin\\PremiumResults.tsx"
+      ]
+    },
+    {
+      "route": "/api/test-results/admin/stats",
+      "sources": [
+        "frontend\\pages\\admin\\PremiumResults.tsx"
+      ]
+    },
+    {
+      "route": "/api/upload/image",
+      "sources": [
+        "frontend\\components\\admin\\SharedImageUploader.tsx",
+        "frontend\\pages\\admin\\Articles.tsx",
+        "frontend\\pages\\admin\\Banners.tsx",
+        "frontend\\pages\\admin\\MediaGallery.tsx",
+        "frontend\\pages\\admin\\WebsiteContent.tsx"
+      ]
+    },
+    {
+      "route": "/api/users",
+      "sources": [
+        "frontend\\pages\\admin\\Users.tsx"
+      ]
+    },
+    {
+      "route": "/api/users/:param",
+      "sources": [
+        "frontend\\pages\\admin\\Users.tsx"
+      ]
+    },
+    {
+      "route": "/api/users/:param/ban",
+      "sources": [
+        "frontend\\pages\\admin\\Users.tsx"
+      ]
+    },
+    {
+      "route": "/api/users/:param/reset-password",
+      "sources": [
+        "frontend\\pages\\admin\\Users.tsx"
+      ]
+    },
+    {
+      "route": "/api/users/:param/unban",
+      "sources": [
+        "frontend\\pages\\admin\\Users.tsx"
+      ]
+    },
+    {
+      "route": "/api/users/stats/summary",
+      "sources": [
+        "frontend\\pages\\admin\\Users.tsx"
+      ]
+    },
+    {
+      "route": "/api/website-content/activities",
+      "sources": [
+        "frontend\\components\\ActivitiesSection.tsx"
+      ]
+    },
+    {
+      "route": "/api/website-content/hero-slides",
+      "sources": [
+        "frontend\\components\\HeroCarousel.tsx"
+      ]
+    },
+    {
+      "route": "/api/website-content/products",
+      "sources": [
+        "frontend\\components\\ProductSlider.tsx"
+      ]
+    },
+    {
+      "route": "/api/website-content/sections",
+      "sources": [
+        "frontend\\pages\\admin\\WebsiteContent.tsx",
+        "frontend\\pages\\landingpage\\Home.tsx"
+      ]
+    },
+    {
+      "route": "/api/website-content/sections/:param",
+      "sources": [
+        "frontend\\pages\\admin\\WebsiteContent.tsx"
+      ]
+    },
+    {
+      "route": "/api/website-content/sections/reorder",
+      "sources": [
+        "frontend\\pages\\admin\\WebsiteContent.tsx"
+      ]
+    },
+    {
+      "route": "/api/website-content/seed-defaults",
+      "sources": [
+        "frontend\\pages\\admin\\WebsiteContent.tsx"
+      ]
+    },
+    {
+      "route": "/api/website-content/testimonials",
+      "sources": [
+        "frontend\\components\\TestimonialSlider.tsx"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/:param/detail",
+      "sources": [
+        "frontend\\pages\\admin\\AdminYayasan.tsx"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/:param/toggle-active",
+      "sources": [
+        "frontend\\pages\\admin\\AdminYayasan.tsx"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/:param/verify",
+      "sources": [
+        "frontend\\pages\\admin\\AdminYayasan.tsx"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/list",
+      "sources": [
+        "frontend\\pages\\admin\\AdminYayasan.tsx"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/withdrawals",
+      "sources": [
+        "frontend\\pages\\admin\\AdminWithdrawals.tsx"
+      ]
+    },
+    {
+      "route": "/api/yayasan/admin/withdrawals/:param/approve",
+      "sources": [
+        "frontend\\pages\\admin\\AdminWithdrawals.tsx"
+      ]
+    }
+  ],
+  "matchedRoutes": [
+    {
+      "route": "/api/admin/dashboard/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/admin/dashboard/stats"
+    },
+    {
+      "route": "/api/admin/login",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/admin/login"
+    },
+    {
+      "route": "/api/admin/me",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/admin/me"
+    },
+    {
+      "route": "/api/admin/users",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/admin/users"
+    },
+    {
+      "route": "/api/admin/users/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/admin/users/:param"
+    },
+    {
+      "route": "/api/admin/users/:param/change-password",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/admin/users/:param/change-password"
+    },
+    {
+      "route": "/api/admin/users/create",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/admin/users/:param"
+    },
+    {
+      "route": "/api/ai-analysis/analyze",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/ai-analysis/analyze"
+    },
+    {
+      "route": "/api/ai-analysis/latest",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/ai-analysis/latest"
+    },
+    {
+      "route": "/api/ai-analysis/my-analyses",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/ai-analysis/my-analyses"
+    },
+    {
+      "route": "/api/analytics/cleanup",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/analytics/cleanup"
+    },
+    {
+      "route": "/api/analytics/online-users",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/analytics/online-users"
+    },
+    {
+      "route": "/api/analytics/pageview",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/analytics/pageview"
+    },
+    {
+      "route": "/api/analytics/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/analytics/stats"
+    },
+    {
+      "route": "/api/articles",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\landingpage\\ArticleDetail.tsx",
+        "frontend\\pages\\landingpage\\ArticlesPage.tsx"
+      ],
+      "backendRoute": "/api/articles"
+    },
+    {
+      "route": "/api/articles/:param",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\landingpage\\ArticleDetail.tsx"
+      ],
+      "backendRoute": "/api/articles/:param"
+    },
+    {
+      "route": "/api/articles/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/articles/stats/summary"
+    },
+    {
+      "route": "/api/auth/change-password",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/auth/change-password"
+    },
+    {
+      "route": "/api/auth/forgot-password",
+      "sources": [
+        "frontend\\pages\\auth\\ForgotPassword.tsx"
+      ],
+      "backendRoute": "/api/auth/forgot-password"
+    },
+    {
+      "route": "/api/auth/login",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/auth/login"
+    },
+    {
+      "route": "/api/auth/me",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/auth/me"
+    },
+    {
+      "route": "/api/auth/profile",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/auth/profile"
+    },
+    {
+      "route": "/api/auth/referral-link",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/auth/referral-link"
+    },
+    {
+      "route": "/api/auth/register",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/auth/register"
+    },
+    {
+      "route": "/api/auth/reset-password",
+      "sources": [
+        "frontend\\pages\\auth\\ResetPassword.tsx"
+      ],
+      "backendRoute": "/api/auth/reset-password"
+    },
+    {
+      "route": "/api/banners",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/banners"
+    },
+    {
+      "route": "/api/banners/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/banners/:param"
+    },
+    {
+      "route": "/api/banners/reorder",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/banners/:param"
+    },
+    {
+      "route": "/api/certificates/check-eligibility",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/certificates/check-eligibility"
+    },
+    {
+      "route": "/api/certificates/detail/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/certificates/detail/:param"
+    },
+    {
+      "route": "/api/certificates/download-ai-certificate",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/certificates/download-ai-certificate"
+    },
+    {
+      "route": "/api/certificates/download/:param",
+      "sources": [
+        "frontend\\pages\\landingpage\\CertificateVerify.tsx"
+      ],
+      "backendRoute": "/api/certificates/download/:param"
+    },
+    {
+      "route": "/api/certificates/generate-newme/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/certificates/generate-newme/:param"
+    },
+    {
+      "route": "/api/certificates/issue",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/certificates/issue"
+    },
+    {
+      "route": "/api/certificates/issued",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/certificates/issued"
+    },
+    {
+      "route": "/api/certificates/template",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/certificates/template"
+    },
+    {
+      "route": "/api/certificates/template/upload/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/certificates/template/upload/:param"
+    },
+    {
+      "route": "/api/certificates/verify/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/certificates/verify/:param"
+    },
+    {
+      "route": "/api/contacts",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/contacts"
+    },
+    {
+      "route": "/api/contacts/:param/status",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/contacts/:param/status"
+    },
+    {
+      "route": "/api/contacts/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/contacts/stats/summary"
+    },
+    {
+      "route": "/api/finance/disbursements",
+      "sources": [
+        "frontend\\pages\\admin\\Transaksi.tsx"
+      ],
+      "backendRoute": "/api/finance/disbursements"
+    },
+    {
+      "route": "/api/finance/disbursements/:param/process",
+      "sources": [
+        "frontend\\pages\\admin\\Transaksi.tsx"
+      ],
+      "backendRoute": "/api/finance/disbursements/:param/process"
+    },
+    {
+      "route": "/api/finance/disbursements/developer",
+      "sources": [
+        "frontend\\pages\\admin\\LaporanPendapatan.tsx"
+      ],
+      "backendRoute": "/api/finance/disbursements/developer"
+    },
+    {
+      "route": "/api/finance/revenue",
+      "sources": [
+        "frontend\\pages\\admin\\LaporanPendapatan.tsx"
+      ],
+      "backendRoute": "/api/finance/revenue"
+    },
+    {
+      "route": "/api/finance/transactions",
+      "sources": [
+        "frontend\\pages\\admin\\LaporanPendapatan.tsx",
+        "frontend\\pages\\admin\\Transaksi.tsx"
+      ],
+      "backendRoute": "/api/finance/transactions"
+    },
+    {
+      "route": "/api/health",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/health"
+    },
+    {
+      "route": "/api/institutions",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/institutions"
+    },
+    {
+      "route": "/api/institutions/:param/status",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/institutions/:param/status"
+    },
+    {
+      "route": "/api/institutions/inquiry",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/institutions/inquiry"
+    },
+    {
+      "route": "/api/institutions/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/institutions/stats/summary"
+    },
+    {
+      "route": "/api/media",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/media"
+    },
+    {
+      "route": "/api/media/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/media/:param"
+    },
+    {
+      "route": "/api/mitra/admin/:param/detail",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminMitra.tsx"
+      ],
+      "backendRoute": "/api/mitra/admin/:param/detail"
+    },
+    {
+      "route": "/api/mitra/admin/:param/reset-password",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminMitra.tsx"
+      ],
+      "backendRoute": "/api/mitra/admin/:param/reset-password"
+    },
+    {
+      "route": "/api/mitra/admin/:param/toggle-active",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminMitra.tsx"
+      ],
+      "backendRoute": "/api/mitra/admin/:param/toggle-active"
+    },
+    {
+      "route": "/api/mitra/admin/:param/verify",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminMitra.tsx"
+      ],
+      "backendRoute": "/api/mitra/admin/:param/verify"
+    },
+    {
+      "route": "/api/mitra/admin/list",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminMitra.tsx"
+      ],
+      "backendRoute": "/api/mitra/admin/list"
+    },
+    {
+      "route": "/api/mitra/admin/price-change-requests",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/admin/price-change-requests"
+    },
+    {
+      "route": "/api/mitra/admin/price-change-requests/:param/review",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/admin/price-change-requests/:param/review"
+    },
+    {
+      "route": "/api/mitra/admin/withdrawals",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminMitraWithdrawals.tsx"
+      ],
+      "backendRoute": "/api/mitra/admin/withdrawals"
+    },
+    {
+      "route": "/api/mitra/admin/withdrawals/:param/approve",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminMitraWithdrawals.tsx"
+      ],
+      "backendRoute": "/api/mitra/admin/withdrawals/:param/approve"
+    },
+    {
+      "route": "/api/mitra/admin/withdrawals/:param/reject",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/admin/withdrawals/:param/reject"
+    },
+    {
+      "route": "/api/mitra/dashboard/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/dashboard/stats"
+    },
+    {
+      "route": "/api/mitra/login",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/login"
+    },
+    {
+      "route": "/api/mitra/me",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/me"
+    },
+    {
+      "route": "/api/mitra/price-change-requests",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/price-change-requests"
+    },
+    {
+      "route": "/api/mitra/register",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/register"
+    },
+    {
+      "route": "/api/mitra/wallet",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/wallet"
+    },
+    {
+      "route": "/api/mitra/withdraw",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/withdraw"
+    },
+    {
+      "route": "/api/mitra/yayasan",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/yayasan"
+    },
+    {
+      "route": "/api/mitra/yayasan/:param/approve",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/yayasan/:param/approve"
+    },
+    {
+      "route": "/api/mitra/yayasan/:param/detail",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/yayasan/:param/detail"
+    },
+    {
+      "route": "/api/mitra/yayasan/:param/price",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/yayasan/:param/price"
+    },
+    {
+      "route": "/api/mitra/yayasan/:param/price-change-requests",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/mitra/yayasan/:param/price-change-requests"
+    },
+    {
+      "route": "/api/payments",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\Payments.tsx"
+      ],
+      "backendRoute": "/api/payments"
+    },
+    {
+      "route": "/api/payments/:param/approve",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\Payments.tsx"
+      ],
+      "backendRoute": "/api/payments/:param/approve"
+    },
+    {
+      "route": "/api/payments/registration/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/payments/registration/:param"
+    },
+    {
+      "route": "/api/payments/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\Payments.tsx"
+      ],
+      "backendRoute": "/api/payments/stats/summary"
+    },
+    {
+      "route": "/api/payments/upload-proof",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/payments/upload-proof"
+    },
+    {
+      "route": "/api/personality-results",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/personality-results"
+    },
+    {
+      "route": "/api/personality-results/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/personality-results/:param"
+    },
+    {
+      "route": "/api/personality-tests/descriptions/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/personality-tests/descriptions/:param"
+    },
+    {
+      "route": "/api/personality-tests/my-results",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/personality-tests/my-results"
+    },
+    {
+      "route": "/api/personality-tests/questions/:param",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\landingpage\\PersonalityTest.tsx"
+      ],
+      "backendRoute": "/api/personality-tests/questions/:param"
+    },
+    {
+      "route": "/api/personality-tests/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/personality-tests/stats"
+    },
+    {
+      "route": "/api/personality-tests/submit",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\landingpage\\PersonalityTest.tsx"
+      ],
+      "backendRoute": "/api/personality-tests/submit"
+    },
+    {
+      "route": "/api/products",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/products"
+    },
+    {
+      "route": "/api/products/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/products/:param"
+    },
+    {
+      "route": "/api/products/categories/list",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/products/categories/list"
+    },
+    {
+      "route": "/api/products/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/products/stats/summary"
+    },
+    {
+      "route": "/api/products/upload-image",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/products/:param"
+    },
+    {
+      "route": "/api/questions",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/questions"
+    },
+    {
+      "route": "/api/questions/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/questions/:param"
+    },
+    {
+      "route": "/api/questions/categories/list",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/questions/categories/list"
+    },
+    {
+      "route": "/api/questions/reorder",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/questions/:param"
+    },
+    {
+      "route": "/api/questions/seed-questions",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/questions/:param"
+    },
+    {
+      "route": "/api/referrals/leaderboard",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/referrals/leaderboard"
+    },
+    {
+      "route": "/api/referrals/settings",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/referrals/settings"
+    },
+    {
+      "route": "/api/referrals/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/referrals/stats"
+    },
+    {
+      "route": "/api/referrals/transactions",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/referrals/transactions"
+    },
+    {
+      "route": "/api/registrations",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/registrations"
+    },
+    {
+      "route": "/api/registrations/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/registrations/stats/summary"
+    },
+    {
+      "route": "/api/running-info",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/running-info"
+    },
+    {
+      "route": "/api/running-info/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/running-info/:param"
+    },
+    {
+      "route": "/api/running-info/all",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/running-info/:param"
+    },
+    {
+      "route": "/api/settings",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\contexts\\ThemeContext.tsx",
+        "frontend\\pages\\admin\\LaporanPendapatan.tsx",
+        "frontend\\pages\\admin\\Settings.tsx",
+        "frontend\\pages\\admin\\TeamManagement.tsx",
+        "frontend\\pages\\landingpage\\CompanyProfile.tsx",
+        "frontend\\pages\\landingpage\\Contact.tsx",
+        "frontend\\pages\\landingpage\\Home.tsx",
+        "frontend\\pages\\landingpage\\KelasGaliBakat.tsx",
+        "frontend\\pages\\landingpage\\Services.tsx"
+      ],
+      "backendRoute": "/api/settings"
+    },
+    {
+      "route": "/api/settings/banner/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/settings/banner/:param"
+    },
+    {
+      "route": "/api/settings/jenjang-config",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/settings/jenjang-config"
+    },
+    {
+      "route": "/api/settings/test-price",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/settings/test-price"
+    },
+    {
+      "route": "/api/settings/upload/:param",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\Settings.tsx"
+      ],
+      "backendRoute": "/api/settings/upload/:param"
+    },
+    {
+      "route": "/api/settings/upload/team",
+      "sources": [
+        "frontend\\pages\\admin\\TeamManagement.tsx"
+      ],
+      "backendRoute": "/api/settings/upload/:param"
+    },
+    {
+      "route": "/api/test-access/check",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/test-access/check"
+    },
+    {
+      "route": "/api/test-access/record-free-test",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/test-access/record-free-test"
+    },
+    {
+      "route": "/api/test-results",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/test-results"
+    },
+    {
+      "route": "/api/test-results/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/test-results/:param"
+    },
+    {
+      "route": "/api/test-results/admin/premium-results",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\PremiumResults.tsx"
+      ],
+      "backendRoute": "/api/test-results/admin/premium-results"
+    },
+    {
+      "route": "/api/test-results/admin/premium-results/:param",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\PremiumResults.tsx"
+      ],
+      "backendRoute": "/api/test-results/admin/premium-results/:param"
+    },
+    {
+      "route": "/api/test-results/admin/stats",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\PremiumResults.tsx"
+      ],
+      "backendRoute": "/api/test-results/admin/stats"
+    },
+    {
+      "route": "/api/test-results/check-free-test/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/test-results/check-free-test/:param"
+    },
+    {
+      "route": "/api/transactions",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/transactions"
+    },
+    {
+      "route": "/api/transactions/:param/status",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/transactions/:param/status"
+    },
+    {
+      "route": "/api/transactions/create",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/transactions/create"
+    },
+    {
+      "route": "/api/transactions/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/transactions/stats/summary"
+    },
+    {
+      "route": "/api/upload/image",
+      "sources": [
+        "frontend\\components\\admin\\SharedImageUploader.tsx",
+        "frontend\\pages\\admin\\Articles.tsx",
+        "frontend\\pages\\admin\\Banners.tsx",
+        "frontend\\pages\\admin\\MediaGallery.tsx",
+        "frontend\\pages\\admin\\WebsiteContent.tsx"
+      ],
+      "backendRoute": "/api/upload/image"
+    },
+    {
+      "route": "/api/user-payments/check-payment/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/user-payments/check-payment/:param"
+    },
+    {
+      "route": "/api/user-payments/check-qris/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/user-payments/check-qris/:param"
+    },
+    {
+      "route": "/api/user-payments/create-qris",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/user-payments/create-qris"
+    },
+    {
+      "route": "/api/user-payments/create-snap",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/user-payments/create-snap"
+    },
+    {
+      "route": "/api/user-payments/my-payments",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/user-payments/my-payments"
+    },
+    {
+      "route": "/api/user-payments/status/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/user-payments/status/:param"
+    },
+    {
+      "route": "/api/user-payments/test-price",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/user-payments/test-price"
+    },
+    {
+      "route": "/api/user-payments/upload-proof",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/user-payments/upload-proof"
+    },
+    {
+      "route": "/api/users",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\Users.tsx"
+      ],
+      "backendRoute": "/api/users"
+    },
+    {
+      "route": "/api/users/:param",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\Users.tsx"
+      ],
+      "backendRoute": "/api/users/:param"
+    },
+    {
+      "route": "/api/users/:param/ban",
+      "sources": [
+        "frontend\\pages\\admin\\Users.tsx"
+      ],
+      "backendRoute": "/api/users/:param/ban"
+    },
+    {
+      "route": "/api/users/:param/reset-password",
+      "sources": [
+        "frontend\\pages\\admin\\Users.tsx"
+      ],
+      "backendRoute": "/api/users/:param/reset-password"
+    },
+    {
+      "route": "/api/users/:param/status",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/users/:param/status"
+    },
+    {
+      "route": "/api/users/:param/unban",
+      "sources": [
+        "frontend\\pages\\admin\\Users.tsx"
+      ],
+      "backendRoute": "/api/users/:param/unban"
+    },
+    {
+      "route": "/api/users/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\Users.tsx"
+      ],
+      "backendRoute": "/api/users/stats/summary"
+    },
+    {
+      "route": "/api/wallet/balance/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/wallet/balance/:param"
+    },
+    {
+      "route": "/api/wallet/check-status/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/wallet/check-status/:param"
+    },
+    {
+      "route": "/api/wallet/pay-test",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/wallet/pay-test"
+    },
+    {
+      "route": "/api/wallet/topup",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/wallet/topup"
+    },
+    {
+      "route": "/api/wallet/transactions/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/wallet/transactions/:param"
+    },
+    {
+      "route": "/api/website-content/activities",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\components\\ActivitiesSection.tsx"
+      ],
+      "backendRoute": "/api/website-content/activities"
+    },
+    {
+      "route": "/api/website-content/activities/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/website-content/activities/:param"
+    },
+    {
+      "route": "/api/website-content/hero-slides",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\components\\HeroCarousel.tsx"
+      ],
+      "backendRoute": "/api/website-content/hero-slides"
+    },
+    {
+      "route": "/api/website-content/hero-slides/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/website-content/hero-slides/:param"
+    },
+    {
+      "route": "/api/website-content/products",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\components\\ProductSlider.tsx"
+      ],
+      "backendRoute": "/api/website-content/products"
+    },
+    {
+      "route": "/api/website-content/products/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/website-content/products/:param"
+    },
+    {
+      "route": "/api/website-content/sections",
+      "sources": [
+        "frontend\\pages\\admin\\WebsiteContent.tsx",
+        "frontend\\pages\\landingpage\\Home.tsx"
+      ],
+      "backendRoute": "/api/website-content/sections"
+    },
+    {
+      "route": "/api/website-content/sections/:param",
+      "sources": [
+        "frontend\\pages\\admin\\WebsiteContent.tsx"
+      ],
+      "backendRoute": "/api/website-content/sections/:param"
+    },
+    {
+      "route": "/api/website-content/sections/reorder",
+      "sources": [
+        "frontend\\pages\\admin\\WebsiteContent.tsx"
+      ],
+      "backendRoute": "/api/website-content/sections/:param"
+    },
+    {
+      "route": "/api/website-content/seed-defaults",
+      "sources": [
+        "frontend\\pages\\admin\\WebsiteContent.tsx"
+      ],
+      "backendRoute": "/api/website-content/seed-defaults"
+    },
+    {
+      "route": "/api/website-content/testimonials",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\components\\TestimonialSlider.tsx"
+      ],
+      "backendRoute": "/api/website-content/testimonials"
+    },
+    {
+      "route": "/api/website-content/testimonials/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/website-content/testimonials/:param"
+    },
+    {
+      "route": "/api/yayasan/admin/:param/detail",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminYayasan.tsx"
+      ],
+      "backendRoute": "/api/yayasan/admin/:param/detail"
+    },
+    {
+      "route": "/api/yayasan/admin/:param/toggle-active",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminYayasan.tsx"
+      ],
+      "backendRoute": "/api/yayasan/admin/:param/toggle-active"
+    },
+    {
+      "route": "/api/yayasan/admin/:param/verify",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminYayasan.tsx"
+      ],
+      "backendRoute": "/api/yayasan/admin/:param/verify"
+    },
+    {
+      "route": "/api/yayasan/admin/list",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminYayasan.tsx"
+      ],
+      "backendRoute": "/api/yayasan/admin/list"
+    },
+    {
+      "route": "/api/yayasan/admin/withdrawals",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminWithdrawals.tsx"
+      ],
+      "backendRoute": "/api/yayasan/admin/withdrawals"
+    },
+    {
+      "route": "/api/yayasan/admin/withdrawals/:param/approve",
+      "sources": [
+        "frontend\\services\\api.ts",
+        "frontend\\pages\\admin\\AdminWithdrawals.tsx"
+      ],
+      "backendRoute": "/api/yayasan/admin/withdrawals/:param/approve"
+    },
+    {
+      "route": "/api/yayasan/admin/withdrawals/:param/reject",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/yayasan/admin/withdrawals/:param/reject"
+    },
+    {
+      "route": "/api/yayasan/dashboard/stats",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/yayasan/dashboard/stats"
+    },
+    {
+      "route": "/api/yayasan/login",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/yayasan/login"
+    },
+    {
+      "route": "/api/yayasan/me",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/yayasan/me"
+    },
+    {
+      "route": "/api/yayasan/register",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/yayasan/register"
+    },
+    {
+      "route": "/api/yayasan/test-results",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/yayasan/test-results"
+    },
+    {
+      "route": "/api/yayasan/users",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/yayasan/users"
+    },
+    {
+      "route": "/api/yayasan/users/:param/detail",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/yayasan/users/:param/detail"
+    },
+    {
+      "route": "/api/yayasan/wallet",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/yayasan/wallet"
+    },
+    {
+      "route": "/api/yayasan/wallet/withdraw",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/yayasan/wallet/withdraw"
+    }
+  ],
+  "mismatchedRoutes": [
+    {
+      "route": "/api/contacts/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/institutions/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/registrations/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    }
+  ],
+  "unusedBackendRoutes": [
+    "/api/admin/mitra",
+    "/api/admin/mitra/:param/reset-password",
+    "/api/admin/mitra/:param/toggle-active",
+    "/api/admin/mitra/:param/verify",
+    "/api/admin/mitra/stats",
+    "/api/admin/mitra/withdrawals",
+    "/api/admin/mitra/withdrawals/:param/approve",
+    "/api/admin/mitra/withdrawals/:param/reject",
+    "/api/admin/withdrawals",
+    "/api/admin/withdrawals/:param/approve",
+    "/api/admin/withdrawals/:param/reject",
+    "/api/admin/yayasan",
+    "/api/admin/yayasan/:param",
+    "/api/admin/yayasan/:param/approve",
+    "/api/admin/yayasan/:param/toggle",
+    "/api/mitra/stats",
+    "/api/mitra/wallet/withdraw",
+    "/api/payments/midtrans/webhook",
+    "/api/payments/reconcile",
+    "/api/settings/general",
+    "/api/website-content/section-images",
+    "/api/yayasan/referral-price"
+  ]
+}

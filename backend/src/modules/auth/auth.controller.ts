@@ -1,0 +1,199 @@
+import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
+import { Role } from '@prisma/client';
+import { Throttle } from '@nestjs/throttler';
+import { Request, Response } from 'express';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { AuthService } from './auth.service';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+
+const AUTH_RATE_LIMIT_TTL_MS = Number(process.env.AUTH_RATE_LIMIT_TTL || 60) * 1000;
+const AUTH_REGISTER_RATE_LIMIT = Number(process.env.AUTH_RATE_LIMIT_REGISTER_LIMIT || 20);
+const AUTH_LOGIN_RATE_LIMIT = Number(process.env.AUTH_RATE_LIMIT_LOGIN_LIMIT || 20);
+const AUTH_ADMIN_LOGIN_RATE_LIMIT = Number(process.env.AUTH_RATE_LIMIT_ADMIN_LOGIN_LIMIT || 8);
+const AUTH_PASSWORD_RECOVERY_RATE_LIMIT = Number(process.env.AUTH_RATE_LIMIT_PASSWORD_RECOVERY_LIMIT || 8);
+
+const getFrontendBaseUrl = () => {
+  const fallbackOrigin = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .find(Boolean);
+  return String(process.env.FRONTEND_URL || fallbackOrigin || 'http://localhost:5173').replace(/\/+$/, '');
+};
+
+const buildFrontendRedirect = (path: string, query: Request['query']) => {
+  const url = new URL(path.startsWith('/') ? path : `/${path}`, `${getFrontendBaseUrl()}/`);
+
+  for (const [key, rawValue] of Object.entries(query || {})) {
+    if (Array.isArray(rawValue)) {
+      rawValue
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+        .forEach((value) => url.searchParams.append(key, value));
+      continue;
+    }
+
+    const value = String(rawValue || '').trim();
+    if (!value) continue;
+    url.searchParams.set(key, value);
+  }
+
+  return url.toString();
+};
+
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('register')
+  register(@Body() body: RegisterDto) {
+    return this.authService.register(body, Role.USER);
+  }
+
+  @Get('register')
+  registerRedirect(@Req() req: Request, @Res() res: Response) {
+    return res.redirect(302, buildFrontendRedirect('/register', req.query));
+  }
+
+  @Throttle({ default: { limit: AUTH_LOGIN_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('login')
+  login(@Body() body: LoginDto) {
+    return this.authService.login(body, Role.USER);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  me(@CurrentUser() user: any) {
+    return this.authService.getProfile(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('profile')
+  updateProfile(@CurrentUser() user: any, @Body() body: UpdateProfileDto) {
+    return this.authService.updateProfile(user.sub, body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('change-password')
+  changePassword(@CurrentUser() user: any, @Body() body: ChangePasswordDto) {
+    return this.authService.changePassword(user.sub, body);
+  }
+
+  @Throttle({ default: { limit: AUTH_PASSWORD_RECOVERY_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('forgot-password')
+  forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.authService.forgotPassword(body.email);
+  }
+
+  @Throttle({ default: { limit: AUTH_PASSWORD_RECOVERY_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('reset-password')
+  resetPassword(@Body() body: ResetPasswordDto) {
+    return this.authService.resetPassword(body.token, body.password);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('referral-link')
+  referralLink(@CurrentUser() user: any) {
+    return this.authService.getReferralLink(user.sub);
+  }
+}
+
+@Controller('admin')
+export class AdminAuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Throttle({ default: { limit: AUTH_ADMIN_LOGIN_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('login')
+  login(@Body() body: LoginDto, @Req() req: Request) {
+    return this.authService.login(body, Role.ADMIN, true, { ipAddress: req.ip });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @Get('me')
+  me(@CurrentUser() user: any) {
+    return this.authService.getProfile(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @Get('dashboard/stats')
+  dashboardStats() {
+    return this.authService.getAdminDashboardStats();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SUPERADMIN)
+  @Get('users')
+  getAdminUsers() {
+    return this.authService.getAdminUsers();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SUPERADMIN)
+  @Post('users/create')
+  createAdminUser(@Body() body: RegisterDto) {
+    return this.authService.register(body, Role.ADMIN);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SUPERADMIN)
+  @Put('users/:adminId/change-password')
+  changeAdminPassword(@Param('adminId') adminId: string, @Body() body: ChangePasswordDto) {
+    return this.authService.changePassword(adminId, body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SUPERADMIN)
+  @Delete('users/:adminId')
+  deleteAdminUser(@Param('adminId') adminId: string) {
+    return this.authService.deleteUser(adminId);
+  }
+}
+
+@Controller('yayasan')
+export class YayasanAuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('register')
+  register(@Body() body: RegisterDto) {
+    return this.authService.register(body, Role.YAYASAN);
+  }
+
+  @Get('register')
+  registerRedirect(@Req() req: Request, @Res() res: Response) {
+    return res.redirect(302, buildFrontendRedirect('/yayasan/register', req.query));
+  }
+
+  @Throttle({ default: { limit: AUTH_LOGIN_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('login')
+  login(@Body() body: LoginDto) {
+    return this.authService.login(body, Role.YAYASAN);
+  }
+}
+
+@Controller('mitra')
+export class MitraAuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('register')
+  register(@Body() body: RegisterDto) {
+    return this.authService.register(body, Role.MITRA);
+  }
+
+  @Throttle({ default: { limit: AUTH_LOGIN_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('login')
+  login(@Body() body: LoginDto) {
+    return this.authService.login(body, Role.MITRA);
+  }
+}
