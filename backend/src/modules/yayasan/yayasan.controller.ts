@@ -6,9 +6,12 @@ import {
   encodeWithdrawalNotes,
   mapDisbursementForClient,
   mapUserForClient,
+  parseWithdrawalNotes,
+  toClientAccountStatus,
   toClientPaymentStatus,
   toClientTestStatus,
 } from 'src/common/mappers/client-shapes';
+import { mapTestResultForClient } from 'src/common/mappers/test-result-client-shapes';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -69,15 +72,20 @@ export class YayasanController {
     ]);
 
     const totalCommission = sumTx._sum.commission || 0;
+    const reservedOut = disbursements
+      .filter((d) => d.status === 'PENDING' || d.status === 'PROCESSING')
+      .reduce((acc, row) => acc + row.amount, 0);
     const approvedOut = disbursements
       .filter((d) => d.status === 'APPROVED')
       .reduce((acc, row) => acc + row.amount, 0);
 
     return {
-      balance: Math.max(totalCommission - approvedOut, 0),
+      balance: Math.max(totalCommission - approvedOut - reservedOut, 0),
+      reserveBalance: reservedOut,
       transactions: disbursements.map((row) => mapDisbursementForClient(row, { yayasanId: row.userId })),
       totalCommission,
       totalDisbursed: approvedOut,
+      totalRequested: approvedOut + reservedOut,
     };
   }
 
@@ -180,7 +188,32 @@ export class YayasanController {
 
     const referredUser = await this.prisma.user.findFirst({
       where: { id, referredByCode: me.myReferralCode },
-      include: { profile: true, wallet: true, testResults: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      include: {
+        profile: true,
+        wallet: true,
+        testResults: {
+          where: { testType: 'paid' },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                fullName: true,
+                phone: true,
+                profile: {
+                  select: {
+                    province: true,
+                    city: true,
+                    extra: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
     if (!referredUser) {
       throw new BadRequestException('User not found in yayasan scope');
@@ -189,12 +222,8 @@ export class YayasanController {
     const latestResult = referredUser.testResults?.[0] || null;
     return {
       ...this.buildYayasanReferredUser(referredUser),
-      latestResult: latestResult ? {
-        id: latestResult.id,
-        dominantElement: latestResult.dominantElement,
-        personalityCode: latestResult.personalityCode,
-        createdAt: latestResult.createdAt,
-      } : null,
+      status: toClientAccountStatus(referredUser.status),
+      latestResult: await mapTestResultForClient(this.prisma, latestResult),
     };
   }
 
@@ -206,29 +235,39 @@ export class YayasanController {
     if (me?.yayasanProfile?.approvalStatus !== YayasanApprovalStatus.APPROVED) return [];
     if (!me?.myReferralCode) return [];
 
-    const referredUsers = await this.prisma.user.findMany({
-      where: { referredByCode: me.myReferralCode },
-      select: { id: true, fullName: true, email: true },
-    });
-    const referredMap = new Map(referredUsers.map((u) => [u.id, u]));
     const resultRows = await this.prisma.testResult.findMany({
-      where: { userId: { in: referredUsers.map((u) => u.id) } },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return resultRows.map((r) => ({
-      ...r,
-      _id: r.id,
-      userName: referredMap.get(r.userId)?.fullName,
-      userEmail: referredMap.get(r.userId)?.email,
-      analysis: {
-        dominantElement: (r.dominantElement || '').toLowerCase(),
-        personalityType: r.personalityCode,
-        insights: r.freeTeaser,
-        aiInsights: r.aiInsights,
+      where: {
+        testType: 'paid',
+        user: { referredByCode: me.myReferralCode },
       },
-      dominantLabel: [r.socialType, r.dominantElement].filter(Boolean).join(' ') || r.personalityCode || '-',
-    }));
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            phone: true,
+            profile: {
+              select: {
+                province: true,
+                city: true,
+                extra: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    const latestByUser = new Map<string, any>();
+    for (const row of resultRows) {
+      if (!row.userId || latestByUser.has(row.userId)) continue;
+      latestByUser.set(row.userId, row);
+    }
+
+    return Promise.all(
+      Array.from(latestByUser.values()).map((row) => mapTestResultForClient(this.prisma, row)),
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -237,7 +276,7 @@ export class YayasanController {
   async wallet(@CurrentUser() user: any) {
     const me = await this.prisma.user.findUnique({ where: { id: user.sub }, include: { yayasanProfile: true } });
     if (me?.yayasanProfile?.approvalStatus !== YayasanApprovalStatus.APPROVED) {
-      return { balance: 0, transactions: [], totalCommission: 0, totalDisbursed: 0 };
+      return { balance: 0, reserveBalance: 0, transactions: [], totalCommission: 0, totalDisbursed: 0, totalRequested: 0 };
     }
     return this.computeWalletByReferralCode(me?.myReferralCode || '', user.sub);
   }
@@ -392,9 +431,22 @@ export class YayasanController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.SUPERADMIN)
   async approveWithdrawal(@Param('id') id: string, @Body() body: ProcessWithdrawalDto) {
+    const current = await this.prisma.disbursement.findUnique({ where: { id } });
+    const currentMeta = current ? parseWithdrawalNotes(current.notes) : null;
     const updated = await this.prisma.disbursement.update({
       where: { id },
-      data: { status: body.status === 'REJECTED' ? 'REJECTED' : 'APPROVED', notes: body.notes || undefined, processedAt: new Date() },
+      data: {
+        status: body.status === 'REJECTED' ? 'REJECTED' : 'APPROVED',
+        notes: current
+          ? encodeWithdrawalNotes({
+              notes: body.notes ?? currentMeta?.notes,
+              bankName: currentMeta?.bankName,
+              bankAccount: currentMeta?.bankAccount,
+              accountName: currentMeta?.accountName,
+            })
+          : body.notes || undefined,
+        processedAt: new Date(),
+      },
     });
     return mapDisbursementForClient(updated);
   }
@@ -403,9 +455,22 @@ export class YayasanController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.SUPERADMIN)
   async rejectWithdrawal(@Param('id') id: string, @Body() body: ProcessWithdrawalDto) {
+    const current = await this.prisma.disbursement.findUnique({ where: { id } });
+    const currentMeta = current ? parseWithdrawalNotes(current.notes) : null;
     const updated = await this.prisma.disbursement.update({
       where: { id },
-      data: { status: 'REJECTED', notes: body.notes || undefined, processedAt: new Date() },
+      data: {
+        status: 'REJECTED',
+        notes: current
+          ? encodeWithdrawalNotes({
+              notes: body.notes ?? currentMeta?.notes,
+              bankName: currentMeta?.bankName,
+              bankAccount: currentMeta?.bankAccount,
+              accountName: currentMeta?.accountName,
+            })
+          : body.notes || undefined,
+        processedAt: new Date(),
+      },
     });
     return mapDisbursementForClient(updated);
   }

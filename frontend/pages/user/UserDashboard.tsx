@@ -9,15 +9,23 @@ import { Input } from '../../components/ui/input';
 import ResponsiveTabs from '../../components/ui/responsive-tabs';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import { useToast } from '../../hooks/use-toast';
-import { aiAnalysisAPI, authAPI, certificatesAPI, referralAPI, userPaymentsAPI } from '../../services/api';
+import { authAPI, personalAnalysisAPI, referralAPI, userPaymentsAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import { buildFrontendUrl } from '../../lib/public-url';
+import { copyTextToClipboard } from '../../lib/clipboard';
 import { formatCurrency } from '../../lib/utils';
 
 const fmt = formatCurrency;
 const isApprovedPayment = (status) => ['approved', 'success', 'settlement', 'capture', 'paid'].includes(String(status || '').toLowerCase());
 const isPendingPayment = (status) => ['pending'].includes(String(status || '').toLowerCase());
 const SNAP_LOAD_TIMEOUT_MS = 15000;
+const asObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+const asArray = (value) => (Array.isArray(value) ? value : []);
+const asNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+const normalizeElementKey = (value) => String(value || '').trim().toUpperCase();
 const FIVE_ELEMENTS = [
   {
     name: 'KAYU',
@@ -160,8 +168,8 @@ export default function UserDashboard() {
 
   const loadPremiumResult = async () => {
     try {
-      const response = await aiAnalysisAPI.getLatest();
-      if (response.data?.analysis) setPremiumResult(response.data.analysis);
+      const response = await personalAnalysisAPI.getLatest();
+      setPremiumResult(response.data?.success && response.data?.analysis ? response.data.analysis : null);
     } catch {
       setPremiumResult(null);
     }
@@ -239,6 +247,50 @@ export default function UserDashboard() {
     }
   };
 
+  const handleChangePaymentMethod = async () => {
+    setSnapLoading(true);
+    try {
+      const response = await userPaymentsAPI.createSnap({ replacePending: true });
+      setSnapData(response.data?.data || null);
+      setSnapReloadKey((value) => value + 1);
+      setSnapFrameStatus('loading');
+      toast({
+        title: 'Metode pembayaran diperbarui',
+        description: 'Transaksi pending sebelumnya dibatalkan lalu sesi Midtrans baru dibuka agar Anda bisa memilih metode pembayaran lagi.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Gagal mengganti metode pembayaran',
+        description: getApiErrorMessage(error, 'Sesi pembayaran lama belum bisa diganti. Silakan coba lagi.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setSnapLoading(false);
+    }
+  };
+
+  const handleCancelPayment = async () => {
+    if (!snapData?.orderId) return;
+    setSnapLoading(true);
+    try {
+      await userPaymentsAPI.cancelPayment(snapData.orderId);
+      setSnapData(null);
+      setSnapFrameStatus('idle');
+      toast({
+        title: 'Transaksi dibatalkan',
+        description: 'Transaksi pending berhasil dibatalkan. Anda dapat membuat pembayaran baru kapan saja.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Gagal membatalkan transaksi',
+        description: getApiErrorMessage(error, 'Transaksi pending belum berhasil dibatalkan.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setSnapLoading(false);
+    }
+  };
+
   const handleCheckPayment = async () => {
     if (!snapData?.orderId) return;
     setCheckingPayment(true);
@@ -261,21 +313,16 @@ export default function UserDashboard() {
   };
 
   const handleDownloadCertificate = async () => {
-    if (!user?._id && !user?.id) return;
+    const targetUserId = user?._id || user?.id;
+    if (!targetUserId) return;
     setDownloadingCertificate(true);
     try {
-      const response = await certificatesAPI.generateMyCertificate(user._id || user.id);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `newme-${user._id || user.id}.pdf`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.URL.revokeObjectURL(url);
+      const opened = window.open(`/certificate-download/${targetUserId}?download=1`, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        throw new Error('Popup blocked');
+      }
     } catch (error) {
-      toast({ title: 'Gagal download sertifikat', description: getApiErrorMessage(error, 'Sertifikat belum bisa diunduh saat ini.'), variant: 'destructive' });
+      toast({ title: 'Gagal membuka sertifikat', description: getApiErrorMessage(error, 'Izinkan pop-up browser untuk menyimpan sertifikat sebagai PDF.'), variant: 'destructive' });
     } finally {
       setDownloadingCertificate(false);
     }
@@ -283,8 +330,12 @@ export default function UserDashboard() {
 
   const handleCopyReferral = async () => {
     const link = buildFrontendUrl('/register', { ref: user.myReferralCode });
-    await navigator.clipboard.writeText(link);
-    toast({ title: 'Tersalin', description: 'Link referral berhasil disalin.' });
+    const copied = await copyTextToClipboard(link);
+    toast({
+      title: copied ? 'Tersalin' : 'Salin gagal',
+      description: copied ? 'Link referral berhasil disalin.' : 'Browser menolak akses clipboard. Coba salin manual dari kolom link.',
+      variant: copied ? 'default' : 'destructive',
+    });
   };
 
   const handleShareReferral = async () => {
@@ -309,6 +360,57 @@ export default function UserDashboard() {
   const hasCompletedPremium = user?.paidTestStatus === 'completed';
   const hasCompletedFree = user?.freeTestStatus === 'completed';
   const showFreeTest = !user?.isYayasanLinked;
+  const premiumDisplayAnalysis = asObject(premiumResult?.displayAnalysis);
+  const premiumAnalysis = asObject(premiumResult?.analysis);
+  const premiumInsights = asObject(premiumAnalysis.insights);
+  const premiumPersonalInsights = asObject(premiumAnalysis.personalInsights || premiumAnalysis.aiInsights);
+  const premiumPersonalityType =
+    premiumDisplayAnalysis.personalityType
+    || premiumAnalysis.personalityType
+    || premiumResult?.personalityType
+    || premiumResult?.personalityCode
+    || 'Hasil Tersedia';
+  const premiumSummary =
+    premiumDisplayAnalysis.summary
+    || premiumPersonalInsights.ringkasanKepribadian
+    || 'Analisis personal premium Anda sudah tersedia dan siap ditinjau.';
+  const premiumElementScores = Object.entries(asObject(premiumDisplayAnalysis.elementScores || premiumAnalysis.elementScores))
+    .map(([element, score]) => {
+      const elementKey = normalizeElementKey(element);
+      const elementInfo = FIVE_ELEMENTS.find((item) => item.name === elementKey);
+      return {
+        element: elementKey || String(element || '').toUpperCase(),
+        percentage: asNumber(score?.percentage ?? score),
+        label: score?.label || elementInfo?.label || 'Profil Elemen',
+        elementInfo,
+      };
+    })
+    .filter((item) => item.element && item.percentage > 0)
+    .sort((a, b) => b.percentage - a.percentage);
+  const premiumStrengths =
+    asArray(premiumDisplayAnalysis.strengths).length > 0
+      ? asArray(premiumDisplayAnalysis.strengths)
+      : asArray(premiumPersonalInsights.kekuatanUtama);
+  const premiumGrowthAreas =
+    asArray(premiumDisplayAnalysis.areasToImprove).length > 0
+      ? asArray(premiumDisplayAnalysis.areasToImprove)
+      : asArray(premiumPersonalInsights.areasPengembanganDiri);
+  const premiumCareerRecommendations = (() => {
+    const displayCareers = asArray(premiumDisplayAnalysis.careerRecommendations);
+    if (displayCareers.length > 0) return displayCareers;
+
+    const specificCareers = asArray(premiumPersonalInsights.rekomendasiKarirSpesifik)
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (!item || typeof item !== 'object') return null;
+        return item.bidang || asArray(item.roleContoh)[0] || null;
+      })
+      .filter(Boolean);
+    if (specificCareers.length > 0) return specificCareers;
+
+    const fallbackCareer = premiumInsights.rekomendasiKarir || premiumInsights.dibutuhkanPadaProfesi;
+    return fallbackCareer ? [fallbackCareer] : [];
+  })();
 
   if (loading || !user) {
     return <div className="min-h-screen bg-gradient-to-b from-[#1a1a1a] to-[#2a2a2a] flex items-center justify-center"><LoadingSpinner size="lg" text="Memuat dashboard..." /></div>;
@@ -336,9 +438,8 @@ export default function UserDashboard() {
                   <p className="inline-flex rounded-full bg-green-400/15 px-3 py-1 text-xs font-medium text-green-400">Peserta Yayasan</p>
                   <h3 className="mt-3 text-lg font-semibold text-white">Akun Anda terhubung ke yayasan</h3>
                   <p className="mt-1 text-sm text-gray-300">{user.yayasanName || 'Yayasan'} menjadi afiliasi utama akun ini.</p>
-                  <div className="mt-4 grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                  <div className="mt-4 grid grid-cols-1 gap-4 text-sm">
                     <div><p className="text-gray-400">Yayasan</p><p className="text-white">{user.yayasanName || '-'}</p></div>
-                    <div><p className="text-gray-400">Mitra Pengampu</p><p className="text-white">{user.mitraName || '-'}</p></div>
                   </div>
                 </CardContent>
               </Card>
@@ -355,31 +456,146 @@ export default function UserDashboard() {
             <CardContent className="p-6">
               {hasCompletedPremium && premiumResult ? (
                 <div className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#1a1a1a] p-5">
-                    <div>
-                      <p className="text-sm text-gray-400">Hasil Premium Anda</p>
-                      <p className="mt-2 text-2xl font-bold text-yellow-400">{premiumResult.personalityType || premiumResult.personalityCode || 'Hasil Tersedia'}</p>
-                      <p className="mt-2 text-sm text-gray-300">{premiumResult.dominantElement ? `Elemen dominan: ${premiumResult.dominantElement}` : 'Hasil premium telah tersedia di akun Anda.'}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      <Button className="bg-yellow-400 text-black hover:bg-yellow-500" onClick={() => navigate(`/test-result/${premiumResult.resultId || premiumResult.id}`)}>
-                        <Trophy className="mr-2 h-4 w-4" />
-                        Buka Halaman Hasil
-                      </Button>
-                    </div>
+                  <Card className="border-yellow-400/30 bg-gradient-to-br from-yellow-400/20 to-yellow-600/10">
+                    <CardContent className="p-6">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-start gap-4">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-yellow-400 text-black">
+                            <Trophy className="h-7 w-7" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-300">Hasil Tes Premium</p>
+                            <h2 className="mt-1 text-2xl font-bold text-white">{premiumPersonalityType}</h2>
+                            <p className="mt-2 text-sm text-gray-300">
+                              {premiumResult?.dominantElement ? `Elemen dominan: ${premiumResult.dominantElement}` : 'Hasil premium Anda sudah siap ditinjau.'}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          className="border-yellow-400/40 text-yellow-400"
+                          disabled={downloadingCertificate}
+                          onClick={() => void handleDownloadCertificate()}
+                        >
+                          {downloadingCertificate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                          Download Sertifikat
+                        </Button>
+                      </div>
+                      <p className="mt-4 text-sm leading-7 text-gray-200">{premiumSummary}</p>
+                    </CardContent>
+                  </Card>
+
+                  {premiumElementScores.length > 0 && (
+                    <Card className="border-yellow-400/20 bg-[#1f1f1f]">
+                      <CardHeader>
+                        <CardTitle className="text-white">Skor 5 Elemen</CardTitle>
+                        <CardDescription className="text-gray-400">Distribusi elemen dari hasil premium Anda.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {premiumElementScores.map((item) => {
+                          const Icon = item.elementInfo?.icon || Sparkles;
+                          return (
+                            <div key={item.element} className="space-y-2">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${item.elementInfo?.bgColor || 'bg-yellow-400/20'}`}>
+                                    <Icon className={`h-5 w-5 ${item.elementInfo?.textColor || 'text-yellow-400'}`} />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-white">{item.element}</p>
+                                    <p className="text-xs text-gray-400">{item.label}</p>
+                                  </div>
+                                </div>
+                                <p className={`text-sm font-semibold ${item.elementInfo?.textColor || 'text-yellow-400'}`}>{item.percentage}%</p>
+                              </div>
+                              <div className="h-2 overflow-hidden rounded-full bg-[#111111]">
+                                <div className={`h-full rounded-full bg-gradient-to-r ${item.elementInfo?.color || 'from-yellow-400 to-yellow-600'}`} style={{ width: `${item.percentage}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {premiumStrengths.length > 0 && (
+                      <Card className="border-green-400/20 bg-[#1f1f1f]">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-white">
+                            <CheckCircle className="h-5 w-5 text-green-400" />
+                            Kekuatan Anda
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {premiumStrengths.map((item, index) => (
+                              <div key={`${item}-${index}`} className="flex items-start gap-3 rounded-lg bg-green-500/10 p-3 text-sm text-gray-200">
+                                <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-400" />
+                                <span>{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {premiumGrowthAreas.length > 0 && (
+                      <Card className="border-blue-400/20 bg-[#1f1f1f]">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-white">
+                            <Info className="h-5 w-5 text-blue-400" />
+                            Area Pengembangan
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {premiumGrowthAreas.map((item, index) => (
+                              <div key={`${item}-${index}`} className="flex items-start gap-3 rounded-lg bg-blue-500/10 p-3 text-sm text-gray-200">
+                                <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-400" />
+                                <span>{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    <Button variant="outline" className="border-yellow-400/40 text-yellow-400" disabled={downloadingCertificate} onClick={() => void handleDownloadCertificate()}>
-                      {downloadingCertificate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Download Sertifikat
-                    </Button>
-                  </div>
-                  <div className="overflow-hidden rounded-2xl border border-yellow-400/20 bg-[#111111]">
-                    <iframe
-                      title="Hasil Tes Premium"
-                      src={`/test-result/${premiumResult.resultId || premiumResult.id}?embed=1`}
-                      className="h-[1600px] w-full bg-white"
-                    />
+
+                  {premiumCareerRecommendations.length > 0 && (
+                    <Card className="border-purple-400/20 bg-[#1f1f1f]">
+                      <CardHeader>
+                        <CardTitle className="text-white">Rekomendasi Karir</CardTitle>
+                        <CardDescription className="text-gray-400">Bidang yang paling dekat dengan kecenderungan hasil premium Anda.</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex flex-wrap gap-2">
+                          {premiumCareerRecommendations.map((item, index) => (
+                            <span key={`${item}-${index}`} className="rounded-full border border-purple-400/30 bg-purple-500/10 px-4 py-2 text-sm text-purple-200">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="rounded-2xl border border-yellow-400/20 bg-[#1a1a1a] p-5">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-lg font-semibold text-white">Sertifikat Hasil Premium</p>
+                        <p className="mt-1 text-sm text-gray-400">Unduh sertifikat pada halaman khusus agar file yang tersimpan hanya berisi sertifikat full page.</p>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        <Button variant="outline" className="border-yellow-400/40 text-yellow-400" onClick={() => navigate(`/test-result/${premiumResult.resultId || premiumResult.id}`)}>
+                          Lihat Halaman Hasil
+                        </Button>
+                        <Button className="bg-yellow-400 text-black hover:bg-yellow-500" disabled={downloadingCertificate} onClick={() => void handleDownloadCertificate()}>
+                          {downloadingCertificate ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                          Download Sertifikat
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -599,6 +815,15 @@ export default function UserDashboard() {
                       <Button variant="outline" className="border-yellow-400/20 text-gray-200" disabled={!snapData?.paymentUrl} onClick={handleReloadSnap}>
                         Muat Ulang Panel Pembayaran
                       </Button>
+                      <Button
+                        variant="outline"
+                        className="border-blue-400/30 text-blue-300"
+                        disabled={!snapData?.orderId || snapLoading}
+                        onClick={() => void handleChangePaymentMethod()}
+                      >
+                        {snapLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Ganti Metode Pembayaran
+                      </Button>
                     </div>
                     <div className="rounded-lg border border-yellow-400/10 bg-[#1f1f1f] p-4 text-sm text-gray-300">
                       <p className="font-medium text-white">Jika panel Midtrans gagal dimuat</p>
@@ -608,10 +833,21 @@ export default function UserDashboard() {
                         <li>Jika masih gagal, pulihkan sesi pembayaran agar link Snap aktif diambil ulang tanpa membuat alur baru yang membingungkan.</li>
                       </ul>
                     </div>
-                    <Button variant="outline" className="border-red-400/30 text-red-300" disabled={snapLoading} onClick={() => void handleRecoverSnap()}>
-                      {snapLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Pulihkan Sesi Pembayaran
-                    </Button>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <Button variant="outline" className="border-red-400/30 text-red-300" disabled={snapLoading} onClick={() => void handleRecoverSnap()}>
+                        {snapLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Pulihkan Sesi Pembayaran
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="border-red-500/40 text-red-200"
+                        disabled={!snapData?.orderId || snapLoading}
+                        onClick={() => void handleCancelPayment()}
+                      >
+                        {snapLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Batalkan Transaksi Pending
+                      </Button>
+                    </div>
                   </>
                 )}
               </CardContent>
@@ -722,17 +958,13 @@ export default function UserDashboard() {
                 <CardHeader>
                   <CardTitle className="text-white">Afiliasi Yayasan</CardTitle>
                   <CardDescription className="text-gray-400">
-                    Informasi hubungan akun Anda dengan yayasan dan mitra pengampu.
+                    Informasi hubungan akun Anda dengan yayasan yang menaungi akun ini.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-3 text-sm md:grid-cols-2">
+                <CardContent className="grid gap-3 text-sm">
                   <div className="rounded-lg bg-[#1a1a1a] p-4">
                     <p className="text-gray-400">Yayasan</p>
                     <p className="mt-1 text-white">{user.yayasanName || '-'}</p>
-                  </div>
-                  <div className="rounded-lg bg-[#1a1a1a] p-4">
-                    <p className="text-gray-400">Mitra Pengampu</p>
-                    <p className="mt-1 text-white">{user.mitraName || '-'}</p>
                   </div>
                 </CardContent>
               </Card>

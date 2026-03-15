@@ -27,6 +27,7 @@
     "prisma:seed:prod": "node dist/prisma/seed.js",
     "check:flows": "node scripts/manual-flow-check.mjs",
     "check:referral-flow": "node scripts/referral-flow-check.mjs",
+    "check:premium-sync": "node scripts/check-premium-sync.mjs",
     "audit:endpoints": "node scripts/audit-frontend-endpoints.mjs",
     "benchmark:dev": "node scripts/benchmark-dev.mjs",
     "docs:api": "node scripts/generate-api-endpoint-docs.mjs"

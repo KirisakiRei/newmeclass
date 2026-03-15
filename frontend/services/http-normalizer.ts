@@ -69,10 +69,36 @@ const normalizePayment = (item: Record<string, any>) => {
   return next;
 };
 
-const normalizeCertificate = (item: Record<string, any>) => {
+const detectResponseOrigin = (response?: AxiosResponse) => {
+  const backendUrl = process.env.REACT_APP_BACKEND_URL || "";
+  if (backendUrl) return backendUrl.replace(/\/+$/, "");
+
+  const responseUrl = response?.request?.responseURL;
+  if (typeof responseUrl === "string" && /^https?:\/\//i.test(responseUrl)) {
+    try {
+      return new URL(responseUrl).origin;
+    } catch {
+      return "";
+    }
+  }
+
+  const baseUrl = response?.config?.baseURL;
+  if (typeof baseUrl === "string" && /^https?:\/\//i.test(baseUrl)) {
+    try {
+      return new URL(baseUrl).origin;
+    } catch {
+      return "";
+    }
+  }
+
+  return "";
+};
+
+const normalizeCertificate = (item: Record<string, any>, response?: AxiosResponse) => {
   const next = { ...item };
   const meta = isObject(next.metadata) ? next.metadata : {};
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || "";
+  const template = isObject(next.template) ? { ...next.template } : null;
+  const backendUrl = detectResponseOrigin(response);
   const toAbsoluteUrl = (value: unknown) => {
     if (typeof value !== "string" || !value.startsWith("/uploads/")) return value;
     return backendUrl ? `${backendUrl}${value}` : value;
@@ -83,10 +109,24 @@ const normalizeCertificate = (item: Record<string, any>) => {
   next.backgroundUrl = toAbsoluteUrl(next.backgroundUrl);
   next.logoUrl = toAbsoluteUrl(next.logoUrl);
   next.signatureUrl = toAbsoluteUrl(next.signatureUrl);
+  next.backgroundTextureUrl = toAbsoluteUrl(next.backgroundTextureUrl);
+  next.brandLogoUrl = toAbsoluteUrl(next.brandLogoUrl);
+  next.secondaryLogoUrl = toAbsoluteUrl(next.secondaryLogoUrl);
+  next.productionBadgeUrl = toAbsoluteUrl(next.productionBadgeUrl);
+  if (template) {
+    template.backgroundUrl = toAbsoluteUrl(template.backgroundUrl);
+    template.logoUrl = toAbsoluteUrl(template.logoUrl);
+    template.signatureUrl = toAbsoluteUrl(template.signatureUrl);
+    template.backgroundTextureUrl = toAbsoluteUrl(template.backgroundTextureUrl);
+    template.brandLogoUrl = toAbsoluteUrl(template.brandLogoUrl);
+    template.secondaryLogoUrl = toAbsoluteUrl(template.secondaryLogoUrl);
+    template.productionBadgeUrl = toAbsoluteUrl(template.productionBadgeUrl);
+    next.template = template;
+  }
   return next;
 };
 
-const normalizeByPath = (path: string, payload: unknown): unknown => {
+const normalizeByPath = (path: string, payload: unknown, response?: AxiosResponse): unknown => {
   const normalizeCollection = (
     value: unknown,
     mapper: (item: Record<string, any>) => Record<string, any>,
@@ -99,7 +139,7 @@ const normalizeByPath = (path: string, payload: unknown): unknown => {
   if (path.includes("/articles")) return normalizeCollection(payload, normalizeArticle);
   if (path.includes("/banners")) return normalizeCollection(payload, normalizeBanner);
   if (path.includes("/payments")) return normalizeCollection(payload, normalizePayment);
-  if (path.includes("/certificates")) return normalizeCollection(payload, normalizeCertificate);
+  if (path.includes("/certificates")) return normalizeCollection(payload, (item) => normalizeCertificate(item, response));
   return payload;
 };
 
@@ -113,12 +153,12 @@ const normalizeResponse = (response: AxiosResponse) => {
   }
 
   if (isStandardEnvelope(raw)) {
-    const unwrapped = normalizeByPath(path, raw.data);
+    const unwrapped = normalizeByPath(path, raw.data, response);
     response.data = withIdAliases(unwrapped);
     return response;
   }
 
-  const normalized = normalizeByPath(path, raw);
+  const normalized = normalizeByPath(path, raw, response);
   response.data = withIdAliases(normalized);
   return response;
 };

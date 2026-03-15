@@ -12,6 +12,10 @@ describe('PaymentsService', () => {
     expect(service.mapMidtransStatus('pending')).toBe('PENDING');
   });
 
+  it('maps midtrans cancel to CANCEL', () => {
+    expect(service.mapMidtransStatus('cancel')).toBe('CANCEL');
+  });
+
   it('maps unknown status to FAILURE', () => {
     expect(service.mapMidtransStatus('random-status')).toBe('FAILURE');
   });

@@ -1,8 +1,11 @@
-import { Body, Controller, Get, Headers, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 import { PaymentsService } from './payments.service';
 import { UploadProofDto } from './dto/upload-proof.dto';
 import { ApproveProofDto } from './dto/approve-proof.dto';
@@ -26,16 +29,22 @@ export class PaymentsController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
   getAll() {
     return this.service.listPayments();
   }
 
   @Get('stats/summary')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
   stats() {
     return this.service.paymentStats();
   }
 
   @Put(':id/approve')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
   approve(@Param('id') id: string, @Body() body: ApproveProofDto) {
     return this.service.approveManualProof(id, body.status || 'approved', body.rejectionReason);
   }
@@ -48,7 +57,7 @@ export class PaymentsController {
   @Post('midtrans/webhook')
   async webhook(@Body() payload: any, @Headers() _headers: any) {
     if (!this.service.verifyMidtransSignature(payload)) {
-      return { success: false, message: 'invalid signature' };
+      throw new ForbiddenException('invalid signature');
     }
 
     const inbox = await this.service.saveWebhookInbox(payload);
@@ -70,6 +79,8 @@ export class PaymentsController {
   }
 
   @Post('reconcile')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPERADMIN)
   reconcile(@Query('windowMinutes') windowMinutes = '120') {
     return this.service.reconcilePending(Number(windowMinutes));
   }

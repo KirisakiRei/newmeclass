@@ -41,6 +41,12 @@ const MIDTRANS_PRODUCTION_API_URL = 'https://api.midtrans.com';
 export class PaymentsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly settledStatuses = new Set<PaymentStatus>([
+    PaymentStatus.SETTLEMENT,
+    PaymentStatus.CAPTURE,
+    PaymentStatus.SUCCESS,
+  ]);
+
   private statusRank: Record<string, number> = {
     CREATED: 1,
     PENDING: 2,
@@ -112,6 +118,19 @@ export class PaymentsService {
       || paymentUrl.startsWith(`${MIDTRANS_PRODUCTION_APP_URL}/snap/`);
     const snapToken = this.getSnapTokenFromMetadata(order?.metadata);
     return hasKnownSnapUrl && !!snapToken;
+  }
+
+  private hasReusableSnapSession(order: any) {
+    return this.hasUsableSnapSession(order) && !this.isPendingOrderExpired(order);
+  }
+
+  private isPendingOrderExpired(order: any) {
+    if (!order?.expiresAt) return false;
+    return new Date(order.expiresAt).getTime() <= Date.now();
+  }
+
+  private isSettledStatus(status?: PaymentStatus | string | null) {
+    return this.settledStatuses.has(String(status || '').toUpperCase() as PaymentStatus);
   }
 
   private async parseJsonResponse(response: Response) {
@@ -420,16 +439,45 @@ export class PaymentsService {
     paymentType: PaymentType;
     metadata?: any;
     idempotencyKey?: string;
+    replacePending?: boolean;
   }) {
-    const pendingOrder = data.paymentType === PaymentType.TEST_PAYMENT
+    const paidOrder = data.paymentType === PaymentType.TEST_PAYMENT
+      ? await this.getLatestSuccessfulTestPayment(data.userId)
+      : null;
+    if (paidOrder) {
+      return paidOrder;
+    }
+
+    let pendingOrder = data.paymentType === PaymentType.TEST_PAYMENT
       ? await this.getLatestPendingTestPayment(data.userId)
       : null;
 
-    if (pendingOrder && this.hasUsableSnapSession(pendingOrder)) {
+    if (pendingOrder && this.isPendingOrderExpired(pendingOrder)) {
+      await this.applyOrderTransition(
+        pendingOrder.orderId,
+        PaymentStatus.EXPIRE,
+        'midtrans.local-expiry',
+        { reason: 'local_session_expired' },
+      );
+      pendingOrder = await this.getLatestPendingTestPayment(data.userId);
+    }
+
+    if (pendingOrder && data.replacePending) {
+      const cancelled = await this.cancelSnapOrder(pendingOrder.orderId, {
+        allowLocalFallback: true,
+        source: 'user.replace-method',
+      });
+      if (cancelled && this.isSettledStatus(cancelled.status)) {
+        return cancelled;
+      }
+      pendingOrder = await this.getLatestPendingTestPayment(data.userId);
+    }
+
+    if (pendingOrder && this.hasReusableSnapSession(pendingOrder)) {
       return pendingOrder;
     }
 
-    if (pendingOrder && !this.hasUsableSnapSession(pendingOrder)) {
+    if (pendingOrder && !this.hasReusableSnapSession(pendingOrder)) {
       await this.applyOrderTransition(
         pendingOrder.orderId,
         PaymentStatus.EXPIRE,
@@ -464,6 +512,10 @@ export class PaymentsService {
       return order;
     }
 
+    if (this.isSettledStatus(order.status)) {
+      return order;
+    }
+
     const response = await fetch(`${this.getMidtransApiBaseUrl()}/v2/${encodeURIComponent(orderId)}/status`, {
       method: 'GET',
       headers: this.getMidtransHeaders(),
@@ -474,9 +526,62 @@ export class PaymentsService {
     }
 
     const payload = await this.parseJsonResponse(response);
+    if (!payload?.transaction_status) {
+      if (order.status === PaymentStatus.PENDING && this.isPendingOrderExpired(order)) {
+        await this.applyOrderTransition(orderId, PaymentStatus.EXPIRE, 'midtrans.status-check.local-expiry', payload);
+        return this.getOrderByOrderId(orderId);
+      }
+      return order;
+    }
     const nextStatus = this.mapMidtransStatus(payload.transaction_status, payload.fraud_status);
     await this.applyOrderTransition(orderId, nextStatus, 'midtrans.status-check', payload);
     return this.getOrderByOrderId(orderId);
+  }
+
+  async cancelSnapOrder(
+    orderId: string,
+    options?: {
+      allowLocalFallback?: boolean;
+      source?: string;
+    },
+  ) {
+    const source = options?.source || 'user.cancel-payment';
+    const order = await this.getOrderByOrderId(orderId);
+    if (!order) return null;
+    if (this.isSettledStatus(order.status) || order.status !== PaymentStatus.PENDING) {
+      return order;
+    }
+
+    const freshOrder = await this.syncOrderStatusFromMidtrans(orderId);
+    if (freshOrder && freshOrder.status !== PaymentStatus.PENDING) {
+      return freshOrder;
+    }
+
+    if (!this.hasUsableSnapSession(order)) {
+      await this.applyOrderTransition(orderId, PaymentStatus.CANCEL, `${source}.local`, {
+        reason: 'missing_snap_session',
+      });
+      return this.getOrderByOrderId(orderId);
+    }
+
+    const response = await fetch(`${this.getMidtransApiBaseUrl()}/v2/${encodeURIComponent(orderId)}/cancel`, {
+      method: 'POST',
+      headers: this.getMidtransHeaders(),
+    });
+    const payload = await this.parseJsonResponse(response);
+
+    if (payload?.transaction_status) {
+      const providerStatus = this.mapMidtransStatus(payload.transaction_status, payload.fraud_status);
+      await this.applyOrderTransition(orderId, providerStatus, `${source}.midtrans`, payload);
+      return this.getOrderByOrderId(orderId);
+    }
+
+    if (response.ok || options?.allowLocalFallback) {
+      await this.applyOrderTransition(orderId, PaymentStatus.CANCEL, `${source}.local`, payload);
+      return this.getOrderByOrderId(orderId);
+    }
+
+    return freshOrder || order;
   }
 
   getSnapSession(order: any) {
@@ -605,9 +710,23 @@ export class PaymentsService {
 
       await tx.$queryRawUnsafe('SELECT id FROM PaymentOrder WHERE id = ? FOR UPDATE', order.id);
 
+      if (order.status === newStatus) {
+        return { applied: false, reason: 'stale_transition', status: order.status };
+      }
+
+      const currentIsSettled = this.isSettledStatus(order.status);
+      const nextIsSettled = this.isSettledStatus(newStatus);
+      if (currentIsSettled && !nextIsSettled) {
+        return { applied: false, reason: 'preserve_settlement', status: order.status };
+      }
+
+      if (source === 'midtrans.status-check' && newStatus === PaymentStatus.FAILURE && !payload?.transaction_status) {
+        return { applied: false, reason: 'inconclusive_status_check', status: order.status };
+      }
+
       const currentRank = this.statusRank[order.status] || 0;
       const nextRank = this.statusRank[newStatus] || 0;
-      if (nextRank < currentRank || (currentRank === nextRank && order.status === newStatus)) {
+      if (!nextIsSettled && nextRank < currentRank) {
         return { applied: false, reason: 'stale_transition', status: order.status };
       }
 
@@ -633,12 +752,7 @@ export class PaymentsService {
         },
       });
 
-      const settledStatuses = new Set<PaymentStatus>([
-        PaymentStatus.SETTLEMENT,
-        PaymentStatus.CAPTURE,
-        PaymentStatus.SUCCESS,
-      ]);
-      const successTransition = settledStatuses.has(newStatus) && !settledStatuses.has(order.status);
+      const successTransition = this.settledStatuses.has(newStatus) && !this.settledStatuses.has(order.status);
 
       if (successTransition) {
         await this.applySuccessEffect(tx, updated);
@@ -887,6 +1001,10 @@ export class PaymentsService {
         userId,
         paymentType: PaymentType.TEST_PAYMENT,
         status: PaymentStatus.PENDING,
+        OR: [
+          { expiresAt: null },
+          { expiresAt: { gt: new Date() } },
+        ],
       },
       orderBy: { createdAt: 'desc' },
     });

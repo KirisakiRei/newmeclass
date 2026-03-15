@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Award, Upload, Save, Users, FileText, Building2, User, Eye } from 'lucide-react';
+import { Award, Save, Users, FileText, Building2, User, Eye } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -10,30 +10,83 @@ import { certificatesAPI, usersAPI } from '../../services/api';
 import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import CertificatePreview from '../../components/admin/CertificatePreview';
+import CertificateAssetUploader from '../../components/admin/CertificateAssetUploader';
 
 const CERT_TYPES = [
   { id: 'individu', label: 'Individu', icon: User, description: 'Sertifikat standar untuk pengguna individual' },
-  { id: 'yayasan', label: 'Yayasan VIP', icon: Building2, description: 'Sertifikat premium untuk pengguna via yayasan' },
+  { id: 'yayasan', label: 'Yayasan', icon: Building2, description: 'Sertifikat resmi untuk pengguna yang terhubung ke yayasan' },
 ];
+
+const BUILTIN_LOGO_PATHS = ['/logo.png', '/images/newme-logo.png'];
+const BACKEND_UPLOAD_BASE = String(process.env.REACT_APP_BACKEND_URL || '').trim().replace(/\/+$/, '');
+
+const isBuiltinLogo = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return BUILTIN_LOGO_PATHS.some((item) => normalized.endsWith(item));
+};
+
+const toAbsoluteCertificateAssetUrl = (value) => {
+  if (typeof value !== 'string' || !value) return value;
+  if (/^https?:\/\//i.test(value) || value.startsWith('data:')) return value;
+  if (!value.startsWith('/')) return value;
+  return BACKEND_UPLOAD_BASE ? `${BACKEND_UPLOAD_BASE}${value}` : value;
+};
+
+const toAbsoluteUploadedAssetUrl = (value, response) => {
+  if (typeof value !== 'string' || !value) return value;
+  if (/^https?:\/\//i.test(value) || value.startsWith('data:')) return value;
+  if (!value.startsWith('/')) return value;
+
+  const responseUrl = response?.request?.responseURL;
+  if (typeof responseUrl === 'string' && /^https?:\/\//i.test(responseUrl)) {
+    try {
+      return `${new URL(responseUrl).origin}${value}`;
+    } catch {
+      return toAbsoluteCertificateAssetUrl(value);
+    }
+  }
+
+  return toAbsoluteCertificateAssetUrl(value);
+};
 
 const createEmptyTemplate = (type) => ({
   certType: type,
-  titleText: type === 'yayasan' ? 'SERTIFIKAT VIP' : 'SERTIFIKAT',
-  subtitleText: '',
+  styleVersion: 'official-certificate-v1',
+  titleText: 'SERTIFIKAT',
+  subtitleText: 'ANALISA KEPRIBADIAN & JATIDIRI',
   completionText: '',
   signerName: '',
   signerTitle: '',
-  textColor: '#000000',
-  accentColor: type === 'yayasan' ? '#FFD700' : '#1a1a1a',
-  backgroundUrl: null,
-  logoUrl: '/logo.png',
+  textColor: '#2e2e2e',
+  accentColor: type === 'yayasan' ? '#B8860B' : '#D4A017',
+  backgroundTextureUrl: null,
+  brandLogoUrl: '/logo.png',
+  secondaryLogoUrl: null,
+  productionBadgeUrl: null,
   signatureUrl: null,
   organization: '',
-  layoutPositions: {
-    logo: { x: 50, y: 8, width: type === 'yayasan' ? 14 : 12 },
-    signature: { x: 50, y: 75, width: type === 'yayasan' ? 11 : 10 },
-  },
+  backgroundUrl: null,
+  logoUrl: null,
 });
+
+const normalizeTemplateState = (value, type) => {
+  const defaults = createEmptyTemplate(type);
+  const next = value && typeof value === 'object' ? value : {};
+  const resolvedSecondaryLogo =
+    isBuiltinLogo(next.secondaryLogoUrl) || isBuiltinLogo(next.logoUrl)
+      ? null
+      : (next.secondaryLogoUrl ?? next.logoUrl ?? defaults.secondaryLogoUrl);
+  return {
+    ...defaults,
+    ...next,
+    backgroundTextureUrl: next.backgroundTextureUrl ?? next.backgroundUrl ?? defaults.backgroundTextureUrl,
+    brandLogoUrl: next.brandLogoUrl ?? defaults.brandLogoUrl,
+    secondaryLogoUrl: resolvedSecondaryLogo,
+    productionBadgeUrl: next.productionBadgeUrl ?? defaults.productionBadgeUrl,
+    backgroundUrl: next.backgroundTextureUrl ?? next.backgroundUrl ?? defaults.backgroundTextureUrl,
+    logoUrl: resolvedSecondaryLogo,
+  };
+};
 
 const Certificates = () => {
   const { toast } = useToast();
@@ -58,7 +111,7 @@ const Certificates = () => {
         certificatesAPI.getIssued(),
         usersAPI.getAll()
       ]);
-      setTemplate(templateRes.data || createEmptyTemplate(certType));
+      setTemplate(normalizeTemplateState(templateRes.data, certType));
       setIssuedCerts(Array.isArray(certsRes.data) ? certsRes.data : []);
       setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
     } catch (error) {
@@ -73,17 +126,13 @@ const Certificates = () => {
     const loadTemplate = async () => {
       try {
         const res = await certificatesAPI.getTemplate(certType);
-        setTemplate(res.data || createEmptyTemplate(certType));
+        setTemplate(normalizeTemplateState(res.data, certType));
       } catch (error) {
-        setTemplate(createEmptyTemplate(certType));
+        setTemplate(normalizeTemplateState(null, certType));
       }
     };
     if (!loading) loadTemplate();
   }, [certType]);
-
-  const handleLayoutChange = (positions) => {
-    setTemplate(prev => ({ ...prev, layoutPositions: positions }));
-  };
 
   const handleSaveTemplate = async () => {
     setSaving(true);
@@ -91,8 +140,16 @@ const Certificates = () => {
       await certificatesAPI.updateTemplate({
         ...template,
         certType,
+        styleVersion: template.styleVersion || 'official-certificate-v1',
+        brandLogoUrl: template.brandLogoUrl || '/logo.png',
+        backgroundTextureUrl: template.backgroundTextureUrl || null,
+        secondaryLogoUrl: template.secondaryLogoUrl || null,
+        productionBadgeUrl: template.productionBadgeUrl || null,
+        signatureUrl: template.signatureUrl || null,
+        logoUrl: template.secondaryLogoUrl || null,
+        backgroundUrl: template.backgroundTextureUrl || null,
       });
-      toast({ title: 'Sukses', description: `Template ${certType === 'yayasan' ? 'Yayasan VIP' : 'Individu'} berhasil disimpan` });
+      toast({ title: 'Sukses', description: `Template ${certType === 'yayasan' ? 'Yayasan' : 'Individu'} berhasil disimpan` });
     } catch (error) {
       toast({ title: 'Error', description: 'Gagal menyimpan template', variant: 'destructive' });
     } finally {
@@ -103,11 +160,34 @@ const Certificates = () => {
   const handleUploadAsset = async (assetType, file) => {
     try {
       const response = await certificatesAPI.uploadAsset(assetType, file);
-      setTemplate({ ...template, [`${assetType}Url`]: response.data.url });
+      const uploadedUrl = toAbsoluteUploadedAssetUrl(response.data.url, response);
+      setTemplate((current) => {
+        if (assetType === 'background') {
+          return { ...current, backgroundTextureUrl: uploadedUrl, backgroundUrl: uploadedUrl };
+        }
+        if (assetType === 'logo') {
+          return { ...current, secondaryLogoUrl: uploadedUrl, logoUrl: uploadedUrl };
+        }
+        return { ...current, [`${assetType}Url`]: uploadedUrl };
+      });
       toast({ title: 'Sukses', description: `${assetType} berhasil diupload` });
+      return uploadedUrl;
     } catch (error) {
       toast({ title: 'Error', description: 'Gagal upload file', variant: 'destructive' });
+      throw error;
     }
+  };
+
+  const handleRemoveAsset = (assetType) => {
+    setTemplate((current) => {
+      if (assetType === 'background') {
+        return { ...current, backgroundTextureUrl: null, backgroundUrl: null };
+      }
+      if (assetType === 'logo') {
+        return { ...current, secondaryLogoUrl: null, logoUrl: null };
+      }
+      return { ...current, [`${assetType}Url`]: null };
+    });
   };
 
   const handleIssueCertificate = async (e) => {
@@ -198,10 +278,7 @@ const Certificates = () => {
                 template={template}
                 certType={certType}
                 recipientName="NAMA PENERIMA"
-                courseName={template.subtitleText || 'Program Sertifikasi'}
                 certificateNumber="NMC-2026-XXXXX"
-                editable={true}
-                onLayoutChange={handleLayoutChange}
               />
             </CardContent>
           </Card>
@@ -234,15 +311,8 @@ const Certificates = () => {
                   <Input value={template.signerTitle || ''} onChange={(e) => setTemplate({ ...template, signerTitle: e.target.value })} className="bg-[#1a1a1a] border-yellow-400/20 text-white" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-gray-400 text-sm">Warna Teks</label>
-                  <Input type="color" value={template.textColor || '#000000'} onChange={(e) => setTemplate({ ...template, textColor: e.target.value })} className="bg-[#1a1a1a] border-yellow-400/20 h-10" />
-                </div>
-                <div>
-                  <label className="text-gray-400 text-sm">Warna Aksen</label>
-                  <Input type="color" value={template.accentColor || '#FFD700'} onChange={(e) => setTemplate({ ...template, accentColor: e.target.value })} className="bg-[#1a1a1a] border-yellow-400/20 h-10" />
-                </div>
+              <div className="rounded-lg border border-yellow-400/20 bg-[#1a1a1a] p-4 text-sm text-gray-400">
+                Layout resmi sertifikat dikunci. Admin hanya mengatur logo yayasan, tanda tangan, texture background, dan identitas penandatangan.
               </div>
               <Button onClick={handleSaveTemplate} disabled={saving} className="w-full bg-yellow-400 text-black hover:bg-yellow-500">
                 <Save className="w-4 h-4 mr-2" /> {saving ? 'Menyimpan...' : 'Simpan Template'}
@@ -255,41 +325,42 @@ const Certificates = () => {
               <CardTitle className="text-white">Upload Assets</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <label className="text-gray-400 text-sm">Background Sertifikat</label>
-                <div className="flex gap-2 mt-1">
-                  <input type="file" accept="image/*" onChange={(e) => e.target.files[0] && handleUploadAsset('background', e.target.files[0])} className="flex-1 text-gray-400 text-sm" />
-                </div>
-                {template.backgroundUrl && <img src={template.backgroundUrl} alt="Background" className="mt-2 h-20 object-contain rounded" />}
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm">Logo</label>
-                <div className="flex gap-2 mt-1">
-                  <input type="file" accept="image/*" onChange={(e) => e.target.files[0] && handleUploadAsset('logo', e.target.files[0])} className="flex-1 text-gray-400 text-sm" />
-                </div>
-                {template.logoUrl && (
-                  <div className="mt-2">
-                    <img src={template.logoUrl} alt="Logo" className="h-16 object-contain" />
-                    {template.layoutPositions.logo && (
-                      <p className="text-xs text-gray-500 mt-1">Posisi: x={Math.round(template.layoutPositions.logo.x)}% y={Math.round(template.layoutPositions.logo.y)}%</p>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="text-gray-400 text-sm">Tanda Tangan</label>
-                <div className="flex gap-2 mt-1">
-                  <input type="file" accept="image/*" onChange={(e) => e.target.files[0] && handleUploadAsset('signature', e.target.files[0])} className="flex-1 text-gray-400 text-sm" />
-                </div>
-                {template.signatureUrl && (
-                  <div className="mt-2">
-                    <img src={template.signatureUrl} alt="Signature" className="h-12 object-contain" />
-                    {template.layoutPositions.signature && (
-                      <p className="text-xs text-gray-500 mt-1">Posisi: x={Math.round(template.layoutPositions.signature.x)}% y={Math.round(template.layoutPositions.signature.y)}%</p>
-                    )}
-                  </div>
-                )}
-              </div>
+              <CertificateAssetUploader
+                title="Background Sertifikat"
+                description="Opsional. Texture akan dilapis lembut di atas background putih sertifikat resmi."
+                assetType="background"
+                value={template.backgroundTextureUrl}
+                previewClassName="min-h-[160px]"
+                onUpload={handleUploadAsset}
+                onRemove={() => handleRemoveAsset('background')}
+              />
+              <CertificateAssetUploader
+                title="Logo Yayasan / Partner"
+                description="Logo NEWME tampil otomatis. Upload di sini untuk logo kedua di area atas tengah sertifikat."
+                assetType="logo"
+                value={template.secondaryLogoUrl}
+                previewClassName="min-h-[160px]"
+                onUpload={handleUploadAsset}
+                onRemove={() => handleRemoveAsset('logo')}
+              />
+              <CertificateAssetUploader
+                title="Tanda Tangan"
+                description="Tanda tangan tampil pada blok footer kanan sesuai desain sertifikat resmi."
+                assetType="signature"
+                value={template.signatureUrl}
+                previewClassName="min-h-[120px]"
+                onUpload={handleUploadAsset}
+                onRemove={() => handleRemoveAsset('signature')}
+              />
+              <CertificateAssetUploader
+                title="Production Badge"
+                description="Opsional. Badge kecil di pojok kanan bawah untuk identitas produksi sertifikat."
+                assetType="productionBadge"
+                value={template.productionBadgeUrl}
+                previewClassName="min-h-[160px]"
+                onUpload={handleUploadAsset}
+                onRemove={() => handleRemoveAsset('productionBadge')}
+              />
             </CardContent>
           </Card>
         </div>
@@ -370,7 +441,7 @@ const Certificates = () => {
                         <span className={`px-2 py-0.5 rounded text-xs ${
                           cert.certType === 'yayasan' ? 'bg-purple-400/20 text-purple-400' : 'bg-blue-400/20 text-blue-400'
                         }`}>
-                          {cert.certType === 'yayasan' ? 'Yayasan VIP' : 'Individu'}
+                          {cert.certType === 'yayasan' ? 'Yayasan' : 'Individu'}
                         </span>
                       </td>
                       <td className="p-4 text-gray-400 text-sm">{new Date(cert.issuedAt).toLocaleDateString('id-ID')}</td>

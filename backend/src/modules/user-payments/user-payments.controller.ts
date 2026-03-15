@@ -101,15 +101,37 @@ export class UserPaymentsController {
       amount: Number(body.amount || pricing.totalPrice || pricing.basePrice || 100000),
       paymentType: 'TEST_PAYMENT',
       idempotencyKey: body.idempotencyKey,
+      replacePending: body.replacePending,
       metadata: { source: 'user-payments.create-snap', pricing },
     });
 
     return {
       success: true,
-      already_pending: true,
+      already_pending: String(order?.status || '').toUpperCase() === 'PENDING',
       data: {
         ...this.paymentsService.getSnapSession(order),
+        status: String(order?.status || '').toLowerCase(),
         pricing,
+      },
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('cancel-payment/:orderId')
+  async cancelPayment(@CurrentUser() user: any, @Param('orderId') orderId: string) {
+    const row = await this.paymentsService.getOrderByOrderId(orderId);
+    if (row?.userId && row.userId !== user.sub && ![Role.ADMIN, Role.SUPERADMIN].includes(user.role)) {
+      throw new ForbiddenException('Insufficient role');
+    }
+    const updated = await this.paymentsService.cancelSnapOrder(orderId, {
+      allowLocalFallback: true,
+      source: 'user.cancel-payment',
+    });
+    return {
+      success: true,
+      data: {
+        orderId: updated?.orderId || orderId,
+        status: String(updated?.status || '').toLowerCase() || 'cancel',
       },
     };
   }
@@ -132,7 +154,9 @@ export class UserPaymentsController {
     if (row?.userId && row.userId !== user.sub && ![Role.ADMIN, Role.SUPERADMIN].includes(user.role)) {
       throw new ForbiddenException('Insufficient role');
     }
-    const freshRow = await this.paymentsService.syncOrderStatusFromMidtrans(orderId);
+    const freshRow = row && ['settlement', 'capture', 'success'].includes(String(row.status).toLowerCase())
+      ? row
+      : await this.paymentsService.syncOrderStatusFromMidtrans(orderId);
     return { status: freshRow?.status?.toLowerCase() || row?.status?.toLowerCase() || 'pending' };
   }
 

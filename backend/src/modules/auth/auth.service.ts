@@ -196,6 +196,9 @@ export class AuthService {
 
   private async resolveReferralContext(role: Role, rawCode?: string | null) {
     const referralCode = this.normalizeReferralCode(rawCode);
+    if (role === Role.YAYASAN && !referralCode) {
+      throw new BadRequestException('Yayasan registration requires an active mitra referral code');
+    }
     if (!referralCode) {
       return {
         referredByCode: null,

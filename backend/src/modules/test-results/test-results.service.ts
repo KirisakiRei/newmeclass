@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, Role, TestStatus } from '@prisma/client';
+import { mapTestResultForClient } from 'src/common/mappers/test-result-client-shapes';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScoringService } from '../scoring/scoring.service';
 import { TestAccessService } from '../test-access/test-access.service';
@@ -92,7 +93,24 @@ export class TestResultsService {
   async getResultById(id: string, user: { sub?: string; role?: Role }) {
     const result = await this.prisma.testResult.findUnique({
       where: { id },
-      include: { user: { select: { id: true, email: true, fullName: true, role: true } } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            phone: true,
+            role: true,
+            profile: {
+              select: {
+                province: true,
+                city: true,
+                extra: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!result) {
@@ -104,7 +122,7 @@ export class TestResultsService {
       return null;
     }
 
-    return result;
+    return mapTestResultForClient(this.prisma, result);
   }
 
   async checkHasUsedFreeTest(userId: string) {
@@ -120,7 +138,7 @@ export class TestResultsService {
   }
 
   async adminPremiumList() {
-    return this.prisma.testResult.findMany({
+    const rows = await this.prisma.testResult.findMany({
       where: { testType: 'paid' },
       include: {
         user: {
@@ -128,25 +146,63 @@ export class TestResultsService {
             id: true,
             email: true,
             fullName: true,
+            phone: true,
             role: true,
+            profile: {
+              select: {
+                province: true,
+                city: true,
+                extra: true,
+              },
+            },
           },
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: 300,
     });
+
+    const latestByUser = new Map<string, any>();
+    for (const row of rows) {
+      if (!row.userId || latestByUser.has(row.userId)) continue;
+      latestByUser.set(row.userId, row);
+    }
+
+    return Promise.all(
+      Array.from(latestByUser.values()).map((row) => mapTestResultForClient(this.prisma, row)),
+    );
   }
 
   async adminPremiumByUser(userId: string) {
-    return this.prisma.testResult.findMany({
+    const row = await this.prisma.testResult.findFirst({
       where: { userId, testType: 'paid' },
       orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            phone: true,
+            role: true,
+            profile: {
+              select: {
+                province: true,
+                city: true,
+                extra: true,
+              },
+            },
+          },
+        },
+      },
     });
+
+    return mapTestResultForClient(this.prisma, row);
   }
 
   async adminStats() {
     const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const [totalResults, totalPremiumResults, premiumResultsThisMonth] = await Promise.all([
+    const [total, totalPaid, premiumResultsThisMonth] = await Promise.all([
       this.prisma.testResult.count(),
       this.prisma.testResult.count({ where: { testType: 'paid' } }),
       this.prisma.testResult.count({
@@ -158,8 +214,9 @@ export class TestResultsService {
     ]);
 
     return {
-      totalResults,
-      totalPremiumResults,
+      total,
+      totalPaid,
+      totalFree: Math.max(total - totalPaid, 0),
       premiumResultsThisMonth,
     };
   }

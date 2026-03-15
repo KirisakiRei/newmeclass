@@ -32,6 +32,7 @@ import { getApiErrorMessage } from '../../services/api-error';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import { formatCurrency } from '../../lib/utils';
 import { buildFrontendUrl } from '../../lib/public-url';
+import { copyTextToClipboard } from '../../lib/clipboard';
 import ResponsiveTabs from '../../components/ui/responsive-tabs';
 
 const fmt = formatCurrency;
@@ -110,10 +111,14 @@ export default function MitraDashboard() {
     navigate('/mitra/login');
   };
 
-  const handleCopyInvite = () => {
+  const handleCopyInvite = async () => {
     const link = buildFrontendUrl('/yayasan/register', { mitra: mitra.inviteCode });
-    navigator.clipboard.writeText(link);
-    toast({ title: 'Disalin!', description: 'Link undangan yayasan berhasil disalin' });
+    const copied = await copyTextToClipboard(link);
+    toast({
+      title: copied ? 'Disalin!' : 'Salin gagal',
+      description: copied ? 'Link undangan yayasan berhasil disalin' : 'Browser menolak akses clipboard. Coba salin manual dari kolom link.',
+      variant: copied ? 'default' : 'destructive',
+    });
   };
 
   const openDetail = async (yayasanId) => {
@@ -257,7 +262,7 @@ export default function MitraDashboard() {
               <CardContent>
                 <div className="flex gap-2">
                   <Input value={buildFrontendUrl('/yayasan/register', { mitra: mitra.inviteCode || '' })} readOnly className="bg-[#1a1a1a] border-yellow-400/20 text-white" />
-                  <Button onClick={handleCopyInvite} className="bg-yellow-400 text-black hover:bg-yellow-500 shrink-0">
+                  <Button onClick={() => void handleCopyInvite()} className="bg-yellow-400 text-black hover:bg-yellow-500 shrink-0">
                     <Copy className="w-4 h-4 mr-2" /> Salin
                   </Button>
                 </div>
@@ -389,7 +394,13 @@ export default function MitraDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card className="bg-[#2a2a2a] border-yellow-400/20">
                 <CardHeader><CardTitle className="text-white">Saldo Wallet</CardTitle></CardHeader>
-                <CardContent><p className="text-4xl font-bold text-yellow-400">{fmt(wallet.balance || 0)}</p></CardContent>
+                <CardContent className="space-y-3">
+                  <p className="text-4xl font-bold text-yellow-400">{fmt(wallet.balance || 0)}</p>
+                  <div className="rounded-lg bg-[#1a1a1a] p-3 text-sm">
+                    <p className="text-gray-400">Dana dicadangkan untuk penarikan pending</p>
+                    <p className="mt-1 font-semibold text-white">{fmt(wallet.reserveBalance || 0)}</p>
+                  </div>
+                </CardContent>
               </Card>
 
               <Card className="bg-[#2a2a2a] border-yellow-400/20">

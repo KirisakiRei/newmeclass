@@ -41,6 +41,7 @@ const isUserEndpoint = (url = '') => (
 );
 const isCertificateUserEndpoint = (url = '') => (
   url.startsWith('/certificates/generate-newme/')
+  || url.startsWith('/certificates/preview-data/')
   || url.startsWith('/certificates/download-ai-certificate')
   || url.startsWith('/certificates/check-eligibility')
 );
@@ -251,6 +252,14 @@ export const transactionsAPI = {
   getStats: () => apiClient.get('/transactions/stats/summary'),
 };
 
+export const financeAPI = {
+  getRevenue: (params) => apiClient.get('/finance/revenue', { params }),
+  getTransactions: (params) => apiClient.get('/finance/transactions', { params }),
+  getDisbursements: (params) => apiClient.get('/finance/disbursements', { params }),
+  processDisbursement: (id, data) => apiClient.put(`/finance/disbursements/${id}/process`, data),
+  createDeveloperDisbursement: (data) => apiClient.post('/finance/disbursements/developer', data),
+};
+
 // Certificates API
 export const certificatesAPI = {
   getTemplate: (certType) => apiClient.get('/certificates/template', { params: { certType } }),
@@ -267,6 +276,7 @@ export const certificatesAPI = {
   issue: (data) => apiClient.post('/certificates/issue', data),
   verify: (certificateNumber) => apiClient.get(`/certificates/verify/${certificateNumber}`),
   checkEligibility: () => apiClient.get('/certificates/check-eligibility'),
+  getPreviewData: (userId) => apiClient.get(`/certificates/preview-data/${userId}`),
   downloadAICertificate: () => apiClient.get('/certificates/download-ai-certificate', { responseType: 'arraybuffer' }),
   generateMyCertificate: (userId) => apiClient.get(`/certificates/generate-newme/${userId}`, { responseType: 'arraybuffer' }),
   generateYayasanUserCertificate: (userId) => apiClient.get(`/certificates/generate-newme/${userId}`, { responseType: 'arraybuffer' }),
@@ -294,6 +304,7 @@ export const settingsAPI = {
     };
   },
   getTestPrice: () => apiClient.get('/settings/test-price'),
+  getSystemSummary: () => apiClient.get('/settings/system-summary'),
   update: (data) => apiClient.put('/settings', data),
   uploadAsset: (assetType, file) => {
     const formData = new FormData();
@@ -328,6 +339,7 @@ export const userPaymentsAPI = {
   }),
   createQRIS: () => apiClient.post('/user-payments/create-qris'),
   createSnap: (data) => apiClient.post('/user-payments/create-snap', data || {}),
+  cancelPayment: (orderId) => apiClient.post(`/user-payments/cancel-payment/${orderId}`),
   checkQRIS: (uniqueCode) => apiClient.get(`/user-payments/check-qris/${uniqueCode}`),
   checkPayment: (orderId) => apiClient.get(`/user-payments/check-payment/${orderId}`),
   getStatus: (userId) => apiClient.get(`/user-payments/status/${userId}`),
@@ -384,12 +396,15 @@ export const personalityTestsAPI = {
   getStats: () => apiClient.get('/personality-tests/stats'),
 };
 
-// AI Analysis API
-export const aiAnalysisAPI = {
+// Personal Analysis API
+const personalAnalysisClient = {
   analyze: (data) => apiClient.post('/ai-analysis/analyze', data),
   getMyAnalyses: () => apiClient.get('/ai-analysis/my-analyses'),
   getLatest: () => apiClient.get('/ai-analysis/latest'),
 };
+
+export const personalAnalysisAPI = personalAnalysisClient;
+export const aiAnalysisAPI = personalAnalysisClient;
 
 export const testAccessAPI = {
   check: () => apiClient.get('/test-access/check'),

@@ -21,6 +21,7 @@ type PersonalityTemplateRecord = {
 
 type CertificateTemplateInput = {
   certType: string;
+  styleVersion: string;
   titleText: string;
   subtitleText: string;
   completionText: string;
@@ -28,11 +29,12 @@ type CertificateTemplateInput = {
   signerTitle: string;
   textColor: string;
   accentColor: string;
-  backgroundUrl: string | null;
-  logoUrl: string | null;
+  backgroundTextureUrl: string | null;
+  brandLogoUrl: string | null;
+  secondaryLogoUrl: string | null;
+  productionBadgeUrl: string | null;
   signatureUrl: string | null;
   organization: string;
-  layoutPositions: Record<string, any>;
 };
 
 type CertificateTemplateRow = {
@@ -63,41 +65,39 @@ const CERTIFICATE_TEMPLATE_SETTING_PREFIX = 'certificate-template:';
 const DEFAULT_CERTIFICATE_TEMPLATE: Record<CertificateType, CertificateTemplateInput> = {
   INDIVIDU: {
     certType: 'individu',
+    styleVersion: 'official-certificate-v1',
     titleText: 'SERTIFIKAT',
-    subtitleText: 'Personality Assessment Program',
+    subtitleText: 'ANALISA KEPRIBADIAN & JATIDIRI',
     completionText:
       'Telah berhasil menyelesaikan program asesmen kepribadian dan dinyatakan kompeten dalam memahami profil kepribadian melalui metode 5 Element.',
     signerName: 'Dr. Rina Wijaya, M.Psi',
     signerTitle: 'Direktur NEWMECLASS',
     textColor: '#1a1a1a',
-    accentColor: '#1a1a1a',
-    backgroundUrl: null,
-    logoUrl: '/logo.png',
+    accentColor: '#D4A017',
+    backgroundTextureUrl: null,
+    brandLogoUrl: '/logo.png',
+    secondaryLogoUrl: null,
+    productionBadgeUrl: null,
     signatureUrl: null,
     organization: 'PT. MITRA SEMESTA EDUCLASS',
-    layoutPositions: {
-      logo: { x: 50, y: 8, width: 12 },
-      signature: { x: 50, y: 75, width: 10 },
-    },
   },
   YAYASAN: {
     certType: 'yayasan',
-    titleText: 'SERTIFIKAT VIP',
-    subtitleText: 'Exclusive Personality Development Program',
+    styleVersion: 'official-certificate-v1',
+    titleText: 'SERTIFIKAT',
+    subtitleText: 'ANALISA KEPRIBADIAN & JATIDIRI',
     completionText:
       'Telah berhasil menyelesaikan program pengembangan kepribadian eksklusif melalui Yayasan dan dinyatakan kompeten dalam memahami potensi diri.',
     signerName: 'Dr. Rina Wijaya, M.Psi',
     signerTitle: 'Direktur NEWMECLASS',
     textColor: '#2c1810',
     accentColor: '#B8860B',
-    backgroundUrl: null,
-    logoUrl: '/logo.png',
+    backgroundTextureUrl: null,
+    brandLogoUrl: '/logo.png',
+    secondaryLogoUrl: null,
+    productionBadgeUrl: null,
     signatureUrl: null,
     organization: 'PT. MITRA SEMESTA EDUCLASS',
-    layoutPositions: {
-      logo: { x: 50, y: 8, width: 14 },
-      signature: { x: 50, y: 75, width: 11 },
-    },
   },
 };
 
@@ -199,6 +199,7 @@ export async function getDemoCertificateTemplate(certType: CertificateType): Pro
 
   return {
     certType: certType === CertificateType.INDIVIDU ? 'individu' : 'yayasan',
+    styleVersion: safeString(raw.styleVersion, fallback.styleVersion),
     titleText: safeString(raw.titleText, fallback.titleText),
     subtitleText: safeString(raw.subtitleText, fallback.subtitleText),
     completionText: safeString(raw.completionText, fallback.completionText),
@@ -206,22 +207,31 @@ export async function getDemoCertificateTemplate(certType: CertificateType): Pro
     signerTitle: safeString(raw.signerTitle, fallback.signerTitle),
     textColor: safeString(raw.textColor, fallback.textColor),
     accentColor: safeString(raw.accentColor, fallback.accentColor),
-    backgroundUrl:
-      typeof raw.backgroundUrl === 'string' || raw.backgroundUrl === null
-        ? raw.backgroundUrl
-        : fallback.backgroundUrl,
-    logoUrl:
-      typeof raw.logoUrl === 'string' || raw.logoUrl === null
-        ? raw.logoUrl
-        : fallback.logoUrl,
+    backgroundTextureUrl:
+      typeof raw.backgroundTextureUrl === 'string' || raw.backgroundTextureUrl === null
+        ? raw.backgroundTextureUrl
+        : (typeof raw.backgroundUrl === 'string' || raw.backgroundUrl === null
+          ? raw.backgroundUrl
+          : fallback.backgroundTextureUrl),
+    brandLogoUrl:
+      typeof raw.brandLogoUrl === 'string' || raw.brandLogoUrl === null
+        ? raw.brandLogoUrl
+        : fallback.brandLogoUrl,
+    secondaryLogoUrl:
+      typeof raw.secondaryLogoUrl === 'string' || raw.secondaryLogoUrl === null
+        ? raw.secondaryLogoUrl
+        : (typeof raw.logoUrl === 'string' || raw.logoUrl === null
+          ? raw.logoUrl
+          : fallback.secondaryLogoUrl),
+    productionBadgeUrl:
+      typeof raw.productionBadgeUrl === 'string' || raw.productionBadgeUrl === null
+        ? raw.productionBadgeUrl
+        : fallback.productionBadgeUrl,
     signatureUrl:
       typeof raw.signatureUrl === 'string' || raw.signatureUrl === null
         ? raw.signatureUrl
         : fallback.signatureUrl,
     organization: safeString(raw.organization, fallback.organization),
-    layoutPositions: Object.keys(safeObject(raw.layoutPositions)).length
-      ? safeObject(raw.layoutPositions)
-      : fallback.layoutPositions,
   };
 }
 
@@ -235,6 +245,7 @@ export function buildCertificateTemplateMetadata(
   const defaults = DEFAULT_CERTIFICATE_TEMPLATE[certType];
   return {
     certType: certType === CertificateType.INDIVIDU ? 'individu' : 'yayasan',
+    styleVersion: safeString(input.styleVersion, defaults.styleVersion),
     titleText: safeString(input.titleText || input.title, defaults.titleText),
     subtitleText: safeString(input.subtitleText, defaults.subtitleText),
     completionText: safeString(input.completionText, defaults.completionText),
@@ -243,17 +254,26 @@ export function buildCertificateTemplateMetadata(
     textColor: safeString(input.textColor, defaults.textColor),
     accentColor: safeString(input.accentColor, defaults.accentColor),
     organization: safeString(input.organization, defaults.organization),
-    layoutPositions: Object.keys(safeObject(input.layoutPositions)).length
-      ? safeObject(input.layoutPositions)
-      : defaults.layoutPositions,
-    backgroundUrl:
-      typeof input.backgroundUrl === 'string' || input.backgroundUrl === null
-        ? input.backgroundUrl
-        : defaults.backgroundUrl,
-    logoUrl:
-      typeof input.logoUrl === 'string' || input.logoUrl === null
-        ? input.logoUrl
-        : defaults.logoUrl,
+    backgroundTextureUrl:
+      typeof input.backgroundTextureUrl === 'string' || input.backgroundTextureUrl === null
+        ? input.backgroundTextureUrl
+        : (typeof input.backgroundUrl === 'string' || input.backgroundUrl === null
+          ? input.backgroundUrl
+          : defaults.backgroundTextureUrl),
+    brandLogoUrl:
+      typeof input.brandLogoUrl === 'string' || input.brandLogoUrl === null
+        ? input.brandLogoUrl
+        : defaults.brandLogoUrl,
+    secondaryLogoUrl:
+      typeof input.secondaryLogoUrl === 'string' || input.secondaryLogoUrl === null
+        ? input.secondaryLogoUrl
+        : (typeof input.logoUrl === 'string' || input.logoUrl === null
+          ? input.logoUrl
+          : defaults.secondaryLogoUrl),
+    productionBadgeUrl:
+      typeof input.productionBadgeUrl === 'string' || input.productionBadgeUrl === null
+        ? input.productionBadgeUrl
+        : defaults.productionBadgeUrl,
     signatureUrl:
       typeof input.signatureUrl === 'string' || input.signatureUrl === null
         ? input.signatureUrl
@@ -270,8 +290,8 @@ export function serializeCertificateTemplateForStorage(
     certType,
     title: payload.titleText,
     body: null,
-    backgroundUrl: payload.backgroundUrl,
-    logoUrl: payload.logoUrl,
+    backgroundUrl: payload.backgroundTextureUrl,
+    logoUrl: payload.secondaryLogoUrl,
     signatureUrl: payload.signatureUrl,
   };
 }
@@ -338,6 +358,7 @@ export async function mapCertificateTemplateForClient(
     _id: row.id || null,
     id: row.id || null,
     certType: certType === CertificateType.INDIVIDU ? 'individu' : 'yayasan',
+    styleVersion: safeString(merged.styleVersion, defaults.styleVersion),
     titleText: safeString(row.title, defaults.titleText),
     subtitleText: safeString(merged.subtitleText, defaults.subtitleText),
     completionText: safeString(merged.completionText, defaults.completionText),
@@ -345,12 +366,16 @@ export async function mapCertificateTemplateForClient(
     signerTitle: safeString(merged.signerTitle, defaults.signerTitle),
     textColor: safeString(merged.textColor, defaults.textColor),
     accentColor: safeString(merged.accentColor, defaults.accentColor),
-    backgroundUrl: row.backgroundUrl ?? defaults.backgroundUrl,
-    logoUrl: row.logoUrl ?? defaults.logoUrl,
+    backgroundTextureUrl: row.backgroundUrl ?? defaults.backgroundTextureUrl,
+    brandLogoUrl: safeString(merged.brandLogoUrl, defaults.brandLogoUrl || '/logo.png'),
+    secondaryLogoUrl: row.logoUrl ?? defaults.secondaryLogoUrl,
+    productionBadgeUrl:
+      typeof merged.productionBadgeUrl === 'string' || merged.productionBadgeUrl === null
+        ? merged.productionBadgeUrl
+        : defaults.productionBadgeUrl,
     signatureUrl: row.signatureUrl ?? defaults.signatureUrl,
     organization: safeString(merged.organization, defaults.organization),
-    layoutPositions: Object.keys(safeObject(merged.layoutPositions)).length
-      ? safeObject(merged.layoutPositions)
-      : defaults.layoutPositions,
+    backgroundUrl: row.backgroundUrl ?? defaults.backgroundTextureUrl,
+    logoUrl: row.logoUrl ?? defaults.secondaryLogoUrl,
   };
 }

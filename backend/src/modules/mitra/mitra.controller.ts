@@ -7,6 +7,7 @@ import {
   encodeWithdrawalNotes,
   mapDisbursementForClient,
   mapUserForClient,
+  parseWithdrawalNotes,
   toClientPaymentStatus,
   toClientTestStatus,
 } from 'src/common/mappers/client-shapes';
@@ -85,12 +86,17 @@ export class MitraController {
       }),
     ]);
     const revenue = sumTx._sum.commission || 0;
+    const reserved = disbursements
+      .filter((d) => d.status === 'PENDING' || d.status === 'PROCESSING')
+      .reduce((acc, d) => acc + d.amount, 0);
     const out = disbursements.filter((d) => d.status === 'APPROVED').reduce((acc, d) => acc + d.amount, 0);
     return {
-      balance: Math.max(revenue - out, 0),
+      balance: Math.max(revenue - out - reserved, 0),
+      reserveBalance: reserved,
       transactions: disbursements.map((row) => mapDisbursementForClient(row)),
       totalRevenue: revenue,
       totalDisbursed: out,
+      totalRequested: out + reserved,
     };
   }
 
@@ -581,9 +587,22 @@ export class MitraController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.SUPERADMIN)
   async approveWithdrawal(@Param('id') id: string, @Body() body: ProcessWithdrawalDto) {
+    const current = await this.prisma.disbursement.findUnique({ where: { id } });
+    const currentMeta = current ? parseWithdrawalNotes(current.notes) : null;
     const updated = await this.prisma.disbursement.update({
       where: { id },
-      data: { status: body.status === 'REJECTED' ? 'REJECTED' : 'APPROVED', notes: body.notes || undefined, processedAt: new Date() },
+      data: {
+        status: body.status === 'REJECTED' ? 'REJECTED' : 'APPROVED',
+        notes: current
+          ? encodeWithdrawalNotes({
+              notes: body.notes ?? currentMeta?.notes,
+              bankName: currentMeta?.bankName,
+              bankAccount: currentMeta?.bankAccount,
+              accountName: currentMeta?.accountName,
+            })
+          : body.notes || undefined,
+        processedAt: new Date(),
+      },
     });
     return mapDisbursementForClient(updated);
   }

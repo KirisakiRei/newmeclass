@@ -34,10 +34,7 @@ import {
   mapCertificateTemplateForClient,
   serializeCertificateTemplateForStorage,
 } from 'src/common/demo-frontend-reference';
-import {
-  buildDisplayAnalysis,
-  buildTemplateInsights,
-} from 'src/common/personality-result-shape';
+import { mapTestResultForClient } from 'src/common/mappers/test-result-client-shapes';
 import { PrismaService } from '../prisma/prisma.service';
 
 const CERT_DOWNLOAD_RATE_LIMIT_TTL_MS = Number(process.env.CERT_DOWNLOAD_RATE_LIMIT_TTL || 60) * 1000;
@@ -67,12 +64,114 @@ export class CertificatesController {
     return dir;
   }
 
-  private publicUploadUrl(request: Request, fileName: string) {
-    return `${request.protocol}://${request.get('host')}/uploads/certificates/${fileName}`;
+  private publicUploadUrl(_request: Request, fileName: string) {
+    return `/uploads/certificates/${fileName}`;
   }
 
   private sanitizeFileSegment(value: string) {
     return value.replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 'asset';
+  }
+
+  private async findLatestCertificateResult(userId: string, includeUser = false) {
+    const baseWhere = { userId };
+    const baseSelect = includeUser
+      ? {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              fullName: true,
+              phone: true,
+              role: true,
+              profile: {
+                select: {
+                  province: true,
+                  city: true,
+                  extra: true,
+                },
+              },
+            },
+          },
+        }
+      : undefined;
+
+    const latestPaid = await this.prisma.testResult.findFirst({
+      where: { ...baseWhere, testType: 'paid' },
+      orderBy: { createdAt: 'desc' },
+      ...(baseSelect ? { include: baseSelect } : {}),
+    });
+
+    if (latestPaid) {
+      return latestPaid;
+    }
+
+    return this.prisma.testResult.findFirst({
+      where: baseWhere,
+      orderBy: { createdAt: 'desc' },
+      ...(baseSelect ? { include: baseSelect } : {}),
+    });
+  }
+
+  private buildCertificatePersonalityData(resultDto: any, existingData: Record<string, any> = {}) {
+    const source = this.safeObject(existingData);
+    const analysis = this.safeObject(resultDto?.analysis);
+    const insights = this.safeObject(analysis.insights);
+    const personalInsights = this.safeObject(analysis.personalInsights || analysis.aiInsights);
+    const displayAnalysis = this.safeObject(resultDto?.displayAnalysis);
+
+    return {
+      ...source,
+      code: resultDto?.personalityCode || source.code || null,
+      personalityType:
+        displayAnalysis.personalityType
+        || analysis.personalityType
+        || source.personalityType
+        || source.personalityLabel
+        || null,
+      personalityLabel:
+        insights.personalityLabel
+        || source.personalityLabel
+        || displayAnalysis.personalityType
+        || analysis.personalityType
+        || null,
+      dominantElement: resultDto?.dominantElement || analysis.dominantElement || source.dominantElement || null,
+      summary: displayAnalysis.summary || source.summary || personalInsights.ringkasanKepribadian || '',
+      elementDescription:
+        insights.elementDescription
+        || source.elementDescription
+        || personalInsights.ringkasanKepribadian
+        || [],
+      karakter:
+        insights.karakter
+        || source.karakter
+        || personalInsights.tipsPraktis
+        || [],
+      ciriKhas:
+        insights.ciriKhas
+        || source.ciriKhas
+        || personalInsights.tipsPraktis
+        || [],
+      rekomendasiKarir:
+        insights.rekomendasiKarir
+        || insights.dibutuhkanPadaProfesi
+        || source.rekomendasiKarir
+        || personalInsights.rekomendasiKarirSpesifik
+        || '',
+      kekuatanJatidiri:
+        insights.kekuatanJatidiri
+        || source.kekuatanJatidiri
+        || {},
+      kompilasiAdaptasi:
+        insights.kompilasiAdaptasi
+        || source.kompilasiAdaptasi
+        || personalInsights.strategiPengembanganDiri
+        || {},
+      elementScores:
+        displayAnalysis.elementScores
+        || analysis.elementScores
+        || source.elementScores
+        || {},
+    };
   }
 
   private async findTemplateForResult(result: {
@@ -109,62 +208,39 @@ export class CertificatesController {
   }) {
     const metadata = this.safeObject(input.metadata);
     const existingData = this.safeObject(metadata.personalityData);
-    if (Object.keys(existingData).length) {
-      return {
-        personalityCode: metadata.personalityCode || existingData.code || null,
-        personalityType:
-          metadata.personalityType
-          || existingData.personalityType
-          || existingData.personalityLabel
-          || null,
-        personalityData: existingData,
-      };
-    }
 
     const result = input.testResultId
       ? await this.prisma.testResult.findUnique({
           where: { id: input.testResultId },
         })
       : input.userId
-        ? await this.prisma.testResult.findFirst({
-            where: { userId: input.userId },
-            orderBy: { createdAt: 'desc' },
-          })
+        ? await this.findLatestCertificateResult(input.userId)
         : null;
 
     if (!result) {
       return {
         personalityCode: metadata.personalityCode || null,
         personalityType: metadata.personalityType || null,
-        personalityData: null,
+        personalityData: Object.keys(existingData).length ? existingData : null,
       };
     }
 
-    const template = await this.findTemplateForResult(result);
-    const displayAnalysis = buildDisplayAnalysis(
-      template,
-      result.normalizedScores || result.elementScores,
-      result.personalityCode || 'Hasil Kepribadian',
-    );
-    const insights = buildTemplateInsights(template, result.personalityCode || undefined) as Record<string, any>;
+    const resultDto = await mapTestResultForClient(this.prisma, result as any);
+    const normalizedPersonalityData = this.buildCertificatePersonalityData(resultDto, existingData);
 
     return {
-      personalityCode: result.personalityCode || insights.code || null,
-      personalityType: displayAnalysis.personalityType,
-      personalityData: {
-        code: result.personalityCode || insights.code || null,
-        personalityType: displayAnalysis.personalityType,
-        personalityLabel: insights.personalityLabel || displayAnalysis.personalityType,
-        dominantElement: result.dominantElement || null,
-        summary: displayAnalysis.summary,
-        elementDescription: insights.elementDescription || [],
-        karakter: insights.karakter || [],
-        ciriKhas: insights.ciriKhas || [],
-        rekomendasiKarir: insights.rekomendasiKarir || insights.dibutuhkanPadaProfesi || '',
-        kekuatanJatidiri: insights.kekuatanJatidiri || {},
-        kompilasiAdaptasi: insights.kompilasiAdaptasi || {},
-        elementScores: displayAnalysis.elementScores,
-      },
+      personalityCode:
+        resultDto?.personalityCode
+        || metadata.personalityCode
+        || normalizedPersonalityData.code
+        || null,
+      personalityType:
+        resultDto?.displayAnalysis?.personalityType
+        || metadata.personalityType
+        || normalizedPersonalityData.personalityType
+        || normalizedPersonalityData.personalityLabel
+        || null,
+      personalityData: normalizedPersonalityData,
     };
   }
 
@@ -230,6 +306,101 @@ export class CertificatesController {
     response.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     response.setHeader('Content-Length', payload.length);
     response.end(payload);
+  }
+
+  private async assertCertificateAccess(currentUser: any, userId: string) {
+    const isSelfOrAdmin =
+      currentUser.sub === userId || [Role.ADMIN, Role.SUPERADMIN].includes(currentUser.role);
+
+    if (!isSelfOrAdmin && currentUser.role === Role.YAYASAN) {
+      const yayasan = await this.prisma.user.findUnique({
+        where: { id: currentUser.sub },
+        select: { myReferralCode: true },
+      });
+      const targetUserScope = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { referredByCode: true },
+      });
+
+      if (!yayasan?.myReferralCode || targetUserScope?.referredByCode !== yayasan.myReferralCode) {
+        throw new ForbiddenException('Insufficient role');
+      }
+      return;
+    }
+
+    if (!isSelfOrAdmin) {
+      throw new ForbiddenException('Insufficient role');
+    }
+  }
+
+  private async getCertificateSourceData(userId: string) {
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        profile: {
+          select: {
+            extra: true,
+          },
+        },
+      },
+    });
+    if (!targetUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    const latestResult = await this.findLatestCertificateResult(userId, true);
+
+    const personality = await this.resolvePersonalityData({
+      userId,
+      testResultId: latestResult?.id || null,
+    });
+    const targetExtra = this.safeObject(targetUser.profile?.extra);
+    const latestResultExtra = this.safeObject((latestResult as any)?.user?.profile?.extra);
+    const resolvedCertType =
+      targetExtra.isYayasanLinked || latestResultExtra.isYayasanLinked
+        ? CertificateType.YAYASAN
+        : CertificateType.INDIVIDU;
+
+    let cert = await this.prisma.issuedCertificate.findFirst({
+      where: { userId },
+      orderBy: { issuedAt: 'desc' },
+    });
+
+    if (cert && cert.certType !== resolvedCertType) {
+      cert = await this.prisma.issuedCertificate.update({
+        where: { id: cert.id },
+        data: { certType: resolvedCertType },
+      });
+    }
+
+    if (!cert) {
+      cert = await this.prisma.issuedCertificate.create({
+        data: {
+          certificateNumber: `${process.env.CERT_NUMBER_PREFIX || 'NEWME'}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${targetUser.id.slice(-6).toUpperCase()}`,
+          userId,
+          certType: resolvedCertType,
+          testResultId: latestResult?.id || null,
+          metadata: {
+            userName: targetUser.fullName,
+            userEmail: targetUser.email,
+            courseName: 'NEWME Personality Assessment',
+            personalityCode: personality.personalityCode,
+            personalityType: personality.personalityType,
+            personalityData: personality.personalityData,
+          },
+        },
+      });
+    }
+
+    return {
+      targetUser,
+      latestResult,
+      cert,
+      personality,
+    };
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -328,10 +499,7 @@ export class CertificatesController {
     const latestResult = body.testResultId
       ? await this.prisma.testResult.findUnique({ where: { id: body.testResultId } })
       : body.userId
-        ? await this.prisma.testResult.findFirst({
-            where: { userId: body.userId },
-            orderBy: { createdAt: 'desc' },
-          })
+        ? await this.findLatestCertificateResult(body.userId)
         : null;
     const personality = await this.resolvePersonalityData({
       userId: body.userId || null,
@@ -383,6 +551,36 @@ export class CertificatesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('preview-data/:userId')
+  async previewData(@CurrentUser() currentUser: any, @Param('userId') userId: string) {
+    await this.assertCertificateAccess(currentUser, userId);
+    const { latestResult, cert, targetUser } = await this.getCertificateSourceData(userId);
+
+    if (!latestResult) {
+      throw new NotFoundException('Test result not found');
+    }
+
+    const result = await mapTestResultForClient(this.prisma, latestResult);
+    const enrichedCert = await this.enrichCertificate(cert);
+    const templateRow = await this.prisma.certificateTemplate.findUnique({
+      where: { certType: this.toCertificateType(enrichedCert.certType) },
+    });
+    const template = await mapCertificateTemplateForClient(this.prisma, templateRow);
+
+    return {
+      certificateNumber: enrichedCert.certificateNumber,
+      issuedAt: enrichedCert.issuedAt,
+      courseName: enrichedCert.courseName || 'NEWME Personality Assessment',
+      certType: enrichedCert.certType,
+      userId: targetUser.id,
+      userName: targetUser.fullName,
+      userEmail: targetUser.email,
+      template,
+      result,
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: CERT_AI_DOWNLOAD_RATE_LIMIT, ttl: CERT_DOWNLOAD_RATE_LIMIT_TTL_MS } })
   @Get('download-ai-certificate')
   downloadAi(@Res() response: Response) {
@@ -410,62 +608,8 @@ export class CertificatesController {
   @Throttle({ default: { limit: CERT_GENERATE_RATE_LIMIT, ttl: CERT_DOWNLOAD_RATE_LIMIT_TTL_MS } })
   @Get('generate-newme/:userId')
   async generateNewme(@CurrentUser() currentUser: any, @Param('userId') userId: string, @Res() response: Response) {
-    const isSelfOrAdmin =
-      currentUser.sub === userId || [Role.ADMIN, Role.SUPERADMIN].includes(currentUser.role);
-
-    if (!isSelfOrAdmin && currentUser.role === Role.YAYASAN) {
-      const yayasan = await this.prisma.user.findUnique({
-        where: { id: currentUser.sub },
-        select: { myReferralCode: true },
-      });
-      const targetUserScope = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { referredByCode: true },
-      });
-
-      if (!yayasan?.myReferralCode || targetUserScope?.referredByCode !== yayasan.myReferralCode) {
-        throw new ForbiddenException('Insufficient role');
-      }
-    } else if (!isSelfOrAdmin) {
-      throw new ForbiddenException('Insufficient role');
-    }
-    const targetUser = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, fullName: true, email: true },
-    });
-    if (!targetUser) {
-      throw new NotFoundException('User not found');
-    }
-
-    const latestResult = await this.prisma.testResult.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-    const personality = await this.resolvePersonalityData({
-      userId,
-      testResultId: latestResult?.id || null,
-    });
-
-    const existing = await this.prisma.issuedCertificate.findFirst({
-      where: { userId },
-      orderBy: { issuedAt: 'desc' },
-    });
-    const cert = existing || await this.prisma.issuedCertificate.create({
-      data: {
-        certificateNumber: `${process.env.CERT_NUMBER_PREFIX || 'NEWME'}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${targetUser.id.slice(-6).toUpperCase()}`,
-        userId,
-        certType: 'INDIVIDU',
-        testResultId: latestResult?.id || null,
-        metadata: {
-          userName: targetUser.fullName,
-          userEmail: targetUser.email,
-          courseName: 'NEWME Personality Assessment',
-          personalityCode: personality.personalityCode,
-          personalityType: personality.personalityType,
-          personalityData: personality.personalityData,
-        },
-      },
-    });
+    await this.assertCertificateAccess(currentUser, userId);
+    const { cert, targetUser } = await this.getCertificateSourceData(userId);
 
     const enriched = await this.enrichCertificate(cert);
     this.sendPdf(response, `newme-${targetUser.id}.pdf`, this.buildCertificatePdf(enriched));

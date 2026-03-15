@@ -49,7 +49,7 @@ const CertificateDetail = () => {
     );
   }
 
-  const isVip = cert.certType === 'yayasan';
+  const isYayasan = cert.certType === 'yayasan';
 
   return (
     <div>
@@ -76,7 +76,6 @@ const CertificateDetail = () => {
             certificateNumber={cert.certificateNumber}
             date={new Date(cert.issuedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
             personalityData={cert.personalityData}
-            editable={false}
           />
         </CardContent>
       </Card>
@@ -112,9 +111,9 @@ const CertificateDetail = () => {
               <div>
                 <p className="text-gray-400 text-xs">Tipe</p>
                 <span className={`inline-block px-2 py-0.5 rounded text-xs ${
-                  isVip ? 'bg-purple-400/20 text-purple-400' : 'bg-blue-400/20 text-blue-400'
+                  isYayasan ? 'bg-purple-400/20 text-purple-400' : 'bg-blue-400/20 text-blue-400'
                 }`}>
-                  {isVip ? 'Yayasan VIP' : 'Individu'}
+                  {isYayasan ? 'Yayasan' : 'Individu'}
                 </span>
               </div>
             </div>

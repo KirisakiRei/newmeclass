@@ -43,6 +43,7 @@ const UserDashboard = lazy(() => import('./pages/user/UserDashboard'));
 const UserTest = lazy(() => import('./pages/user/UserTest'));
 const Wallet = lazy(() => import('./pages/user/Wallet'));
 const TestResult = lazy(() => import('./pages/user/TestResult'));
+const CertificateDownload = lazy(() => import('./pages/shared/CertificateDownload'));
 
 // Admin pages are downloaded only when a user navigates to /admin/*
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
@@ -165,6 +166,8 @@ const AppContent = () => {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/certificate-download/:userId" element={<CertificateDownload />} />
         
         {/* Mitra routes */}
         <Route path="/mitra" element={<Navigate to="/mitra/login" replace />} />

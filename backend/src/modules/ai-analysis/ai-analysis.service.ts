@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { mapTestResultForClient } from 'src/common/mappers/test-result-client-shapes';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -31,23 +32,30 @@ export class AiAnalysisService {
     if (!latest) {
       return { success: false, message: 'No analysis found' };
     }
-    return {
-      success: true,
-      analysis: {
-        id: latest.id,
-        resultId: latest.id,
-        testType: latest.testType,
-        dominantElement: latest.dominantElement,
-        personalityCode: latest.personalityCode,
-        aiAnalysis: latest.aiInsights || {
-          personalityType: latest.personalityCode,
-          summary: 'Rules-based premium analysis',
-          strengths: ['Resilience'],
-          areasToImprove: ['Focus'],
-          careerRecommendations: ['Strategist'],
-          elementScores: latest.normalizedScores,
+    const hydrated = await this.prisma.testResult.findUnique({
+      where: { id: latest.id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            phone: true,
+            profile: {
+              select: {
+                province: true,
+                city: true,
+                extra: true,
+              },
+            },
+          },
         },
       },
+    });
+
+    return {
+      success: true,
+      analysis: await mapTestResultForClient(this.prisma, hydrated),
     };
   }
 }

@@ -43,6 +43,14 @@ const YayasanRegister = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!mitraReferralCode) {
+      toast({
+        title: 'Link undangan wajib',
+        description: 'Pendaftaran yayasan hanya bisa dilakukan melalui link undangan mitra.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setLoading(true);
 
     try {
@@ -87,6 +95,14 @@ const YayasanRegister = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {!mitraReferralCode && (
+              <div className="mb-6 rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-sm">
+                <p className="font-medium text-red-300">Registrasi yayasan dikunci melalui invite link mitra.</p>
+                <p className="mt-2 text-gray-300">
+                  Minta link undangan dari mitra NEWME terlebih dahulu, lalu buka kembali halaman ini melalui link tersebut.
+                </p>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               {formData.referralCode && (
                 <div className="bg-green-400/10 border border-green-400/30 rounded-lg p-4 text-sm">
@@ -206,7 +222,7 @@ const YayasanRegister = () => {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !mitraReferralCode}
                 className="w-full bg-yellow-400 text-black hover:bg-yellow-500"
               >
                 {loading ? (
@@ -215,7 +231,7 @@ const YayasanRegister = () => {
                     Memproses...
                   </span>
                 ) : (
-                  'Daftar Yayasan'
+                  mitraReferralCode ? 'Daftar Yayasan' : 'Butuh Link Undangan Mitra'
                 )}
               </Button>
             </form>

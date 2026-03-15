@@ -16,6 +16,7 @@ import { formatDateTime } from '../../lib/utils';
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const asArray = (value) => (Array.isArray(value) ? value : []);
 const asObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+const extractPayload = (value) => (value && typeof value === 'object' && 'data' in value ? value.data : value);
 
 const PremiumResults = () => {
   const { toast } = useToast();
@@ -38,7 +39,8 @@ const PremiumResults = () => {
       const response = await axios.get(`${API_URL}/api/test-results/admin/premium-results`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setResults(response.data.results || []);
+      const payload = extractPayload(response.data);
+      setResults(Array.isArray(payload) ? payload : payload?.results || []);
     } catch (error) {
       toast({
         title: 'Error',
@@ -56,7 +58,7 @@ const PremiumResults = () => {
       const response = await axios.get(`${API_URL}/api/test-results/admin/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setStats(response.data);
+      setStats(extractPayload(response.data));
     } catch (error) {
       console.error('Error loading stats:', error);
     }
@@ -69,7 +71,7 @@ const PremiumResults = () => {
       const response = await axios.get(`${API_URL}/api/test-results/admin/premium-results/${result.userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSelectedResult(response.data);
+      setSelectedResult(extractPayload(response.data));
       setShowDetailDialog(true);
     } catch (error) {
       toast({
@@ -109,7 +111,7 @@ const PremiumResults = () => {
     return <LoadingSpinner size="lg" text="Memuat hasil premium..." className="min-h-[60vh]" />;
   }
 
-  const selectedAnalysis = asObject(selectedResult?.displayAnalysis || selectedResult?.aiAnalysis);
+  const selectedAnalysis = asObject(selectedResult?.displayAnalysis);
   const selectedElementScores = asObject(selectedAnalysis.elementScores);
   const selectedStrengths = asArray(selectedAnalysis.strengths);
   const selectedAreasToImprove = asArray(selectedAnalysis.areasToImprove);
@@ -123,7 +125,7 @@ const PremiumResults = () => {
       <PageHeader icon={Trophy} title="Hasil Test Premium" description="Lihat hasil analisis test premium pengguna" />
 
       {/* Stats */}
-      {stats && (
+          {stats && (
         <StatsGrid columns={3} stats={[
           { label: 'Total Test Premium', value: stats.totalPaid || 0, icon: Trophy, iconBg: 'bg-yellow-400/10', iconColor: 'text-yellow-400', valueColor: 'text-yellow-400' },
           { label: 'Total Test Gratis', value: stats.totalFree || 0, icon: Star, iconBg: 'bg-green-400/10', iconColor: 'text-green-400', valueColor: 'text-green-400' },

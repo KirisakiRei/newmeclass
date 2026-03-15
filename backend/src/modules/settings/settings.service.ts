@@ -217,4 +217,34 @@ export class SettingsService {
     value.testPriceSettings.basePrice = Math.max(Number(value.testPriceSettings.basePrice || value.testPrice || 100000), 100000);
     return value;
   }
+
+  async getSystemSummary() {
+    const all = await this.getAll();
+    const gatewayConfigured = !!String(process.env.MIDTRANS_SERVER_KEY || '').trim();
+    return {
+      pricing: {
+        testPrice: Math.max(Number(all.paymentAmount || all.testPrice || 100000), 100000),
+        referralTotalPrice: 250000,
+        referralShareBudget: 150000,
+        yayasanPricingManagedBy: 'mitra_approval_and_admin_review',
+      },
+      developerFee: {
+        percent: Math.max(Number(all.devFeePercent || 5), 0),
+        bankName: all.devBankName || '',
+        bankAccount: all.devBankAccount || '',
+        accountName: all.devAccountName || '',
+      },
+      paymentGateway: {
+        activeProvider: 'MIDTRANS',
+        mode: String(process.env.MIDTRANS_IS_PRODUCTION || 'false').toLowerCase() === 'true' ? 'production' : 'sandbox',
+        isConfigured: gatewayConfigured,
+        legacyPaydisiniConfigured: !!String(all.paydisiniApiKey || '').trim(),
+      },
+      featureFlags: {
+        allowRegistration: !!all.allowRegistration,
+        requirePayment: !!all.requirePayment,
+        maintenanceMode: !!all.maintenanceMode,
+      },
+    };
+  }
 }

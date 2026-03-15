@@ -9,11 +9,12 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { useToast } from '../../hooks/use-toast';
-import { authAPI, certificatesAPI, yayasanAPI } from '../../services/api';
+import { authAPI, yayasanAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import { formatCurrency } from '../../lib/utils';
 import { buildFrontendUrl } from '../../lib/public-url';
+import { copyTextToClipboard } from '../../lib/clipboard';
 import ResponsiveTabs from '../../components/ui/responsive-tabs';
 
 const fmt = formatCurrency;
@@ -106,8 +107,12 @@ export default function YayasanDashboard() {
 
   const handleCopyReferral = async () => {
     if (!referralLink) return;
-    await navigator.clipboard.writeText(referralLink);
-    toast({ title: 'Tersalin', description: 'Link referral yayasan berhasil disalin.' });
+    const copied = await copyTextToClipboard(referralLink);
+    toast({
+      title: copied ? 'Tersalin' : 'Salin gagal',
+      description: copied ? 'Link referral yayasan berhasil disalin.' : 'Browser menolak akses clipboard. Coba salin manual dari kolom link.',
+      variant: copied ? 'default' : 'destructive',
+    });
   };
 
   const handleOpenUserDetail = async (id) => {
@@ -127,18 +132,12 @@ export default function YayasanDashboard() {
   const handleDownloadCertificate = async (userId) => {
     setDownloadingUserId(userId);
     try {
-      const response = await certificatesAPI.generateYayasanUserCertificate(userId);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `sertifikat-${userId}.pdf`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.URL.revokeObjectURL(url);
+      const opened = window.open(`/certificate-download/${userId}?download=1`, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        throw new Error('Popup blocked');
+      }
     } catch (error) {
-      toast({ title: 'Gagal download sertifikat', description: getApiErrorMessage(error, 'Sertifikat belum bisa diunduh saat ini.'), variant: 'destructive' });
+      toast({ title: 'Gagal membuka sertifikat', description: getApiErrorMessage(error, 'Izinkan pop-up browser untuk menyimpan sertifikat sebagai PDF.'), variant: 'destructive' });
     } finally {
       setDownloadingUserId('');
     }
@@ -349,6 +348,10 @@ export default function YayasanDashboard() {
                     <p className="text-sm text-gray-400">Saldo Wallet</p>
                     <p className="mt-1 text-4xl font-black text-yellow-400">{fmt(wallet.balance || 0)}</p>
                     <p className="mt-2 text-xs text-gray-500">Komisi dari peserta yayasan yang berhasil membayar test premium.</p>
+                    <div className="mt-4 rounded-lg bg-[#1a1a1a] p-3 text-sm">
+                      <p className="text-gray-400">Dana dicadangkan untuk penarikan pending</p>
+                      <p className="mt-1 font-semibold text-white">{fmt(wallet.reserveBalance || 0)}</p>
+                    </div>
                   </CardContent>
                 </Card>
                 <Card className="border-yellow-400/20 bg-[#2a2a2a]">
@@ -399,14 +402,14 @@ export default function YayasanDashboard() {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div><p className="text-xs text-gray-400">Nama</p><p className="text-white">{userDetail.fullName}</p></div>
                 <div><p className="text-xs text-gray-400">Email</p><p className="text-white">{userDetail.email}</p></div>
-                <div><p className="text-xs text-gray-400">Status Bayar</p><span className={`inline-flex rounded-full px-2 py-1 text-xs ${paymentColor(userDetail.paymentStatus)}`}>{paymentLabel(userDetail.paymentStatus)}</span></div>
-                <div><p className="text-xs text-gray-400">Status Test</p><span className={`inline-flex rounded-full px-2 py-1 text-xs ${testColor(userDetail.paidTestStatus)}`}>{testLabel(userDetail.paidTestStatus)}</span></div>
+                              <div><p className="text-xs text-gray-400">Status Bayar</p><span className={`inline-flex rounded-full px-2 py-1 text-xs ${paymentColor(userDetail.paymentStatus)}`}>{paymentLabel(userDetail.paymentStatus)}</span></div>
+                              <div><p className="text-xs text-gray-400">Status Test</p><span className={`inline-flex rounded-full px-2 py-1 text-xs ${testColor(userDetail.paidTestStatus)}`}>{testLabel(userDetail.paidTestStatus)}</span></div>
               </div>
               {userDetail.latestResult ? (
                 <div className="rounded-lg bg-[#1a1a1a] p-4">
                   <p className="text-sm font-medium text-yellow-400">Ringkasan Hasil Test</p>
                   <p className="mt-2 text-sm text-gray-300">Elemen dominan: <span className="text-white">{userDetail.latestResult.dominantElement || '-'}</span></p>
-                  <p className="mt-1 text-sm text-gray-300">Kode kepribadian: <span className="text-white">{userDetail.latestResult.personalityCode || '-'}</span></p>
+                  <p className="mt-1 text-sm text-gray-300">Tipe kepribadian: <span className="text-white">{userDetail.latestResult.displayAnalysis?.personalityType || userDetail.latestResult.personalityType || userDetail.latestResult.personalityCode || '-'}</span></p>
                 </div>
               ) : (
                 <div className="rounded-lg bg-[#1a1a1a] p-4 text-sm text-gray-400">Pengguna ini belum memiliki hasil test premium.</div>
@@ -423,9 +426,9 @@ export default function YayasanDashboard() {
               <div><p className="text-lg font-semibold text-white">{resultDetail.userName}</p><p className="text-sm text-gray-400">{resultDetail.userEmail}</p></div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="rounded-lg bg-[#1a1a1a] p-4"><p className="text-xs text-gray-400">Dominan</p><p className="mt-1 text-yellow-400">{resultDetail.dominantLabel || '-'}</p></div>
-                <div className="rounded-lg bg-[#1a1a1a] p-4"><p className="text-xs text-gray-400">Tipe Kepribadian</p><p className="mt-1 text-white">{resultDetail.analysis?.personalityType || '-'}</p></div>
+                <div className="rounded-lg bg-[#1a1a1a] p-4"><p className="text-xs text-gray-400">Tipe Kepribadian</p><p className="mt-1 text-white">{resultDetail.displayAnalysis?.personalityType || resultDetail.analysis?.personalityType || resultDetail.personalityType || '-'}</p></div>
               </div>
-              <div className="rounded-lg bg-[#1a1a1a] p-4"><p className="text-xs text-gray-400">Insight Singkat</p><p className="mt-2 text-sm text-gray-300">{resultDetail.analysis?.insights?.personalityLabel || resultDetail.analysis?.insights?.ringkasan || 'Hasil test premium tersedia untuk pengguna ini.'}</p></div>
+              <div className="rounded-lg bg-[#1a1a1a] p-4"><p className="text-xs text-gray-400">Insight Singkat</p><p className="mt-2 text-sm text-gray-300">{resultDetail.displayAnalysis?.summary || resultDetail.analysis?.insights?.personalityLabel || 'Hasil test premium tersedia untuk pengguna ini.'}</p></div>
               <div className="flex justify-end"><Button className="bg-yellow-400 text-black hover:bg-yellow-500" disabled={downloadingUserId === resultDetail.userId} onClick={() => void handleDownloadCertificate(resultDetail.userId)}>{downloadingUserId === resultDetail.userId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDownToLine className="mr-2 h-4 w-4" />}Download Sertifikat</Button></div>
             </div>
           )}
