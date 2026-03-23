@@ -11,11 +11,15 @@ import StatsGrid from '../../components/ui/stats-grid';
 import LoadingSpinner, { TableSkeleton } from '../../components/ui/loading-spinner';
 import { formatCurrency } from '../../lib/utils';
 import axios from 'axios';
+import Pagination from '../../components/ui/pagination';
+import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 export default function AdminYayasan() {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [yayasanList, setYayasanList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openCard, setOpenCard] = useState(null);
@@ -23,22 +27,37 @@ export default function AdminYayasan() {
   const [showDetail, setShowDetail] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [userSearch, setUserSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [pagination, setPagination] = useState(createEmptyPageState(10));
   const token = () => localStorage.getItem('admin_token');
   const headers = () => ({ Authorization: `Bearer ${token()}` });
   const detailUsers = Array.isArray(detailYayasan?.users) ? detailYayasan.users : [];
   const detailStats = detailYayasan?.stats || {};
+  const canManageYayasan = adminAccess.hasPermission('yayasan.manage');
 
-  useEffect(() => { loadYayasan(); }, []);
+  useEffect(() => { loadYayasan(); }, [page, pageSize, searchTerm]);
 
   const loadYayasan = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/yayasan/admin/list`, { headers: headers() });
-      setYayasanList(res.data);
+      const res = await axios.get(`${API_URL}/api/yayasan/admin/list`, {
+        headers: headers(),
+        params: {
+          page,
+          pageSize,
+          search: searchTerm || undefined,
+        },
+      });
+      const nextPage = extractPaginatedResponse(res.data, pageSize);
+      setYayasanList(nextPage.items || []);
+      setPagination(nextPage);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
 
   const toggleActive = async (id, current) => {
+    if (!canManageYayasan) return;
     try {
       await axios.put(`${API_URL}/api/yayasan/admin/${id}/toggle-active`, {}, { headers: headers() });
       setYayasanList(prev => prev.map(y => y._id === id ? { ...y, isActive: !current } : y));
@@ -49,6 +68,7 @@ export default function AdminYayasan() {
   };
 
   const verify = async (id) => {
+    if (!canManageYayasan) return;
     try {
       await axios.put(`${API_URL}/api/yayasan/admin/${id}/verify`, {}, { headers: headers() });
       setYayasanList(prev => prev.map(y => y._id === id ? { ...y, isVerified: true } : y));
@@ -97,17 +117,17 @@ export default function AdminYayasan() {
         className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10" title="Lihat Detail">
         <Eye className="w-4 h-4" />
       </Button>
-      {!y.isVerified && (
+      {canManageYayasan && !y.isVerified ? (
         <Button size="sm" variant="ghost" onClick={() => verify(y._id)}
           className="text-green-400 hover:text-green-300 hover:bg-green-400/10" title="Verifikasi">
           <CheckCircle className="w-4 h-4" />
         </Button>
-      )}
-      <Button size="sm" variant="ghost" onClick={() => toggleActive(y._id, y.isActive)}
+      ) : null}
+      {canManageYayasan ? <Button size="sm" variant="ghost" onClick={() => toggleActive(y._id, y.isActive)}
         className={y.isActive ? 'text-green-400 hover:text-green-300 hover:bg-green-400/10' : 'text-red-400 hover:text-red-300 hover:bg-red-400/10'}
         title={y.isActive ? 'Nonaktifkan' : 'Aktifkan'}>
         {y.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-      </Button>
+      </Button> : null}
     </div>
   );
 
@@ -124,10 +144,22 @@ export default function AdminYayasan() {
       <PageHeader icon={Building2} title="Manajemen Yayasan" description="Kelola yayasan yang terdaftar di platform" />
 
       <StatsGrid stats={[
-        { label: 'Total Yayasan', value: yayasanList.length, icon: Building2, iconBg: 'bg-yellow-400/10', iconColor: 'text-yellow-400', valueColor: 'text-yellow-400' },
+        { label: 'Total Yayasan', value: pagination.total, icon: Building2, iconBg: 'bg-yellow-400/10', iconColor: 'text-yellow-400', valueColor: 'text-yellow-400' },
         { label: 'Terverifikasi', value: yayasanList.filter(y => y.isVerified).length, icon: ShieldCheck, iconBg: 'bg-blue-400/10', iconColor: 'text-blue-400', valueColor: 'text-blue-400' },
         { label: 'Aktif', value: yayasanList.filter(y => y.isActive).length, icon: Users, iconBg: 'bg-green-400/10', iconColor: 'text-green-400', valueColor: 'text-green-400' },
       ]} columns={3} />
+
+      <div className="flex items-center gap-3">
+        <Input
+          value={searchTerm}
+          onChange={(event) => {
+            setSearchTerm(event.target.value);
+            setPage(1);
+          }}
+          placeholder="Cari nama, email, atau kode referral..."
+          className="max-w-sm bg-[#2a2a2a] border-yellow-400/30 text-white"
+        />
+      </div>
 
       <Card className="bg-[#2a2a2a] border-yellow-400/20">
         <CardContent className="p-0">
@@ -210,6 +242,18 @@ export default function AdminYayasan() {
           </div>
         </CardContent>
       </Card>
+
+      <Pagination
+        currentPage={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.total}
+        pageSize={pagination.pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(nextSize) => {
+          setPageSize(nextSize);
+          setPage(1);
+        }}
+      />
 
       {/* Detail Modal */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>

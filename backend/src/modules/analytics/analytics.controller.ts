@@ -1,4 +1,10 @@
-import { Controller, Delete, Get, Post, Query } from '@nestjs/common';
+import { Controller, Delete, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Role } from '@prisma/client';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
+import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('analytics')
@@ -11,6 +17,9 @@ export class AnalyticsController {
   }
 
   @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('analytics.view')
   async stats() {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -68,6 +77,9 @@ export class AnalyticsController {
   }
 
   @Get('online-users')
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('analytics.view')
   async onlineUsers() {
     const threshold = new Date(Date.now() - 5 * 60 * 1000);
     const sessions = await this.prisma.onlineSession.findMany({
@@ -86,6 +98,9 @@ export class AnalyticsController {
   }
 
   @Delete('cleanup')
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('analytics.manage')
   async cleanup() {
     const threshold = new Date(Date.now() - 24 * 60 * 60 * 1000);
     await this.prisma.onlineSession.deleteMany({ where: { lastSeenAt: { lt: threshold } } });

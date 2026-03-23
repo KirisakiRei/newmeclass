@@ -1,33 +1,35 @@
 ﻿// @ts-nocheck
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
-import { Share2, MessageCircle, Facebook, Instagram, Download } from 'lucide-react';
+import { MessageCircle, Facebook, Instagram, Download, Lock } from 'lucide-react';
 import ResultCertificate from '../../components/certificates/ResultCertificate';
+import { authAPI, testResultsAPI } from '../../services/api';
+import { getApiErrorMessage } from '../../services/api-error';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const SITE_URL = window.location.origin;
-
-// ── helper ──────────────────────────────────────────────────
-const pct = (val, total) => total > 0 ? Math.round((val / total) * 100) : 0;
 
 const ELEM_COLORS = {
   kayu: '#4CAF50', api: '#FF5722', tanah: '#FFC107',
   logam: '#9E9E9E', air: '#2196F3',
 };
 const ELEM_LABELS = {
-  kayu: 'Kayu (Wood)', api: 'Api (Fire)', tanah: 'Tanah (Earth)', 
-  logam: 'Logam (Metal)', air: 'Air (Water)',
+  kayu: 'Kayu', api: 'Api', tanah: 'Tanah', 
+  logam: 'Logam', air: 'Air',
 };
 
 const normalizeElementKey = (value) => String(value || '').trim().toLowerCase();
 const asArray = (value) => (Array.isArray(value) ? value : []);
 const asObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
-const extractPayload = (value) => (value && typeof value === 'object' && 'data' in value ? value.data : value);
 const asNumber = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+const stripCodeModifier = (value) => String(value || '').trim().replace(/\((\+|-|#)\)\s*$/, '');
+const getCodeModifier = (value) => {
+  const match = String(value || '').trim().match(/\((\+|-|#)\)\s*$/);
+  return match ? match[0] : '';
+};
+const formatPercentage = (value) => asNumber(value).toFixed(2);
 const getElementLabel = (value) => {
   const normalized = normalizeElementKey(value);
   return ELEM_LABELS[normalized] || String(value || '-');
@@ -40,10 +42,12 @@ const getElementColor = (value) => {
 
 // ── PersonalityCode badge ────────────────────────────────────
 function CodeBadge({ code }) {
-  const prefix = code?.[0] || 'e';
-  const suffix = code?.[1] || 'K';
+  const normalizedCode = stripCodeModifier(code);
+  const prefix = normalizedCode?.[0] || 'e';
+  const suffix = normalizedCode?.[1] || 'K';
+  const modifier = getCodeModifier(code);
   return (
-    <div className="flex items-center justify-center">
+    <div className="flex flex-col items-center justify-center gap-2">
       <div
         className="w-28 h-28 rounded-full border-4 border-yellow-400 flex items-center justify-center bg-white shadow-xl"
         style={{ fontFamily: 'serif' }}
@@ -53,6 +57,11 @@ function CodeBadge({ code }) {
           <span className="text-gray-900">{suffix}</span>
         </span>
       </div>
+      {modifier ? (
+        <span className="flex h-7 min-w-7 items-center justify-center rounded-md border border-yellow-500/30 bg-yellow-400/15 px-2 text-xs font-bold text-yellow-700">
+          {modifier}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -91,13 +100,29 @@ export default function TestResult() {
   useEffect(() => {
     (async () => {
       try {
-        const token = localStorage.getItem('user_token');
-        const res = await axios.get(`${API}/test-results/${id}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        setResult(extractPayload(res.data));
+        let payload = null;
+
+        try {
+          const res = await testResultsAPI.getById(id);
+          payload = res.data;
+        } catch (error) {
+          if (error?.response?.status === 401) {
+            await authAPI.refreshSession();
+            const retried = await testResultsAPI.getById(id);
+            payload = retried.data;
+          } else {
+            throw error;
+          }
+        }
+
+        if (!payload) {
+          setError('Hasil tes tidak dapat diakses dari akun ini. Silakan masuk dengan akun yang mengerjakan tes tersebut.');
+          return;
+        }
+
+        setResult(payload);
       } catch (e) {
-        setError('Hasil test tidak ditemukan.');
+        setError(getApiErrorMessage(e, 'Hasil test tidak ditemukan.'));
       } finally {
         setLoading(false);
       }
@@ -121,34 +146,15 @@ export default function TestResult() {
   const displayAnalysis = asObject(result.displayAnalysis);
   const insights = asObject(analysis.insights);
   const personalInsights = asObject(analysis.personalInsights || analysis.aiInsights);
-  const elem = normalizeElementKey(analysis.dominantElement || result.dominantElement || 'kayu');
-  const elemColor = getElementColor(elem);
-  const elemScores = Object.entries(asObject(analysis.elementScores || displayAnalysis.elementScores)).reduce((acc, [name, score]) => {
+  const coreScoring = asObject(result.coreScoring || analysis.coreScoring);
+  const hasCoreScoring = Object.keys(coreScoring).length > 0;
+  const exactElementScores = Object.entries(asObject(analysis.elementScores || displayAnalysis.elementScores || result.elementScores)).reduce((acc, [name, score]) => {
     const normalizedKey = normalizeElementKey(name);
     if (!normalizedKey) return acc;
     acc[normalizedKey] = (acc[normalizedKey] || 0) + asNumber(score?.percentage ?? score);
     return acc;
   }, {});
-  
-  // Calculate percentages (total = 100%)
-  const totalScore = Object.values(elemScores).reduce((sum, val) => sum + asNumber(val), 0) || 1;
-  const elemPercentages = {};
-  Object.entries(elemScores).forEach(([name, score]) => {
-    elemPercentages[name] = Math.round((asNumber(score) / totalScore) * 100);
-  });
-  
-  // Adjust to ensure total is exactly 100%
-  const percentageSum = Object.values(elemPercentages).reduce((sum, val) => sum + val, 0);
-  if (percentageSum !== 100 && Object.keys(elemPercentages).length > 0) {
-    // Add/subtract difference to highest element
-    const sortedElems = Object.entries(elemPercentages).sort(([,a], [,b]) => b - a);
-    if (sortedElems.length > 0) {
-      elemPercentages[sortedElems[0][0]] += (100 - percentageSum);
-    }
-  }
-  
-  // Get top 3 elements
-  const top3Elements = Object.entries(elemPercentages)
+  const rankedElementScores = Object.entries(exactElementScores)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 3);
   
@@ -167,6 +173,33 @@ export default function TestResult() {
   const personalCareerRecommendations = asArray(personalInsights.rekomendasiKarirSpesifik).filter((item) => item && typeof item === 'object');
   const personalStrategies = asArray(personalInsights.strategiPengembanganDiri).filter((item) => item && typeof item === 'object');
   const personalTips = asArray(personalInsights.tipsPraktis);
+  const dominantRanks = hasCoreScoring
+    ? [
+        {
+          rank: 'Dominan I',
+          element: coreScoring.dominan_1_elemen,
+          percentage: asNumber(coreScoring.dominan_1_persentase),
+          note: 'Karakter utama yang paling kuat terlihat dalam profil Anda.',
+        },
+        {
+          rank: 'Dominan II',
+          element: coreScoring.dominan_2_elemen,
+          percentage: asNumber(coreScoring.dominan_2_persentase),
+          note: 'Sisi pendukung yang ikut membentuk cara Anda merespons banyak situasi.',
+        },
+        {
+          rank: 'Dominan III',
+          element: coreScoring.dominan_3_elemen,
+          percentage: asNumber(coreScoring.dominan_3_persentase),
+          note: 'Nuansa tambahan yang memberi warna pada gaya pribadi Anda.',
+        },
+      ].filter((item) => item.element)
+    : rankedElementScores.map(([element, percentage], index) => ({
+        rank: `Dominan ${['I', 'II', 'III'][index] || index + 1}`,
+        element,
+        percentage: asNumber(percentage),
+        note: 'Distribusi skor elemen',
+      }));
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4">
@@ -175,24 +208,31 @@ export default function TestResult() {
         <div className="max-w-4xl mx-auto mb-4 flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center print:hidden">
           <Link to="/dashboard" className="text-yellow-600 underline text-sm">Kembali ke Dashboard</Link>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => {
-                const targetUserId = result.userId;
-                if (!targetUserId) {
-                  alert('Sertifikat belum tersedia untuk hasil ini.');
-                  return;
-                }
-                const opened = window.open(`/certificate-download/${targetUserId}?download=1`, '_blank', 'noopener,noreferrer');
-                if (!opened) {
-                  alert('Izinkan pop-up browser untuk mengunduh sertifikat.');
-                }
-              }}
-              className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition flex items-center gap-2"
-              data-testid="btn-print"
-            >
-              <Download className="w-4 h-4" />
-              Download Sertifikat
-            </button>
+            {result.testType === 'paid' ? (
+              <button
+                onClick={() => {
+                  const targetUserId = result.userId;
+                  if (!targetUserId) {
+                    alert('Sertifikat belum tersedia untuk hasil ini.');
+                    return;
+                  }
+                  const opened = window.open(`/certificate-download/${targetUserId}?download=1`, '_blank', 'noopener,noreferrer');
+                  if (!opened) {
+                    alert('Izinkan pop-up browser untuk mengunduh sertifikat.');
+                  }
+                }}
+                className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition flex items-center gap-2"
+                data-testid="btn-print"
+              >
+                <Download className="w-4 h-4" />
+                Download Sertifikat
+              </button>
+            ) : (
+              <div className="px-4 py-2 border border-yellow-400/40 text-yellow-700 bg-yellow-50 rounded-lg text-sm font-semibold flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                Sertifikat premium terkunci
+              </div>
+            )}
             
             <button
               onClick={() => {
@@ -242,9 +282,82 @@ export default function TestResult() {
           result={result}
           resultId={result.resultId || result.id}
           certificateNumber={result.resultId || result.id}
+          identityLabel="Member ID"
+          identityValue={result.memberCode || result.publicId || result.userId}
           issuedAt={result.completedAt || result.createdAt}
           certType={result.userRole === 'YAYASAN' || result?.certType === 'yayasan' ? 'yayasan' : 'individu'}
+          lockPremiumSections={result.testType === 'free'}
         />
+      </div>
+
+      <div className="max-w-4xl mx-auto mt-6 bg-white shadow-2xl rounded-xl overflow-hidden border-2 border-yellow-400">
+        <div className="bg-gradient-to-r from-yellow-400 to-orange-500 px-6 py-4">
+          <h2 className="text-2xl font-black text-white">Ringkasan Hasil Kepribadian</h2>
+          <p className="text-white/90 text-sm mt-1">
+            {insights.personalityLabel || analysis.personalityType || displayAnalysis.personalityType || 'Profil kepribadian Anda'}
+          </p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <div className="grid gap-6 md:grid-cols-[180px,1fr] md:items-center">
+            <CodeBadge code={code} />
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full bg-yellow-400/15 px-3 py-1 text-xs font-bold text-yellow-700">
+                  Kode: {code || '-'}
+                </span>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                  Elemen dominan: {result.dominantElement || coreScoring.dominan_1_elemen || '-'}
+                </span>
+              </div>
+              <p className="text-gray-700 leading-relaxed">
+                {displayAnalysis.summary || personalInsights.ringkasanKepribadian || 'Ringkasan analisis belum tersedia.'}
+              </p>
+              {hasCoreScoring ? (
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Hasil ini merangkum karakter utama Anda beserta nuansa personal yang membuat profil Anda lebih khas.
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          {dominantRanks.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Peta Dominan Elemen</h3>
+                  <p className="text-sm text-gray-500">
+                    Tiga elemen berikut menunjukkan susunan karakter yang paling menonjol pada diri Anda.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                {dominantRanks.map((item) => (
+                  <div key={item.rank} className="rounded-xl border border-yellow-400/20 bg-yellow-50/60 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-yellow-700">{item.rank}</p>
+                    <p className="mt-2 text-xl font-black text-gray-900">{getElementShortLabel(item.element)}</p>
+                    <p className="text-sm text-gray-500">{getElementLabel(item.element)}</p>
+                    <p className="mt-3 text-2xl font-black" style={{ color: getElementColor(item.element) }}>
+                      {formatPercentage(item.percentage)}%
+                    </p>
+                    <p className="mt-2 text-xs text-gray-500">{item.note}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                {dominantRanks.map((item) => (
+                  <ElementBar
+                    key={`${item.rank}-${item.element}`}
+                    name={item.element}
+                    percentage={Math.min(Math.max(asNumber(item.percentage), 0), 100)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       </div>
 
       {/* ── Personal Analysis Section (Premium Only) ── */}
@@ -390,7 +503,7 @@ export default function TestResult() {
 
           <div className="bg-gray-50 px-6 py-4 border-t">
             <p className="text-xs text-gray-500 text-center">
-              Analisis personal ini disusun dari hasil jawaban dan template premium yang sesuai dengan profil Anda.
+              Analisis personal ini disusun dari hasil jawaban Newme Test premium yang sesuai dengan profil Anda.
             </p>
           </div>
         </div>

@@ -13,6 +13,9 @@ import { useToast } from '../../hooks/use-toast';
 import { financeAPI, settingsAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import { formatCurrency } from '../../lib/utils';
+import Pagination from '../../components/ui/pagination';
+import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const PERIODS = [
   { value: 'this_month', label: 'Bulan Ini' },
@@ -200,6 +203,7 @@ function DeveloperDisbursementDialog({ open, onOpenChange, availableBalance, def
 
 export default function LaporanPendapatan() {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [period, setPeriod] = useState('this_month');
   const [stats, setStats] = useState(null);
   const [transactions, setTransactions] = useState([]);
@@ -210,6 +214,10 @@ export default function LaporanPendapatan() {
   const [breakdownOpen, setBreakdownOpen] = useState({ type: '', open: false });
   const [disbursementOpen, setDisbursementOpen] = useState(false);
   const [submittingDisbursement, setSubmittingDisbursement] = useState(false);
+  const [transactionsPage, setTransactionsPage] = useState(1);
+  const [transactionsPageSize, setTransactionsPageSize] = useState(10);
+  const [transactionsPagination, setTransactionsPagination] = useState(createEmptyPageState(10));
+  const canManageRevenue = adminAccess.hasPermission('revenue.manage');
 
   useEffect(() => {
     void loadSummary();
@@ -217,7 +225,7 @@ export default function LaporanPendapatan() {
 
   useEffect(() => {
     void loadTransactions();
-  }, [period]);
+  }, [period, transactionsPage, transactionsPageSize]);
 
   useEffect(() => {
     void settingsAPI.getSystemSummary()
@@ -241,8 +249,14 @@ export default function LaporanPendapatan() {
   const loadTransactions = async () => {
     setLoadingTransactions(true);
     try {
-      const response = await financeAPI.getTransactions({ period });
-      setTransactions(response.data || []);
+      const response = await financeAPI.getTransactions({
+        period,
+        page: transactionsPage,
+        pageSize: transactionsPageSize,
+      });
+      const nextPage = extractPaginatedResponse(response.data, transactionsPageSize);
+      setTransactions(nextPage.items || []);
+      setTransactionsPagination(nextPage);
     } catch (error) {
       setTransactions([]);
       toast({ title: 'Gagal memuat transaksi', description: getApiErrorMessage(error, 'Riwayat transaksi belum bisa dimuat.'), variant: 'destructive' });
@@ -252,6 +266,7 @@ export default function LaporanPendapatan() {
   };
 
   const handleCreateDisbursement = async (payload) => {
+    if (!canManageRevenue) return;
     if (!payload.amount) {
       toast({ title: 'Jumlah belum valid', description: 'Masukkan nominal pencairan developer yang valid.', variant: 'destructive' });
       return;
@@ -335,7 +350,7 @@ export default function LaporanPendapatan() {
                         </div>
                       </div>
                     </button>
-                    <button onClick={() => setDisbursementOpen(true)} className="rounded-xl border border-yellow-400/10 bg-[#1a1a1a] p-4 text-left transition hover:border-yellow-400/40">
+                    <button onClick={() => canManageRevenue && setDisbursementOpen(true)} className={`rounded-xl border border-yellow-400/10 bg-[#1a1a1a] p-4 text-left transition ${canManageRevenue ? 'hover:border-yellow-400/40' : 'cursor-default opacity-70'}`}>
                       <div className="flex items-center gap-3">
                         <Code2 className="h-5 w-5 text-yellow-400" />
                         <div>
@@ -414,11 +429,9 @@ export default function LaporanPendapatan() {
                   <p className="mt-1 text-white">{settingsSummary?.developerFee?.bankName || '-'} / {settingsSummary?.developerFee?.bankAccount || '-'}</p>
                   <p className="mt-1 text-xs text-gray-500">{settingsSummary?.developerFee?.accountName || 'Belum diisi'}</p>
                 </div>
-                {settingsSummary?.paymentGateway?.legacyPaydisiniConfigured ? (
-                  <div className="rounded-lg border border-yellow-400/20 bg-yellow-400/10 p-4 text-xs text-yellow-200">
-                    Kredensial PayDisini masih tersimpan, tetapi gateway aktif backend saat ini adalah Midtrans.
-                  </div>
-                ) : null}
+                <div className="rounded-lg border border-yellow-400/20 bg-yellow-400/10 p-4 text-xs text-yellow-200">
+                  Semua flow pembayaran aktif saat ini menggunakan Midtrans. Harga premium individu mengikuti nilai `paymentAmount` dari settings backend.
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -486,6 +499,18 @@ export default function LaporanPendapatan() {
         </CardContent>
       </Card>
 
+      <Pagination
+        currentPage={transactionsPagination.page}
+        totalPages={transactionsPagination.totalPages}
+        totalItems={transactionsPagination.total}
+        pageSize={transactionsPagination.pageSize}
+        onPageChange={setTransactionsPage}
+        onPageSizeChange={(nextSize) => {
+          setTransactionsPageSize(nextSize);
+          setTransactionsPage(1);
+        }}
+      />
+
       <BreakdownDialog
         open={breakdownOpen.open}
         onOpenChange={(open) => setBreakdownOpen((current) => ({ ...current, open }))}
@@ -494,7 +519,7 @@ export default function LaporanPendapatan() {
       />
       <SplitDialog item={splitItem} onClose={() => setSplitItem(null)} />
       <DeveloperDisbursementDialog
-        open={disbursementOpen}
+        open={canManageRevenue && disbursementOpen}
         onOpenChange={setDisbursementOpen}
         availableBalance={stats?.devFeeBalance || 0}
         defaults={settingsSummary?.developerFee}

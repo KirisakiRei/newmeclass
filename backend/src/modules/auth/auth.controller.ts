@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
@@ -6,13 +6,17 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
+import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { AdminLoginDto } from './dto/admin-login.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ClaimMitraInviteDto } from './dto/claim-mitra-invite.dto';
 
 const AUTH_RATE_LIMIT_TTL_MS = Number(process.env.AUTH_RATE_LIMIT_TTL || 60) * 1000;
 const AUTH_REGISTER_RATE_LIMIT = Number(process.env.AUTH_RATE_LIMIT_REGISTER_LIMIT || 20);
@@ -54,8 +58,11 @@ export class AuthController {
 
   @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
   @Post('register')
-  register(@Body() body: RegisterDto) {
-    return this.authService.register(body, Role.USER);
+  register(@Body() body: RegisterDto, @Req() req: Request) {
+    return this.authService.register(body, Role.USER, false, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    });
   }
 
   @Get('register')
@@ -65,14 +72,23 @@ export class AuthController {
 
   @Throttle({ default: { limit: AUTH_LOGIN_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
   @Post('login')
-  login(@Body() body: LoginDto) {
-    return this.authService.login(body, Role.USER);
+  login(@Body() body: LoginDto, @Req() req: Request) {
+    return this.authService.login(body, Role.USER, false, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@CurrentUser() user: any) {
-    return this.authService.getProfile(user.sub);
+    return this.authService.getProfile(user.sub, user.sid);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('refresh-session')
+  refreshSession(@CurrentUser() user: any) {
+    return this.authService.refreshSession(user.sub, user.sid);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -112,50 +128,26 @@ export class AdminAuthController {
 
   @Throttle({ default: { limit: AUTH_ADMIN_LOGIN_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
   @Post('login')
-  login(@Body() body: LoginDto, @Req() req: Request) {
-    return this.authService.login(body, Role.ADMIN, true, { ipAddress: req.ip });
+  login(@Body() body: AdminLoginDto, @Req() req: Request) {
+    return this.authService.loginAdmin(body, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @Get('me')
   me(@CurrentUser() user: any) {
-    return this.authService.getProfile(user.sub);
+    return this.authService.getProfile(user.sub, user.sid);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('dashboard.view')
   @Get('dashboard/stats')
-  dashboardStats() {
-    return this.authService.getAdminDashboardStats();
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPERADMIN)
-  @Get('users')
-  getAdminUsers() {
-    return this.authService.getAdminUsers();
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPERADMIN)
-  @Post('users/create')
-  createAdminUser(@Body() body: RegisterDto) {
-    return this.authService.register(body, Role.ADMIN);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPERADMIN)
-  @Put('users/:adminId/change-password')
-  changeAdminPassword(@Param('adminId') adminId: string, @Body() body: ChangePasswordDto) {
-    return this.authService.changePassword(adminId, body);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPERADMIN)
-  @Delete('users/:adminId')
-  deleteAdminUser(@Param('adminId') adminId: string) {
-    return this.authService.deleteUser(adminId);
+  dashboardStats(@CurrentUser() user: any) {
+    return this.authService.getAdminDashboardStats(user?.role);
   }
 }
 
@@ -165,8 +157,11 @@ export class YayasanAuthController {
 
   @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
   @Post('register')
-  register(@Body() body: RegisterDto) {
-    return this.authService.register(body, Role.YAYASAN);
+  register(@Body() body: RegisterDto, @Req() req: Request) {
+    return this.authService.register(body, Role.YAYASAN, false, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    });
   }
 
   @Get('register')
@@ -176,8 +171,11 @@ export class YayasanAuthController {
 
   @Throttle({ default: { limit: AUTH_LOGIN_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
   @Post('login')
-  login(@Body() body: LoginDto) {
-    return this.authService.login(body, Role.YAYASAN);
+  login(@Body() body: LoginDto, @Req() req: Request) {
+    return this.authService.login(body, Role.YAYASAN, false, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    });
   }
 }
 
@@ -187,13 +185,29 @@ export class MitraAuthController {
 
   @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
   @Post('register')
-  register(@Body() body: RegisterDto) {
-    return this.authService.register(body, Role.MITRA);
+  register() {
+    return this.authService.rejectPublicMitraRegistration();
   }
 
   @Throttle({ default: { limit: AUTH_LOGIN_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
   @Post('login')
-  login(@Body() body: LoginDto) {
-    return this.authService.login(body, Role.MITRA);
+  login(@Body() body: LoginDto, @Req() req: Request) {
+    return this.authService.login(body, Role.MITRA, false, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    });
+  }
+
+  @Get('invite/validate')
+  validateInvite(@Query('token') token?: string) {
+    return this.authService.validateMitraInvite(token);
+  }
+
+  @Post('invite/claim')
+  claimInvite(@Body() body: ClaimMitraInviteDto, @Req() req: Request) {
+    return this.authService.claimMitraInvite(body, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    });
   }
 }

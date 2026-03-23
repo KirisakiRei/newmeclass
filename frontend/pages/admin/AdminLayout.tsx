@@ -1,42 +1,112 @@
-﻿// @ts-nocheck
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  CreditCard, 
-  Settings, 
-  BarChart3, 
+// @ts-nocheck
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import {
+  Activity,
+  ActivitySquare,
+  ArrowDownToLine,
+  ArrowLeftRight,
+  Award,
+  BarChart3,
+  Brain,
+  ChevronDown,
+  FileText,
+  Gift,
+  Handshake,
   HelpCircle,
   Image,
   Images,
+  Layout,
+  LayoutDashboard,
+  Layers,
   LogOut,
   Menu,
-  X,
-  Award,
-  Gift,
-  FileText,
-  UsersRound,
-  Shield,
-  Layout,
-  Layers,
-  ShoppingBag,
-  Package,
   MessageSquare,
-  Activity,
-  Trophy,
-  ArrowDownToLine,
-  ChevronDown,
-  Handshake,
-  Brain,
-  Wallet,
+  Package,
+  Settings,
+  Shield,
+  ShoppingBag,
   TrendingUp,
-  ArrowLeftRight
+  Trophy,
+  Users,
+  UsersRound,
+  Wallet,
+  X,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { useToast } from '../../hooks/use-toast';
-import { adminAPI } from '../../services/api';
 import LoadingSpinner from '../../components/ui/loading-spinner';
+import { useToast } from '../../hooks/use-toast';
+import { adminAPI, mitraAPI, yayasanAPI } from '../../services/api';
+import {
+  AdminAccessProvider,
+  canAccessAdminPath,
+  clearStoredAdminUser,
+  getAdminRoleLabel,
+  getFirstAllowedAdminPath,
+  hasAdminPermission,
+  setStoredAdminUser,
+} from '../../lib/admin-rbac';
+
+const NAVIGATION = [
+  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard, permission: 'dashboard.view' },
+  {
+    label: 'Manajemen Konten',
+    icon: Layout,
+    children: [
+      { label: 'Layout Website', href: '/admin/website-content', icon: Layout, permission: 'website_content.view' },
+      { label: 'Hero Slides', href: '/admin/hero-slides', icon: Layers, permission: 'hero_slides.view' },
+      { label: 'Produk Homepage', href: '/admin/homepage-products', icon: ShoppingBag, permission: 'homepage_products.view' },
+      { label: 'Produk Shop', href: '/admin/shop-products', icon: Package, permission: 'shop_products.view' },
+      { label: 'Testimonial', href: '/admin/testimonials', icon: MessageSquare, permission: 'testimonials.view' },
+      { label: 'Kegiatan', href: '/admin/activities', icon: Activity, permission: 'activities.view' },
+      { label: 'Banners', href: '/admin/banners', icon: Image, permission: 'banners.view' },
+      { label: 'Artikel', href: '/admin/articles', icon: FileText, permission: 'articles.view' },
+      { label: 'Media Gallery', href: '/admin/media', icon: Images, permission: 'media.view' },
+      { label: 'Team & Mitra', href: '/admin/team-management', icon: Shield, permission: 'team_management.view' },
+    ],
+  },
+  {
+    label: 'Test & Sertifikasi',
+    icon: Award,
+    children: [
+      { label: 'Pertanyaan', href: '/admin/questions', icon: HelpCircle, permission: 'questions.view' },
+      { label: 'Hasil Kepribadian', href: '/admin/personality-results', icon: Brain, permission: 'personality_results.view' },
+      { label: 'Hasil Premium', href: '/admin/premium-results', icon: Trophy, permission: 'premium_results.view' },
+      { label: 'Sertifikat', href: '/admin/certificates', icon: Award, permission: 'certificates.view' },
+    ],
+  },
+  {
+    label: 'Operasional Pengguna',
+    icon: Users,
+    children: [
+      { label: 'Data Pengguna', href: '/admin/users', icon: Users, permission: 'users.view' },
+      { label: 'Referral', href: '/admin/referrals', icon: Gift, permission: 'referrals.view' },
+      { label: 'Data Yayasan', href: '/admin/yayasan', icon: UsersRound, permission: 'yayasan.view' },
+      { label: 'Data Mitra', href: '/admin/mitra', icon: Handshake, permission: 'mitra.view' },
+      { label: 'Permintaan Harga', href: '/admin/price-change-requests', icon: ArrowLeftRight, permission: 'price_change_requests.view' },
+    ],
+  },
+  {
+    label: 'Keuangan & Utility',
+    icon: Wallet,
+    children: [
+      { label: 'Laporan Pendapatan', href: '/admin/revenue', icon: TrendingUp, permission: 'revenue.view' },
+      { label: 'Transaksi', href: '/admin/transactions', icon: ArrowLeftRight, permission: 'transactions.view' },
+      { label: 'Monitoring Pembayaran', href: '/admin/payment-ops', icon: ActivitySquare, permission: 'payment_ops.view' },
+      { label: 'Pencairan Yayasan', href: '/admin/withdrawals', icon: ArrowDownToLine, permission: 'yayasan_withdrawals.view' },
+      { label: 'Pencairan Mitra', href: '/admin/mitra-withdrawals', icon: ArrowDownToLine, permission: 'mitra_withdrawals.view' },
+    ],
+  },
+  { label: 'Analytics', href: '/admin/analytics', icon: BarChart3, permission: 'analytics.view' },
+  {
+    label: 'Pengaturan',
+    icon: Settings,
+    children: [
+      { label: 'Pengaturan Website', href: '/admin/settings', icon: Settings, permission: 'settings.view' },
+      { label: 'Manajemen Admin', href: '/admin/admin-users', icon: Shield, permission: 'admin_management.view' },
+    ],
+  },
+];
 
 const AdminLayout = () => {
   const location = useLocation();
@@ -47,103 +117,61 @@ const AdminLayout = () => {
   const [openGroups, setOpenGroups] = useState({});
   const [authChecking, setAuthChecking] = useState(true);
   const [adminUser, setAdminUser] = useState(() => {
-    const user = localStorage.getItem('admin_user');
-    return user ? JSON.parse(user) : null;
+    try {
+      return JSON.parse(localStorage.getItem('admin_user') || 'null');
+    } catch {
+      return null;
+    }
+  });
+  const [withdrawalBadges, setWithdrawalBadges] = useState({
+    yayasan: 0,
+    mitra: 0,
   });
 
-  // Navigation structure: groups with children + direct links
-  const navigation = [
-    { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-    {
-      name: 'Manajemen Konten',
-      icon: Layout,
-      children: [
-        { name: 'Layout Website', href: '/admin/website-content', icon: Layout },
-        { name: 'Hero Slides', href: '/admin/hero-slides', icon: Layers },
-        { name: 'Produk Homepage', href: '/admin/homepage-products', icon: ShoppingBag },
-        { name: 'Produk Shop', href: '/admin/shop-products', icon: Package },
-        { name: 'Testimonial', href: '/admin/testimonials', icon: MessageSquare },
-        { name: 'Kegiatan', href: '/admin/activities', icon: Activity },
-        { name: 'Banners', href: '/admin/banners', icon: Image },
-        { name: 'Artikel', href: '/admin/articles', icon: FileText },
-        { name: 'Media Gallery', href: '/admin/media', icon: Images },
-        { name: 'Team & Mitra', href: '/admin/team-management', icon: Shield },
-      ],
-    },
-    {
-      name: 'Test & Sertifikasi',
-      icon: Award,
-      children: [
-        { name: 'Pertanyaan', href: '/admin/questions', icon: HelpCircle },
-        { name: 'Hasil Kepribadian', href: '/admin/personality-results', icon: Brain },
-        { name: 'Hasil Premium', href: '/admin/premium-results', icon: Trophy },
-        { name: 'Sertifikat', href: '/admin/certificates', icon: Award },
-      ],
-    },
-    {
-      name: 'Manajemen Pengguna',
-      icon: Users,
-      children: [
-        { name: 'Data Pengguna', href: '/admin/users', icon: Users },
-        { name: 'Referral', href: '/admin/referrals', icon: Gift },
-      ],
-    },
-    {
-      name: 'Manajemen Yayasan',
-      icon: UsersRound,
-      children: [
-        { name: 'Data Yayasan', href: '/admin/yayasan', icon: UsersRound },
-      ],
-    },
-    {
-      name: 'Manajemen Mitra',
-      icon: Handshake,
-      children: [
-        { name: 'Data Mitra', href: '/admin/mitra', icon: Handshake },
-        { name: 'Permintaan Harga', href: '/admin/price-change-requests', icon: ArrowLeftRight },
-      ],
-    },
-    {
-      name: 'Keuangan',
-      icon: Wallet,
-      children: [
-        { name: 'Laporan Pendapatan', href: '/admin/revenue', icon: TrendingUp },
-        { name: 'Transaksi', href: '/admin/transactions', icon: ArrowLeftRight },
-      ],
-    },
-    { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
-    {
-      name: 'Pengaturan',
-      icon: Settings,
-      children: [
-        { name: 'Pengaturan Website', href: '/admin/settings', icon: Settings },
-        { name: 'Manajemen Admin', href: '/admin/admin-users', icon: Shield },
-      ],
-    },
-  ];
+  const visibleNavigation = useMemo(
+    () => NAVIGATION
+      .filter((item) => !item.permission || hasAdminPermission(adminUser, item.permission))
+      .map((item) => {
+        if (!item.children) return item;
+        const children = item.children.filter((child) => hasAdminPermission(adminUser, child.permission));
+        return { ...item, children };
+      })
+      .filter((item) => !item.children || item.children.length > 0),
+    [adminUser],
+  );
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = useCallback(
+    (path) => location.pathname === path || location.pathname.startsWith(`${path}/`),
+    [location.pathname],
+  );
 
-  const isGroupActive = useCallback((item) => {
-    if (item.children) {
-      return item.children.some((child) => location.pathname === child.href);
-    }
-    return false;
-  }, [location.pathname]);
+  const isGroupActive = useCallback(
+    (item) => Array.isArray(item.children) && item.children.some((child) => isActive(child.href)),
+    [isActive],
+  );
 
-  // Auto-expand groups that contain the active route
   useEffect(() => {
-    const autoOpen = {};
-    navigation.forEach((item) => {
-      if (item.children && isGroupActive(item)) {
-        autoOpen[item.name] = true;
-      }
+    const activeGroups = visibleNavigation
+      .filter((item) => item.children && isGroupActive(item))
+      .map((item) => item.label);
+
+    if (activeGroups.length === 0) return;
+
+    setOpenGroups((current) => {
+      const next = { ...current };
+      let changed = false;
+      activeGroups.forEach((label) => {
+        if (!next[label]) {
+          next[label] = true;
+          changed = true;
+        }
+      });
+      return changed ? next : current;
     });
-    setOpenGroups((prev) => ({ ...prev, ...autoOpen }));
-  }, [location.pathname]);
+  }, [isGroupActive, visibleNavigation]);
 
   useEffect(() => {
-    const validateAdminSession = async () => {
+    const validateSession = async () => {
       const token = localStorage.getItem('admin_token');
       if (!token) {
         navigate('/admin/login', { replace: true });
@@ -153,10 +181,10 @@ const AdminLayout = () => {
       try {
         const response = await adminAPI.getCurrentAdmin();
         setAdminUser(response.data);
-        localStorage.setItem('admin_user', JSON.stringify(response.data));
+        setStoredAdminUser(response.data);
       } catch {
         localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_user');
+        clearStoredAdminUser();
         navigate('/admin/login', { replace: true });
         return;
       } finally {
@@ -164,15 +192,13 @@ const AdminLayout = () => {
       }
     };
 
-    validateAdminSession();
+    void validateSession();
   }, [navigate]);
 
-  // Close mobile sidebar on navigation
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
 
-  // Close mobile sidebar on resize to desktop
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 768) setMobileOpen(false);
@@ -181,18 +207,111 @@ const AdminLayout = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const toggleGroup = (name) => {
-    setOpenGroups((prev) => ({ ...prev, [name]: !prev[name] }));
-  };
+  useEffect(() => {
+    const loadWithdrawalBadges = async () => {
+      if (!adminUser) {
+        setWithdrawalBadges({ yayasan: 0, mitra: 0 });
+        return;
+      }
+
+      const canViewYayasanWithdrawals = hasAdminPermission(adminUser, 'yayasan_withdrawals.view');
+      const canViewMitraWithdrawals = hasAdminPermission(adminUser, 'mitra_withdrawals.view');
+
+      if (!canViewYayasanWithdrawals && !canViewMitraWithdrawals) {
+        setWithdrawalBadges({ yayasan: 0, mitra: 0 });
+        return;
+      }
+
+      try {
+        const [yayasanResponse, mitraResponse] = await Promise.all([
+          canViewYayasanWithdrawals
+            ? yayasanAPI.getWithdrawals({ status: 'pending', page: 1, pageSize: 1 })
+            : Promise.resolve({ data: { total: 0 } }),
+          canViewMitraWithdrawals
+            ? mitraAPI.getWithdrawals({ status: 'pending', page: 1, pageSize: 1 })
+            : Promise.resolve({ data: { total: 0 } }),
+        ]);
+
+        setWithdrawalBadges({
+          yayasan: Number(yayasanResponse?.data?.total || 0),
+          mitra: Number(mitraResponse?.data?.total || 0),
+        });
+      } catch {
+        setWithdrawalBadges({ yayasan: 0, mitra: 0 });
+      }
+    };
+
+    void loadWithdrawalBadges();
+  }, [adminUser, location.pathname]);
+
+  useEffect(() => {
+    if (authChecking || !adminUser) return;
+    if (canAccessAdminPath(adminUser, location.pathname)) return;
+
+    const fallbackPath = getFirstAllowedAdminPath(adminUser);
+    if (fallbackPath) {
+      toast({
+        title: 'Akses dibatasi',
+        description: 'Halaman ini tidak tersedia untuk permission admin Anda. Kami arahkan ke halaman yang masih diizinkan.',
+        variant: 'destructive',
+      });
+      navigate(fallbackPath, { replace: true });
+      return;
+    }
+
+    toast({
+      title: 'Akun belum punya akses dashboard',
+      description: 'Role ini belum memiliki permission view ke halaman admin mana pun.',
+      variant: 'destructive',
+    });
+    localStorage.removeItem('admin_token');
+    clearStoredAdminUser();
+    navigate('/admin/login', { replace: true });
+  }, [adminUser, authChecking, location.pathname, navigate, toast]);
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
+    clearStoredAdminUser();
     toast({
-      title: 'Logout Berhasil',
-      description: 'Anda telah keluar dari dashboard'
+      title: 'Logout berhasil',
+      description: 'Sesi admin telah diakhiri.',
     });
-    navigate('/admin/login');
+    navigate('/admin/login', { replace: true });
+  };
+
+  const toggleGroup = (groupLabel) => {
+    setOpenGroups((current) => ({ ...current, [groupLabel]: !current[groupLabel] }));
+  };
+
+  const getItemBadgeCount = useCallback((href) => {
+    if (href === '/admin/withdrawals') {
+      return withdrawalBadges.yayasan;
+    }
+    if (href === '/admin/mitra-withdrawals') {
+      return withdrawalBadges.mitra;
+    }
+    return 0;
+  }, [withdrawalBadges.mitra, withdrawalBadges.yayasan]);
+
+  const getGroupBadgeCount = useCallback((item) => (
+    Array.isArray(item.children)
+      ? item.children.reduce((sum, child) => sum + getItemBadgeCount(child.href), 0)
+      : 0
+  ), [getItemBadgeCount]);
+
+  const renderBadge = (count, compact = false) => {
+    if (!count) return null;
+    const displayValue = count > 99 ? '99+' : String(count);
+
+    if (compact) {
+      return <span className="ml-2 inline-flex h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.12)]" />;
+    }
+
+    return (
+      <span className="ml-2 inline-flex min-w-[22px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+        {displayValue}
+      </span>
+    );
   };
 
   if (authChecking) {
@@ -201,130 +320,122 @@ const AdminLayout = () => {
 
   const SidebarContent = ({ collapsed = false }) => (
     <>
-      {/* Header */}
-      <div className="p-4 border-b border-yellow-400/20">
+      <div className="border-b border-yellow-400/20 p-4">
         <div className="flex items-center justify-between">
-          {!collapsed && (
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center">
+          {!collapsed ? (
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-yellow-500">
                 <span className="text-lg font-bold text-[#1a1a1a]">N</span>
               </div>
               <div>
-                <h2 className="text-white font-bold">NEWME</h2>
-                <p className="text-gray-400 text-xs">Admin Panel</p>
+                <h2 className="font-bold text-white">NEWME</h2>
+                <p className="text-xs text-gray-400">Admin Panel</p>
               </div>
             </div>
-          )}
-          {/* Desktop collapse toggle */}
+          ) : null}
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="hidden md:block text-gray-400 hover:text-yellow-400 p-2 rounded"
+            onClick={() => setSidebarOpen((current) => !current)}
+            className="hidden rounded p-2 text-gray-400 hover:text-yellow-400 md:block"
             aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           >
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          {/* Mobile close */}
           <button
             onClick={() => setMobileOpen(false)}
-            className="md:hidden text-gray-400 hover:text-yellow-400 p-2 rounded"
+            className="rounded p-2 text-gray-400 hover:text-yellow-400 md:hidden"
             aria-label="Tutup menu"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto" role="navigation" aria-label="Admin navigation">
-        {navigation.map((item) => {
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3" role="navigation" aria-label="Admin navigation">
+        {visibleNavigation.map((item) => {
           const Icon = item.icon;
 
-          // Direct link (no children)
           if (!item.children) {
+            const badgeCount = getItemBadgeCount(item.href);
             return (
               <Link
-                key={item.name}
+                key={item.label}
                 to={item.href}
-                className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all ${
-                  isActive(item.href) ?
-                     'bg-yellow-400 text-[#1a1a1a]'
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${
+                  isActive(item.href)
+                    ? 'bg-yellow-400 text-[#1a1a1a]'
                     : 'text-gray-300 hover:bg-[#1a1a1a] hover:text-yellow-400'
                 }`}
-                aria-current={isActive(item.href) ? 'page' : undefined}
-                title={collapsed ? item.name : undefined}
+                title={collapsed ? item.label : undefined}
               >
-                <Icon className="w-5 h-5 shrink-0" />
-                {!collapsed && <span className="font-medium text-sm">{item.name}</span>}
+                <Icon className="h-5 w-5 shrink-0" />
+                {!collapsed ? (
+                  <>
+                    <span className="text-sm font-medium">{item.label}</span>
+                    <span className="ml-auto">{renderBadge(badgeCount)}</span>
+                  </>
+                ) : renderBadge(badgeCount, true)}
               </Link>
             );
           }
 
-          // Group with children
-          const groupOpen = openGroups[item.name];
+          const groupOpen = openGroups[item.label];
           const groupActive = isGroupActive(item);
+          const groupBadgeCount = getGroupBadgeCount(item);
 
-          // Collapsed sidebar: show only group icon (first child link on click)
           if (collapsed) {
             return (
-              <div key={item.name} title={item.name}>
-                <button
-                  onClick={() => navigate(item.children[0].href)}
-                  className={`flex items-center justify-center w-full px-3 py-2.5 rounded-lg transition-all ${
-                    groupActive ?
-                       'bg-yellow-400/20 text-yellow-400'
-                      : 'text-gray-300 hover:bg-[#1a1a1a] hover:text-yellow-400'
-                  }`}
-                >
-                  <Icon className="w-5 h-5 shrink-0" />
-                </button>
-              </div>
+              <button
+                key={item.label}
+                onClick={() => navigate(item.children[0]?.href || '/admin/dashboard')}
+                className={`flex w-full items-center justify-center rounded-lg px-3 py-2.5 transition-all ${
+                  groupActive
+                    ? 'bg-yellow-400/20 text-yellow-400'
+                    : 'text-gray-300 hover:bg-[#1a1a1a] hover:text-yellow-400'
+                }`}
+                title={item.label}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                {renderBadge(groupBadgeCount, true)}
+              </button>
             );
           }
 
           return (
-            <div key={item.name}>
-              {/* Group header button */}
+            <div key={item.label}>
               <button
-                onClick={() => toggleGroup(item.name)}
-                className={`flex items-center justify-between w-full px-3 py-2.5 rounded-lg transition-all ${
-                  groupActive ?
-                     'bg-yellow-400/10 text-yellow-400'
+                onClick={() => toggleGroup(item.label)}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition-all ${
+                  groupActive
+                    ? 'bg-yellow-400/10 text-yellow-400'
                     : 'text-gray-300 hover:bg-[#1a1a1a] hover:text-yellow-400'
                 }`}
               >
-                <div className="flex items-center space-x-3">
-                  <Icon className="w-5 h-5 shrink-0" />
-                  <span className="font-medium text-sm">{item.name}</span>
+                <div className="flex items-center gap-3">
+                  <Icon className="h-5 w-5 shrink-0" />
+                  <span className="text-sm font-medium">{item.label}</span>
+                  {renderBadge(groupBadgeCount)}
                 </div>
-                <ChevronDown
-                  className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-                    groupOpen ? 'rotate-180' : ''
-                  }`}
-                />
+                <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${groupOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Children with indentation */}
-              <div
-                className={`overflow-hidden transition-all duration-200 ${
-                  groupOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                }`}
-              >
-                <div className="ml-4 pl-3 border-l border-yellow-400/10 mt-0.5 space-y-0.5">
+              <div className={`overflow-hidden transition-all duration-200 ${groupOpen ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                <div className="mt-0.5 space-y-0.5 border-l border-yellow-400/10 pl-3 ml-4">
                   {item.children.map((child) => {
                     const ChildIcon = child.icon;
+                    const badgeCount = getItemBadgeCount(child.href);
                     return (
                       <Link
-                        key={child.name}
+                        key={child.label}
                         to={child.href}
-                        className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all ${
-                          isActive(child.href) ?
-                             'bg-yellow-400 text-[#1a1a1a]'
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
+                          isActive(child.href)
+                            ? 'bg-yellow-400 text-[#1a1a1a]'
                             : 'text-gray-400 hover:bg-[#1a1a1a] hover:text-yellow-400'
                         }`}
-                        aria-current={isActive(child.href) ? 'page' : undefined}
                       >
-                        <ChildIcon className="w-4 h-4 shrink-0" />
-                        <span className="text-sm">{child.name}</span>
+                        <ChildIcon className="h-4 w-4 shrink-0" />
+                        <span className="text-sm">{child.label}</span>
+                        <span className="ml-auto">{renderBadge(badgeCount)}</span>
                       </Link>
                     );
                   })}
@@ -335,78 +446,70 @@ const AdminLayout = () => {
         })}
       </nav>
 
-      {/* User Info & Logout */}
-      <div className="p-4 border-t border-yellow-400/20">
-        {!collapsed && (
+      <div className="border-t border-yellow-400/20 p-4">
+        {!collapsed ? (
           <div className="mb-3">
-            <p className="text-white font-semibold text-sm">{adminUser.username}</p>
-            <p className="text-gray-400 text-xs">{adminUser.role}</p>
+            <p className="text-sm font-semibold text-white">{adminUser?.username || adminUser?.email || 'Admin'}</p>
+            <p className="text-xs text-gray-400">{getAdminRoleLabel(adminUser)}</p>
           </div>
-        )}
+        ) : null}
         <Button
           onClick={handleLogout}
           variant="outline"
-          className={`w-full border-yellow-400 text-yellow-400 hover:bg-yellow-400/10 ${
-            collapsed && 'px-2'
-          }`}
+          className={`w-full border-yellow-400 text-yellow-400 hover:bg-yellow-400/10 ${collapsed ? 'px-2' : ''}`}
         >
-          <LogOut className="w-4 h-4" />
-          {!collapsed && <span className="ml-2">Logout</span>}
+          <LogOut className="h-4 w-4" />
+          {!collapsed ? <span className="ml-2">Logout</span> : null}
         </Button>
       </div>
     </>
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1a1a1a] to-[#2a2a2a] flex">
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 z-40 md:hidden"
-          onClick={() => setMobileOpen(false)}
-          aria-hidden="true"
-        />
-      )}
+    <AdminAccessProvider adminUser={adminUser} setAdminUser={setAdminUser}>
+      <div className="flex min-h-screen bg-gradient-to-b from-[#1a1a1a] to-[#2a2a2a]">
+        {mobileOpen ? (
+          <div
+            className="fixed inset-0 z-40 bg-black/60 md:hidden"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
+          />
+        ) : null}
 
-      {/* Mobile sidebar drawer */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#2a2a2a] border-r border-yellow-400/20 flex flex-col transform transition-transform duration-300 md:hidden ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <SidebarContent />
-      </aside>
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 flex w-64 transform flex-col border-r border-yellow-400/20 bg-[#2a2a2a] transition-transform duration-300 md:hidden ${
+            mobileOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <SidebarContent />
+        </aside>
 
-      {/* Desktop sidebar */}
-      <aside className={`hidden md:flex ${
-        sidebarOpen ? 'w-64' : 'w-20'
-      } bg-[#2a2a2a] border-r border-yellow-400/20 transition-all duration-300 flex-col shrink-0`}>
-        <SidebarContent collapsed={!sidebarOpen} />
-      </aside>
+        <aside
+          className={`hidden shrink-0 flex-col border-r border-yellow-400/20 bg-[#2a2a2a] transition-all duration-300 md:flex ${
+            sidebarOpen ? 'w-64' : 'w-20'
+          }`}
+        >
+          <SidebarContent collapsed={!sidebarOpen} />
+        </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto min-w-0">
-        {/* Mobile header bar */}
-        <div className="md:hidden sticky top-0 z-30 bg-[#2a2a2a] border-b border-yellow-400/20 px-4 py-3 flex items-center gap-3">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="text-gray-300 hover:text-yellow-400 p-1"
-            aria-label="Buka menu"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-[#1a1a1a]">N</span>
+        <main className="min-w-0 flex-1 overflow-auto">
+          <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-yellow-400/20 bg-[#2a2a2a] px-4 py-3 md:hidden">
+            <button onClick={() => setMobileOpen(true)} className="p-1 text-gray-300 hover:text-yellow-400" aria-label="Buka menu">
+              <Menu className="h-6 w-6" />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-yellow-500">
+                <span className="text-xs font-bold text-[#1a1a1a]">N</span>
+              </div>
+              <span className="text-sm font-bold text-white">NEWME Admin</span>
             </div>
-            <span className="text-white font-bold text-sm">NEWME Admin</span>
           </div>
-        </div>
-        <div className="p-4 sm:p-6 md:p-8">
-          <Outlet />
-        </div>
-      </main>
-    </div>
+          <div className="p-4 sm:p-6 md:p-8">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </AdminAccessProvider>
   );
 };
 

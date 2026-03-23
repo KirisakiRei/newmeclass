@@ -2,19 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, RefreshCw } from 'lucide-react';
 import { mediaAPI } from '../../services/api';
-
-const MEDIA_CATEGORIES = [
-  { value: '', label: 'Semua' },
-  { value: 'hero-slides', label: 'Hero Slides' },
-  { value: 'banners', label: 'Banners' },
-  { value: 'products-home', label: 'Produk Homepage' },
-  { value: 'products-shop', label: 'Produk Shop' },
-  { value: 'testimonials', label: 'Testimonial' },
-  { value: 'activities', label: 'Kegiatan' },
-  { value: 'articles', label: 'Artikel' },
-  { value: 'team', label: 'Tim & Mitra' },
-  { value: 'general', label: 'Umum' },
-];
+import { MEDIA_CATEGORIES, resolveBackendAssetUrl } from '../../lib/admin-media';
 
 const MediaPickerModal = ({ onSelect, onClose, defaultCategory = '' }) => {
   const [media, setMedia] = useState([]);
@@ -42,6 +30,8 @@ const MediaPickerModal = ({ onSelect, onClose, defaultCategory = '' }) => {
   const filtered = search ?
      media.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()))
     : media;
+
+  const resolveImageSrc = (url) => resolveBackendAssetUrl(url, 'https://placehold.co/200x200?text=No+Image');
 
   return (
     <div
@@ -109,7 +99,7 @@ const MediaPickerModal = ({ onSelect, onClose, defaultCategory = '' }) => {
                   title={item.name}
                 >
                   <img
-                    src={item.url}
+                    src={resolveImageSrc(item.url)}
                     alt={item.name}
                     className="w-full h-full object-cover"
                     onError={(e) => { e.target.src = 'https://placehold.co/200x200?text=Error'; }}
@@ -141,5 +131,3 @@ const MediaPickerModal = ({ onSelect, onClose, defaultCategory = '' }) => {
 };
 
 export default MediaPickerModal;
-
-

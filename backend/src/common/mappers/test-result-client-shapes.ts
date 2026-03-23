@@ -1,10 +1,17 @@
+import { CertificateType } from '@prisma/client';
+import { mapCertificateTemplateForClient } from 'src/common/demo-frontend-reference';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
 import { ensureDemoPersonalityTemplates } from 'src/common/demo-frontend-reference';
 import {
+  buildFallbackPersonalityType,
   buildDisplayAnalysis,
   buildLegacyPremiumInsights,
   buildTemplateInsights,
 } from 'src/common/personality-result-shape';
+import {
+  pickPreferredPersonalityTemplate,
+  stripPersonalityCodeModifier,
+} from 'src/common/personality-template-catalog';
 
 type AnyRecord = Record<string, any>;
 
@@ -21,56 +28,85 @@ const stripReservedAnalysisFields = (value: unknown) => {
   const next = { ...source };
   delete next.aiAnalysis;
   delete next.legacyAiInsights;
+  delete next.coreScoring;
   return next;
 };
 
 const isNonEmptyObject = (value: unknown) => Object.keys(safeObject(value)).length > 0;
+const buildFallbackCode = (socialType: unknown, dominantElement: unknown, fallback = '') => {
+  const social = safeString(socialType).trim().toLowerCase();
+  const element = safeString(dominantElement).trim().toUpperCase();
+  if (social && element) {
+    return `${social[0]}${element[0]}`;
+  }
+  return fallback;
+};
 
 async function findTemplateForResult(db: PrismaService, result: AnyRecord) {
   await ensureDemoPersonalityTemplates(db);
+  const preferredCode = stripPersonalityCodeModifier(result.personalityCode);
 
-  if (result.personalityCode) {
+  for (const candidateCode of [safeString(result.personalityCode), preferredCode]) {
+    if (!candidateCode) continue;
     const byCode = await db.personalityResultTemplate.findUnique({
-      where: { code: result.personalityCode },
+      where: { code: candidateCode },
     });
-    if (byCode) return byCode;
+    if (
+      byCode
+      && (!result.socialType || byCode.socialType === String(result.socialType))
+      && (!result.dominantElement || byCode.element === String(result.dominantElement).toLowerCase())
+    ) {
+      return byCode;
+    }
   }
 
   if (result.socialType && result.dominantElement) {
-    const byElement = await db.personalityResultTemplate.findFirst({
+    const byElement = await db.personalityResultTemplate.findMany({
       where: {
         socialType: String(result.socialType),
         element: String(result.dominantElement).toLowerCase(),
       },
     });
-    if (byElement) return byElement;
-  }
-
-  if (result.socialType) {
-    return db.personalityResultTemplate.findFirst({
-      where: { socialType: String(result.socialType) },
-    });
+    const preferredTemplate = pickPreferredPersonalityTemplate(
+      byElement,
+      preferredCode || safeString(result.personalityCode),
+    );
+    if (preferredTemplate) return preferredTemplate;
   }
 
   return null;
 }
 
 function buildNormalizedInsights(result: AnyRecord, template: unknown) {
-  const templateInsights = buildTemplateInsights(template, safeString(result.personalityCode));
+  const fallbackMeta = {
+    socialType: result.socialType,
+    dominantElement: result.dominantElement,
+  };
+  const resolvedCode =
+    safeString(result.personalityCode)
+    || safeString(safeObject(template).code)
+    || buildFallbackCode(result.socialType, result.dominantElement, safeString(result.personalityCode));
+  const templateInsights = buildTemplateInsights(
+    template,
+    resolvedCode,
+    fallbackMeta,
+  );
   const resultInsightSource =
     result.testType === 'paid'
       ? stripReservedAnalysisFields(result.paidInsights)
       : safeObject(result.freeTeaser);
+  const sanitizedResultInsightSource = { ...resultInsightSource };
+  delete sanitizedResultInsightSource.code;
+  delete sanitizedResultInsightSource.personalityLabel;
 
   return {
     ...templateInsights,
-    ...resultInsightSource,
+    ...sanitizedResultInsightSource,
     code: safeString(
-      resultInsightSource.code,
-      safeString(templateInsights.code, safeString(result.personalityCode)),
+      safeString(templateInsights.code),
+      resolvedCode,
     ),
     personalityLabel: safeString(
-      resultInsightSource.personalityLabel,
       safeString(templateInsights.personalityLabel),
     ),
   };
@@ -81,12 +117,14 @@ function buildNormalizedAiInsights(
   template: unknown,
   displayAnalysis: ReturnType<typeof buildDisplayAnalysis>,
 ) {
-  if (isNonEmptyObject(result.aiInsights)) {
+  const hasExactTemplate = !!template;
+
+  if (hasExactTemplate && isNonEmptyObject(result.aiInsights)) {
     return safeObject(result.aiInsights);
   }
 
   const paidInsights = safeObject(result.paidInsights);
-  if (isNonEmptyObject(paidInsights.legacyAiInsights)) {
+  if (hasExactTemplate && isNonEmptyObject(paidInsights.legacyAiInsights)) {
     return safeObject(paidInsights.legacyAiInsights);
   }
 
@@ -94,6 +132,10 @@ function buildNormalizedAiInsights(
     template,
     result.normalizedScores || result.elementScores,
     displayAnalysis.personalityType,
+    {
+      socialType: result.socialType,
+      dominantElement: result.dominantElement,
+    },
   );
 }
 
@@ -123,6 +165,17 @@ function extractUserShape(result: AnyRecord) {
   return {
     userName: safeString(user.fullName) || null,
     userEmail: safeString(user.email) || null,
+    memberCode:
+      safeString(profileExtra.memberCode)
+      || safeString(profileExtra.publicCode)
+      || safeString(profileExtra.publicId)
+      || safeString(user.myReferralCode)
+      || null,
+    publicId:
+      safeString(profileExtra.publicId)
+      || safeString(profileExtra.publicCode)
+      || safeString(user.myReferralCode)
+      || null,
     userWhatsapp: whatsapp,
     userProvince: safeString(profile.province) || null,
     userCity: safeString(profile.city) || null,
@@ -134,12 +187,44 @@ export async function mapTestResultForClient(db: PrismaService, rawResult: AnyRe
 
   const result = rawResult as AnyRecord;
   const template = await findTemplateForResult(db, result);
+  const user = safeObject(result.user);
+  const userProfileExtra = safeObject(safeObject(user.profile).extra);
+  const certType =
+    safeString(user.role).toUpperCase() === 'YAYASAN'
+    || userProfileExtra.isYayasanLinked === true
+      ? CertificateType.YAYASAN
+      : CertificateType.INDIVIDU;
+  const certificateTemplateRow = await db.certificateTemplate.findUnique({
+    where: { certType },
+  });
+  const certificateTemplate = await mapCertificateTemplateForClient(db, certificateTemplateRow);
+  const coreScoring = safeObject(safeObject(result.paidInsights).coreScoring);
+  const resolvedPersonalityCode =
+    safeString(result.personalityCode)
+    || safeString(safeObject(template).code)
+    || buildFallbackCode(
+      result.socialType,
+      result.dominantElement,
+      safeString(result.personalityCode),
+    );
+  const fallbackMeta = {
+    socialType: result.socialType,
+    dominantElement: result.dominantElement,
+  };
   const displayAnalysis = buildDisplayAnalysis(
     template,
     result.normalizedScores || result.elementScores,
-    safeString(result.personalityCode, 'Hasil Kepribadian'),
+    buildFallbackPersonalityType(
+      result.socialType,
+      result.dominantElement,
+      safeString(resolvedPersonalityCode, 'Hasil Kepribadian'),
+    ),
+    fallbackMeta,
   );
   const insights = buildNormalizedInsights(result, template);
+  if (isNonEmptyObject(coreScoring)) {
+    insights.code = safeString(result.personalityCode, insights.code);
+  }
   const personalInsights = buildNormalizedAiInsights(result, template, displayAnalysis);
   const dominantLabel = buildDominantLabel(result, displayAnalysis, insights);
   const userShape = extractUserShape(result);
@@ -153,9 +238,10 @@ export async function mapTestResultForClient(db: PrismaService, rawResult: AnyRe
     createdAt: result.createdAt,
     completedAt: result.createdAt,
     dominantElement: result.dominantElement || null,
-    personalityCode: result.personalityCode || null,
+    personalityCode: resolvedPersonalityCode || null,
     personalityType: displayAnalysis.personalityType,
     dominantLabel,
+    coreScoring: isNonEmptyObject(coreScoring) ? coreScoring : null,
     displayAnalysis,
     analysis: {
       dominantElement: result.dominantElement || null,
@@ -164,7 +250,9 @@ export async function mapTestResultForClient(db: PrismaService, rawResult: AnyRe
       insights,
       personalInsights,
       aiInsights: personalInsights,
+      coreScoring: isNonEmptyObject(coreScoring) ? coreScoring : null,
     },
     ...userShape,
+    template: certificateTemplate,
   };
 }

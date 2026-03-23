@@ -12,6 +12,7 @@ export default function CertificateDownload() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const shouldAutoPrint = searchParams.get('download') === '1';
+  const isPremiumResult = payload?.result?.testType === 'paid';
 
   useEffect(() => {
     let active = true;
@@ -35,7 +36,7 @@ export default function CertificateDownload() {
   }, [userId]);
 
   useEffect(() => {
-    if (!shouldAutoPrint || loading || !payload) return undefined;
+    if (!shouldAutoPrint || loading || !payload || !isPremiumResult) return undefined;
 
     const closeAfterPrint = () => {
       window.removeEventListener('afterprint', closeAfterPrint);
@@ -50,7 +51,7 @@ export default function CertificateDownload() {
       window.clearTimeout(timer);
       window.removeEventListener('afterprint', closeAfterPrint);
     };
-  }, [loading, payload, shouldAutoPrint]);
+  }, [isPremiumResult, loading, payload, shouldAutoPrint]);
 
   if (loading) {
     return (
@@ -101,22 +102,31 @@ export default function CertificateDownload() {
       </style>
       <div className="max-w-4xl mx-auto mb-4 flex items-center justify-between print:hidden">
         <Link to="/dashboard" className="text-yellow-600 underline text-sm">Kembali</Link>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition flex items-center gap-2"
-        >
-          <Printer className="w-4 h-4" />
-          Cetak / Simpan PDF
-        </button>
+        {isPremiumResult ? (
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition flex items-center gap-2"
+          >
+            <Printer className="w-4 h-4" />
+            Cetak / Simpan PDF
+          </button>
+        ) : (
+          <div className="rounded-lg border border-yellow-400/40 bg-yellow-50 px-4 py-2 text-sm font-semibold text-yellow-700">
+            Sertifikat lengkap hanya tersedia untuk hasil premium
+          </div>
+        )}
       </div>
       <ResultCertificate
         template={payload.template || {}}
         result={payload.result}
         resultId={payload.result?.resultId || payload.result?.id}
         certificateNumber={payload.certificateNumber}
+        identityLabel={isPremiumResult ? 'No. Sertifikat' : 'Member ID'}
+        identityValue={isPremiumResult ? payload.certificateNumber : (payload.result?.memberCode || payload.memberCode || payload.userId)}
         issuedAt={payload.issuedAt}
         certType={payload.certType || 'individu'}
+        lockPremiumSections={!isPremiumResult}
       />
     </div>
   );

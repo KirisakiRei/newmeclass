@@ -15,6 +15,11 @@ export class InstitutionsController {
     return this.prisma.institutionInquiry.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  @Get(':id')
+  getById(@Param('id') id: string) {
+    return this.prisma.institutionInquiry.findUnique({ where: { id } });
+  }
+
   @Get('stats/summary')
   async stats() {
     const total = await this.prisma.institutionInquiry.count();

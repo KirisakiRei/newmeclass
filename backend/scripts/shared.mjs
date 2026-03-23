@@ -19,6 +19,15 @@ export function unwrap(payload) {
   return payload && typeof payload === 'object' && 'data' in payload ? payload.data : payload;
 }
 
+export function extractItems(payload) {
+  const data = unwrap(payload);
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && Array.isArray(data.items)) {
+    return data.items;
+  }
+  return [];
+}
+
 export async function requestJson(route, { method = 'GET', token, body, headers } = {}) {
   const started = performance.now();
   const response = await fetch(`${API_BASE}${route}`, {

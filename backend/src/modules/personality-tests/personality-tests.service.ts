@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuestionsService } from '../questions/questions.service';
+import { CoreScoringCatalogService } from '../scoring/core-scoring-catalog.service';
 import { TestResultsService } from '../test-results/test-results.service';
+import { SubmitCorePersonalityTestDto } from './dto/submit-core-personality-test.dto';
 import { SubmitPersonalityTestDto } from './dto/submit-personality-test.dto';
 
 @Injectable()
@@ -9,11 +11,12 @@ export class PersonalityTestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly questionsService: QuestionsService,
+    private readonly coreScoringCatalogService: CoreScoringCatalogService,
     private readonly resultsService: TestResultsService,
   ) {}
 
   async getQuestions(testType: string, includePremium: boolean) {
-    const all = await this.questionsService.getAll();
+    const all = await this.questionsService.getPublicQuestions();
     const normalizedType = (testType || '').toLowerCase();
     const mapped = all
       .filter((q) => {
@@ -49,6 +52,34 @@ export class PersonalityTestsService {
     });
 
     return { result: saved.resultId, resultId: saved.resultId, success: true };
+  }
+
+  async getCorePremiumQuestions(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        profile: {
+          select: {
+            birthDate: true,
+          },
+        },
+      },
+    });
+
+    const birthDate = user?.profile?.birthDate;
+    if (!birthDate) {
+      throw new BadRequestException('Tanggal lahir profil belum tersedia untuk memulai core premium test');
+    }
+
+    return this.coreScoringCatalogService.getRuntimeQuestionsForBirthDate(birthDate);
+  }
+
+  async submitCorePremium(userId: string, body: SubmitCorePersonalityTestDto) {
+    return this.resultsService.submitCorePremiumTest(userId, {
+      tes_a: body.tes_a,
+      tes_b: body.tes_b,
+      tes_c: body.tes_c as any,
+    });
   }
 
   description(personalityType: string) {

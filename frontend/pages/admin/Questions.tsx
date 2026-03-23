@@ -9,6 +9,7 @@ import { questionsAPI } from '../../services/api';
 import PageHeader from '../../components/ui/page-header';
 import StatsGrid from '../../components/ui/stats-grid';
 import { TableSkeleton } from '../../components/ui/loading-spinner';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const ELEMENTS = ['KAYU', 'API', 'TANAH', 'LOGAM', 'AIR'];
 const ELEMENT_COLORS = { KAYU: 'text-green-400', API: 'text-orange-400', TANAH: 'text-yellow-400', LOGAM: 'text-gray-400', AIR: 'text-blue-400' };
@@ -47,8 +48,21 @@ const QUESTION_TYPES = [
   { value: 'yes_no', label: 'Ya/Tidak' },
 ];
 
+const CORE_STAGE_LABELS = {
+  TES_A: 'Core Tes A',
+  TES_B: 'Core Tes B',
+  TES_C: 'Core Tes C',
+};
+
+const CORE_ANSWER_TYPE_LABELS = {
+  boolean: 'Ya / Tidak',
+  multiple_choice: 'Pilihan Tetap',
+  likert: 'Likert 4 Skala',
+};
+
 const Questions = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [activeTab, setActiveTab] = useState('questions'); // 'questions' | 'categories'
   const [questions, setQuestions] = useState([]);
   const [categories, setCategories] = useState(['KAYU', 'API', 'TANAH', 'LOGAM', 'AIR']);
@@ -61,6 +75,31 @@ const Questions = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategoryIdx, setEditingCategoryIdx] = useState(null);
   const [editingCategoryValue, setEditingCategoryValue] = useState('');
+  const canCreateQuestion = adminAccess.hasPermission('questions.create');
+  const canEditQuestion = adminAccess.hasPermission('questions.edit');
+  const canDeleteQuestion = adminAccess.hasPermission('questions.delete');
+  const canManageQuestion = adminAccess.hasPermission('questions.manage');
+  const getCoreMeta = (question) => question?.coreScoringMetadata || question?.variants?.coreScoring || null;
+  const isProtectedCoreQuestion = (question) => Boolean(getCoreMeta(question));
+  const isPremiumCoreQuestion = (question) => isProtectedCoreQuestion(question);
+  const isFreeActiveQuestion = (question) => question?.testType === 'free';
+  const isLegacyPaidQuestion = (question) => question?.testType === 'paid' && !isProtectedCoreQuestion(question);
+  const isCurrentlyUsedQuestion = (question) => isFreeActiveQuestion(question) || isPremiumCoreQuestion(question);
+  const getQuestionGroupLabel = (question) => {
+    const coreMeta = getCoreMeta(question);
+    if (!coreMeta) return question.category || 'Lainnya';
+    if (coreMeta.stage === 'TES_C' && coreMeta.groupElement) {
+      return `${CORE_STAGE_LABELS[coreMeta.stage]} - ${coreMeta.groupElement}`;
+    }
+    return CORE_STAGE_LABELS[coreMeta.stage] || 'Core Scoring';
+  };
+  const getQuestionTypeLabel = (question) => {
+    const coreMeta = getCoreMeta(question);
+    if (coreMeta?.answerType) {
+      return CORE_ANSWER_TYPE_LABELS[coreMeta.answerType] || coreMeta.answerType;
+    }
+    return typeLabel(question.type);
+  };
 
   useEffect(() => {
     loadAll();
@@ -74,7 +113,9 @@ const Questions = () => {
         questionsAPI.getCategories(),
       ]);
       setQuestions(qRes.data || []);
-      if (Array.isArray(cRes.data) && cRes.data.length > 0) setCategories(cRes.data);
+      if (Array.isArray(cRes.data) && cRes.data.length > 0) {
+        setCategories(cRes.data.filter((category) => category && category !== 'CORE_SCORING_PREMIUM_V1'));
+      }
     } catch (err) {
       toast({ title: 'Error', description: 'Gagal memuat data', variant: 'destructive' });
     } finally {
@@ -86,6 +127,7 @@ const Questions = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (editingQuestion ? !canEditQuestion : !canCreateQuestion) return;
     try {
       let payload = { ...formData, order: editingQuestion ? formData.order : questions.length };
 
@@ -117,6 +159,7 @@ const Questions = () => {
   };
 
   const handleEdit = (question) => {
+    if (!canEditQuestion) return;
     setEditingQuestion(question);
     const opts = question.options.length
       ? question.options.map(o => ({
@@ -145,6 +188,12 @@ const Questions = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!canDeleteQuestion) return;
+    const targetQuestion = questions.find((item) => item._id === id || item.id === id);
+    if (isProtectedCoreQuestion(targetQuestion)) {
+      toast({ title: 'Dikunci Sistem', description: 'Pertanyaan core scoring premium tidak dapat dihapus.', variant: 'destructive' });
+      return;
+    }
     if (!window.confirm('Yakin ingin menghapus pertanyaan ini')) return;
     try {
       await questionsAPI.delete(id);
@@ -186,6 +235,7 @@ const Questions = () => {
 
   // ---- Category CRUD ----
   const addCategory = () => {
+    if (!canManageQuestion) return;
     const name = newCategoryName.trim().toUpperCase();
     if (!name || categories.includes(name)) return;
     setCategories(prev => [...prev, name]);
@@ -194,6 +244,7 @@ const Questions = () => {
   };
 
   const deleteCategory = (idx) => {
+    if (!canManageQuestion) return;
     const name = categories[idx];
     if (ELEMENTS.includes(name)) {
       toast({ title: 'Tidak bisa', description: 'Kategori elemen bawaan tidak dapat dihapus', variant: 'destructive' });
@@ -204,11 +255,13 @@ const Questions = () => {
   };
 
   const startEditCategory = (idx) => {
+    if (!canManageQuestion) return;
     setEditingCategoryIdx(idx);
     setEditingCategoryValue(categories[idx]);
   };
 
   const saveEditCategory = () => {
+    if (!canManageQuestion) return;
     const name = editingCategoryValue.trim().toUpperCase();
     if (!name) return;
     setCategories(prev => prev.map((c, i) => i === editingCategoryIdx ? name : c));
@@ -216,22 +269,29 @@ const Questions = () => {
   };
 
   // ---- Derived values ----
-  const filteredQuestions = activeTestType === 'all' ? questions : questions.filter(q => q.testType === activeTestType);
-  const freeCount = questions.filter(q => q.testType === 'free').length;
-  const paidCount = questions.filter(q => q.testType === 'paid').length;
+  const typeLabel = (type) => QUESTION_TYPES.find(t => t.value === type).label || type;
+  const activeQuestions = questions.filter((question) => isCurrentlyUsedQuestion(question));
+  const legacyPaidCount = questions.filter((question) => isLegacyPaidQuestion(question)).length;
+  const filteredQuestions = activeTestType === 'all'
+    ? activeQuestions
+    : activeTestType === 'premium'
+      ? questions.filter((question) => isPremiumCoreQuestion(question))
+      : questions.filter((question) => isFreeActiveQuestion(question));
+  const freeCount = questions.filter((question) => isFreeActiveQuestion(question)).length;
+  const coreCount = questions.filter((question) => isPremiumCoreQuestion(question)).length;
   const groupedQuestions = filteredQuestions.reduce((acc, q) => {
-    const key = q.category || 'Lainnya';
+    const key = getQuestionGroupLabel(q);
     if (!acc[key]) acc[key] = [];
     acc[key].push(q);
     return acc;
   }, {});
-
-  const typeLabel = (type) => QUESTION_TYPES.find(t => t.value === type).label || type;
+  const editingCoreMeta = editingQuestion ? getCoreMeta(editingQuestion) : null;
+  const isEditingProtectedCore = Boolean(editingCoreMeta);
 
   return (
     <div>
       <PageHeader icon={HelpCircle} title="Pertanyaan" description="Kelola pertanyaan dan kategori untuk NEWME Test">
-        {activeTab === 'questions' && (
+        {activeTab === 'questions' && canCreateQuestion && (
           <Button onClick={() => { resetForm(); setShowModal(true); }} className="bg-yellow-400 text-black hover:bg-yellow-500">
             <Plus className="w-4 h-4 mr-2" /> Tambah Pertanyaan
           </Button>
@@ -239,9 +299,10 @@ const Questions = () => {
       </PageHeader>
 
       <StatsGrid className="mb-6" stats={[
-        { label: 'Total Pertanyaan', value: questions.length },
+        { label: 'Total Aktif', value: activeQuestions.length },
         { label: 'Test Gratis', value: freeCount, icon: Star, iconBg: 'bg-green-400/10', iconColor: 'text-green-400', valueColor: 'text-green-400' },
-        { label: 'Test Berbayar', value: paidCount, icon: Lock, iconBg: 'bg-yellow-400/10', iconColor: 'text-yellow-400', valueColor: 'text-yellow-400' },
+        { label: 'Premium Core', value: coreCount, icon: Lock, iconBg: 'bg-yellow-400/10', iconColor: 'text-yellow-400', valueColor: 'text-yellow-400' },
+        { label: 'Legacy Nonaktif', value: legacyPaidCount, icon: BarChart2, iconBg: 'bg-gray-400/10', iconColor: 'text-gray-400', valueColor: 'text-gray-400' },
         { label: 'Kategori', value: categories.length, icon: Tag, iconBg: 'bg-blue-400/10', iconColor: 'text-blue-400', valueColor: 'text-blue-400' },
       ]} />
 
@@ -266,13 +327,24 @@ const Questions = () => {
         <>
           {/* Filter */}
           <div className="flex gap-2 mb-6">
-            {[['all', `Semua (${questions.length})`], ['free', `Gratis (${freeCount})`], ['paid', `Berbayar (${paidCount})`]].map(([val, lbl]) => (
+            {[['all', `Semua Aktif (${activeQuestions.length})`], ['free', `Gratis (${freeCount})`], ['premium', `Premium (${coreCount})`]].map(([val, lbl]) => (
               <Button key={val} variant={activeTestType === val ? 'default' : 'outline'} onClick={() => setActiveTestType(val)}
                 className={activeTestType === val ? 'bg-yellow-400 text-black' : 'border-yellow-400/50 text-yellow-400 text-sm'}>
                 {lbl}
               </Button>
             ))}
           </div>
+
+          {legacyPaidCount > 0 && (
+            <Card className="mb-6 bg-[#2a2a2a] border-gray-500/20">
+              <CardContent className="p-4">
+                <p className="text-sm text-gray-300">
+                  Flow aktif saat ini hanya memakai <span className="text-green-400 font-semibold">Gratis</span> dan <span className="text-yellow-400 font-semibold">Premium Core</span>.
+                  {' '}Masih ada <span className="font-semibold text-gray-100">{legacyPaidCount}</span> pertanyaan berbayar lama yang tersimpan di database, tetapi tidak dipakai lagi oleh user test.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {loading ? (
             <TableSkeleton rows={6} cols={4} />
@@ -294,13 +366,28 @@ const Questions = () => {
                                 <div>
                                   <p className="text-white font-medium">{idx + 1}. {question.question || question.text}</p>
                                   <div className="flex flex-wrap gap-1.5 mt-1">
-                                    <span className="text-xs px-2 py-0.5 bg-yellow-400/20 text-yellow-400 rounded">{typeLabel(question.type)}</span>
-                                    <span className={`text-xs px-2 py-0.5 rounded ${question.testType === 'free' ? 'bg-green-400/20 text-green-400' : 'bg-yellow-400/20 text-yellow-400'}`}>
-                                      {question.testType === 'free' ? 'Gratis' : 'Berbayar'}
+                                    <span className="text-xs px-2 py-0.5 bg-yellow-400/20 text-yellow-400 rounded">{getQuestionTypeLabel(question)}</span>
+                                    <span className={`text-xs px-2 py-0.5 rounded ${isFreeActiveQuestion(question) ? 'bg-green-400/20 text-green-400' : 'bg-yellow-400/20 text-yellow-400'}`}>
+                                      {isFreeActiveQuestion(question) ? 'Gratis' : 'Premium'}
                                     </span>
+                                    {isProtectedCoreQuestion(question) && (
+                                      <span className="text-xs px-2 py-0.5 bg-purple-400/10 text-purple-300 rounded">
+                                        Core Scoring Protected
+                                      </span>
+                                    )}
+                                    {getCoreMeta(question)?.stage && (
+                                      <span className="text-xs px-2 py-0.5 bg-purple-400/10 text-purple-400 rounded">
+                                        {CORE_STAGE_LABELS[getCoreMeta(question).stage] || getCoreMeta(question).stage}
+                                      </span>
+                                    )}
                                     {question.targetElement && (
                                       <span className={`text-xs px-2 py-0.5 bg-blue-400/10 rounded ${ELEMENT_COLORS[question.targetElement] || 'text-blue-400'}`}>
                                         Elemen: {question.targetElement}
+                                      </span>
+                                    )}
+                                    {getCoreMeta(question)?.questionKey && (
+                                      <span className="text-xs px-2 py-0.5 bg-gray-700 text-gray-300 rounded font-mono">
+                                        {getCoreMeta(question).questionKey}
                                       </span>
                                     )}
                                     {question.socialDimension && question.socialDimension !== 'none' && (
@@ -309,8 +396,8 @@ const Questions = () => {
                                   </div>
                                 </div>
                                 <div className="flex gap-1 shrink-0">
-                                  <Button size="sm" variant="ghost" className="text-yellow-400 p-1" onClick={() => handleEdit(question)}><Edit className="w-4 h-4" /></Button>
-                                  <Button size="sm" variant="ghost" className="text-red-400 p-1" onClick={() => handleDelete(question._id)}><Trash2 className="w-4 h-4" /></Button>
+                                  {canEditQuestion ? <Button size="sm" variant="ghost" className="text-yellow-400 p-1" onClick={() => handleEdit(question)}><Edit className="w-4 h-4" /></Button> : null}
+                                  {canDeleteQuestion && !isProtectedCoreQuestion(question) ? <Button size="sm" variant="ghost" className="text-red-400 p-1" onClick={() => handleDelete(question._id)}><Trash2 className="w-4 h-4" /></Button> : null}
                                 </div>
                               </div>
                               {question.type === 'likert' && (
@@ -325,9 +412,14 @@ const Questions = () => {
                                   {question.options.map((opt, i) => (
                                     <div key={i} className="text-gray-400 text-sm pl-2 flex items-start gap-2">
                                       <span className="shrink-0">• {opt.text}</span>
-                                      {opt.scores && (
+                                      {!isProtectedCoreQuestion(question) && opt.scores && (
                                         <span className="text-xs text-gray-600">
                                           [{ELEMENTS.map(el => `${el.slice(0,1)}${opt.scores[el.toLowerCase()] ?? 0}`).join(' ')}]
+                                        </span>
+                                      )}
+                                      {isProtectedCoreQuestion(question) && (
+                                        <span className="text-xs text-gray-600 font-mono">
+                                          ({opt.value})
                                         </span>
                                       )}
                                     </div>
@@ -356,8 +448,8 @@ const Questions = () => {
               <div className="flex gap-2">
                 <Input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value.toUpperCase())}
                   placeholder="Nama kategori (huruf kapital)" className="flex-1 bg-[#1a1a1a] border-yellow-400/20 text-white"
-                  onKeyDown={e => e.key === 'Enter' && addCategory()} />
-                <Button onClick={addCategory} className="bg-yellow-400 text-black hover:bg-yellow-500"><Plus className="w-4 h-4" /></Button>
+                  onKeyDown={e => e.key === 'Enter' && addCategory()} disabled={!canManageQuestion} />
+                {canManageQuestion ? <Button onClick={addCategory} className="bg-yellow-400 text-black hover:bg-yellow-500"><Plus className="w-4 h-4" /></Button> : null}
               </div>
               <p className="text-gray-600 text-xs mt-2">Kategori 5 Elemen bawaan (KAYU, API, TANAH, LOGAM, AIR) tidak dapat dihapus.</p>
             </CardContent>
@@ -376,17 +468,17 @@ const Questions = () => {
                     <span className="flex-1 text-white font-mono text-sm">{cat}</span>
                   )}
                   <div className="flex gap-1">
-                    {editingCategoryIdx === idx ? (
+                    {editingCategoryIdx === idx && canManageQuestion ? (
                       <>
                         <Button size="sm" className="bg-yellow-400 text-black h-7 px-2 text-xs" onClick={saveEditCategory}>Simpan</Button>
                         <Button size="sm" variant="ghost" className="text-gray-400 h-7 px-2" onClick={() => setEditingCategoryIdx(null)}>Batal</Button>
                       </>
                     ) : (
                       <>
-                        <Button size="sm" variant="ghost" className="text-yellow-400 p-1 h-7" onClick={() => startEditCategory(idx)}><Edit className="w-3.5 h-3.5" /></Button>
-                        {!ELEMENTS.includes(cat) && (
+                        {canManageQuestion ? <Button size="sm" variant="ghost" className="text-yellow-400 p-1 h-7" onClick={() => startEditCategory(idx)}><Edit className="w-3.5 h-3.5" /></Button> : null}
+                        {!ELEMENTS.includes(cat) && canManageQuestion ? (
                           <Button size="sm" variant="ghost" className="text-red-400 p-1 h-7" onClick={() => deleteCategory(idx)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                        )}
+                        ) : null}
                       </>
                     )}
                   </div>
@@ -413,34 +505,51 @@ const Questions = () => {
                   rows={3} className="w-full bg-[#1a1a1a] border border-yellow-400/20 rounded-md p-2 text-white text-sm" />
               </div>
 
+              {isEditingProtectedCore && (
+                <div className="bg-purple-400/10 border border-purple-400/20 rounded-lg p-3 space-y-2">
+                  <p className="text-purple-300 text-xs font-semibold uppercase tracking-wider">Core Scoring Protected</p>
+                  <p className="text-gray-300 text-sm">
+                    Pertanyaan ini dipakai langsung oleh engine scoring premium. Yang bisa diubah dari dashboard admin hanya teks pertanyaan, label opsi, dan variasi copy untuk UI.
+                  </p>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="px-2 py-0.5 rounded bg-purple-400/10 text-purple-300">{CORE_STAGE_LABELS[editingCoreMeta?.stage] || editingCoreMeta?.stage}</span>
+                    <span className="px-2 py-0.5 rounded bg-yellow-400/10 text-yellow-300">{CORE_ANSWER_TYPE_LABELS[editingCoreMeta?.answerType] || editingCoreMeta?.answerType}</span>
+                    {editingCoreMeta?.questionKey && <span className="px-2 py-0.5 rounded bg-gray-700 text-gray-200 font-mono">{editingCoreMeta.questionKey}</span>}
+                    {editingCoreMeta?.groupElement && <span className="px-2 py-0.5 rounded bg-blue-400/10 text-blue-300">Elemen: {editingCoreMeta.groupElement}</span>}
+                  </div>
+                </div>
+              )}
+
               {/* Type + Category + TestType */}
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-gray-400 text-xs block mb-1">Tipe Soal</label>
-                  <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full bg-[#1a1a1a] border border-yellow-400/20 rounded-md p-2 text-white text-sm">
-                    {QUESTION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
+              {!isEditingProtectedCore && (
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-gray-400 text-xs block mb-1">Tipe Soal</label>
+                    <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}
+                      className="w-full bg-[#1a1a1a] border border-yellow-400/20 rounded-md p-2 text-white text-sm">
+                      {QUESTION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-xs block mb-1">Kategori</label>
+                    <select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full bg-[#1a1a1a] border border-yellow-400/20 rounded-md p-2 text-white text-sm">
+                      {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-xs block mb-1">Jenis Test</label>
+                    <select value={formData.testType} onChange={e => setFormData({ ...formData, testType: e.target.value })}
+                      className="w-full bg-[#1a1a1a] border border-yellow-400/20 rounded-md p-2 text-white text-sm">
+                      <option value="free">Test Gratis</option>
+                      <option value="paid">Test Berbayar</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-gray-400 text-xs block mb-1">Kategori</label>
-                  <select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full bg-[#1a1a1a] border border-yellow-400/20 rounded-md p-2 text-white text-sm">
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-gray-400 text-xs block mb-1">Jenis Test</label>
-                  <select value={formData.testType} onChange={e => setFormData({ ...formData, testType: e.target.value })}
-                    className="w-full bg-[#1a1a1a] border border-yellow-400/20 rounded-md p-2 text-white text-sm">
-                    <option value="free">Test Gratis</option>
-                    <option value="paid">Test Berbayar</option>
-                  </select>
-                </div>
-              </div>
+              )}
 
               {/* Likert: Target Element + Social Dimension */}
-              {formData.type === 'likert' && (
+              {!isEditingProtectedCore && formData.type === 'likert' && (
                 <div className="bg-blue-400/5 border border-blue-400/20 rounded-lg p-3 space-y-3">
                   <p className="text-blue-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
                     <BarChart2 className="w-3.5 h-3.5" /> Konfigurasi Likert
@@ -471,7 +580,27 @@ const Questions = () => {
               )}
 
               {/* Multiple Choice with per-element scores */}
-              {formData.type === 'multiple_choice' && (
+              {isEditingProtectedCore ? (
+                <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-lg p-3 space-y-3">
+                  <label className="text-gray-300 text-xs block font-medium">
+                    Label Opsi Jawaban
+                    <span className="text-gray-500 ml-1 font-normal">(nilai opsi, bobot, dan urutan slot dikunci oleh engine)</span>
+                  </label>
+                  <div className="space-y-2">
+                    {formData.options.map((opt, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <div className="w-12 text-gray-500 text-sm font-mono text-center">{opt.value}</div>
+                        <input
+                          value={opt.text}
+                          onChange={e => updateOptionText(idx, e.target.value)}
+                          placeholder={`Opsi ${opt.value}`}
+                          className="flex-1 bg-[#1a1a1a] border border-yellow-400/20 rounded-md p-2 text-white text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : formData.type === 'multiple_choice' && (
                 <div>
                   <label className="text-gray-400 text-xs block mb-2 font-medium">
                     Opsi Jawaban — Skor per Elemen
@@ -530,13 +659,13 @@ const Questions = () => {
 
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={formData.isRequired} id="isRequired"
-                  onChange={e => setFormData({ ...formData, isRequired: e.target.checked })} className="rounded" />
+                  onChange={e => setFormData({ ...formData, isRequired: e.target.checked })} className="rounded" disabled={isEditingProtectedCore} />
                 <label htmlFor="isRequired" className="text-gray-400 text-sm cursor-pointer">Pertanyaan wajib dijawab</label>
               </div>
 
               <div className="flex gap-2 pt-2 border-t border-yellow-400/20">
                 <Button type="button" variant="outline" onClick={() => { setShowModal(false); resetForm(); }} className="flex-1 border-gray-600 text-gray-400">Batal</Button>
-                <Button type="submit" className="flex-1 bg-yellow-400 text-black hover:bg-yellow-500">Simpan</Button>
+                <Button type="submit" disabled={editingQuestion ? !canEditQuestion : !canCreateQuestion} className="flex-1 bg-yellow-400 text-black hover:bg-yellow-500">Simpan</Button>
               </div>
             </form>
           </div>

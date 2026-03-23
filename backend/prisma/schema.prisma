@@ -12,6 +12,8 @@ enum Role {
   USER
   ADMIN
   SUPERADMIN
+  OPERATOR
+  DEVELOPER
   YAYASAN
   MITRA
 }
@@ -43,6 +45,27 @@ enum PaymentType {
   DISBURSEMENT
 }
 
+enum WebhookProcessingStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+  IGNORED
+  INVALID
+}
+
+enum PaymentOpsAlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum PaymentOpsAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
 enum LedgerEntryType {
   CREDIT
   DEBIT
@@ -61,6 +84,7 @@ enum DisbursementStatus {
   PROCESSING
   APPROVED
   REJECTED
+  FAILED
 }
 
 enum YayasanApprovalStatus {
@@ -72,6 +96,13 @@ enum PriceChangeRequestStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum MitraInviteStatus {
+  PENDING
+  CLAIMED
+  EXPIRED
+  REVOKED
 }
 
 enum CertificateType {
@@ -93,10 +124,13 @@ enum AccessType {
 model User {
   id               String           @id @default(cuid())
   email            String           @unique
+  username         String?          @unique
   phone            String?          @unique
   passwordHash     String
   fullName         String
   role             Role             @default(USER)
+  adminRoleId      String?
+  adminRole        AdminRole?       @relation(fields: [adminRoleId], references: [id])
   status           AccountStatus    @default(ACTIVE)
   paymentStatus    PaymentStatus    @default(CREATED)
   freeTestStatus   TestStatus       @default(NOT_STARTED)
@@ -118,9 +152,61 @@ model User {
   proofs           ManualPaymentProof[]
   yayasanProfile   YayasanProfile?
   mitraProfile     MitraProfile?
+  managedYayasanProfiles YayasanProfile[]       @relation("MitraManagedYayasan")
+  mitraInvites     MitraInvite[]
+  mitraCapacityChanges MitraCapacityChangeLog[] @relation("MitraCapacityChangedBy")
+  mitraOwnedCapacityChanges MitraCapacityChangeLog[]
   createdAudits    AuditLog[]        @relation("AuditActor")
 
   @@index([role, status, createdAt])
+  @@index([adminRoleId])
+  @@index([username, role])
+}
+
+model AdminRole {
+  id          String                @id @default(cuid())
+  name        String                @unique
+  slug        String                @unique
+  description String?
+  isProtected Boolean               @default(false)
+  isSystem    Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  users       User[]
+  permissions AdminRolePermission[]
+}
+
+model AdminPermission {
+  id          String                @id @default(cuid())
+  key         String                @unique
+  groupKey    String
+  groupLabel  String
+  groupOrder  Int                   @default(0)
+  pageKey     String
+  pageLabel   String
+  pageOrder   Int                   @default(0)
+  actionKey   String
+  actionLabel String
+  actionOrder Int                   @default(0)
+  isSystem    Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  roles       AdminRolePermission[]
+
+  @@index([groupKey, groupOrder, pageOrder, actionOrder])
+  @@index([pageKey, actionKey])
+}
+
+model AdminRolePermission {
+  id           String          @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime        @default(now())
+  role         AdminRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   AdminPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
 }
 
 model UserProfile {
@@ -142,6 +228,8 @@ model YayasanProfile {
   id            String    @id @default(cuid())
   userId         String   @unique
   user           User     @relation(fields: [userId], references: [id])
+  managedByMitraId String?
+  managedByMitra User?    @relation("MitraManagedYayasan", fields: [managedByMitraId], references: [id])
   institutionName String
   referralPrice   Int      @default(0)
   mitraShare      Int      @default(0)
@@ -153,6 +241,8 @@ model YayasanProfile {
   approvalLockedAt DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([managedByMitraId, createdAt])
 }
 
 model MitraProfile {
@@ -162,8 +252,49 @@ model MitraProfile {
   inviteCode     String   @unique
   isVerified     Boolean  @default(false)
   isActive       Boolean  @default(true)
+  capacityLimit  Int      @default(35)
+  capacityUsed   Int      @default(0)
+  capacityUpdatedAt DateTime?
+  invites       MitraInvite[]
+  capacityChangeLogs MitraCapacityChangeLog[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+model MitraInvite {
+  id            String            @id @default(cuid())
+  mitraProfileId String
+  mitraProfile  MitraProfile      @relation(fields: [mitraProfileId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash     String            @unique
+  status        MitraInviteStatus @default(PENDING)
+  expiresAt     DateTime
+  sentAt        DateTime?
+  claimedAt     DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([userId, status])
+  @@index([mitraProfileId, status])
+}
+
+model MitraCapacityChangeLog {
+  id               String       @id @default(cuid())
+  mitraProfileId   String
+  mitraProfile     MitraProfile @relation(fields: [mitraProfileId], references: [id], onDelete: Cascade)
+  mitraUserId      String
+  mitraUser        User         @relation(fields: [mitraUserId], references: [id], onDelete: Cascade)
+  changedByAdminId String?
+  changedByAdmin   User?        @relation("MitraCapacityChangedBy", fields: [changedByAdminId], references: [id])
+  previousLimit    Int
+  newLimit         Int
+  note             String?
+  createdAt        DateTime     @default(now())
+
+  @@index([mitraProfileId, createdAt])
+  @@index([mitraUserId, createdAt])
 }
 
 model AuthSession {
@@ -393,13 +524,57 @@ model PaymentEvent {
 model WebhookInbox {
   id            String   @id @default(cuid())
   eventKey      String   @unique
-  orderId       String
+  provider      String   @default("midtrans")
+  eventType     String?
+  orderId       String?
+  transactionId String?
   signatureKey  String
+  sourceIp      String?
+  userAgent     String?
+  statusBeforeProcess String?
+  nextStatus    String?
+  processingStatus WebhookProcessingStatus @default(RECEIVED)
+  processAttempts Int    @default(0)
+  duplicateCount Int     @default(0)
+  lastDuplicateAt DateTime?
+  lastError     String?
+  lastProcessedBy String?
+  requestLatencyMs Int?
+  processingLatencyMs Int?
+  receivedAt    DateTime @default(now())
   payload       Json
   processedAt   DateTime?
+  updatedAt     DateTime @default(now()) @updatedAt
   createdAt     DateTime @default(now())
 
   @@index([orderId, createdAt])
+  @@index([processingStatus, receivedAt])
+  @@index([provider, receivedAt])
+}
+
+model PaymentOpsAlert {
+  id              String                  @id @default(cuid())
+  alertKey        String                  @unique
+  type            String
+  severity        PaymentOpsAlertSeverity
+  status          PaymentOpsAlertStatus   @default(OPEN)
+  title           String
+  message         String
+  orderId         String?
+  webhookInboxId  String?
+  metadata        Json?
+  hitCount        Int                     @default(1)
+  firstTriggeredAt DateTime               @default(now())
+  lastTriggeredAt DateTime                @default(now())
+  acknowledgedAt  DateTime?
+  acknowledgedBy  String?
+  resolvedAt      DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @default(now()) @updatedAt
+
+  @@index([status, severity, lastTriggeredAt])
+  @@index([type, lastTriggeredAt])
+  @@index([orderId, lastTriggeredAt])
 }
 
 model OutboxEvent {
@@ -451,11 +626,22 @@ model Disbursement {
   userId        String?
   amount        Int
   status        DisbursementStatus @default(PENDING)
+  provider      String            @default("manual")
+  providerReferenceId String?
+  providerStatus String?
+  providerPayload Json?
+  failureReason String?
+  bankName      String?
+  bankAccount   String?
+  accountName   String?
   notes         String?
+  submittedAt   DateTime?
   processedAt   DateTime?
+  completedAt   DateTime?
   createdAt     DateTime           @default(now())
 
   @@index([type, status, createdAt])
+  @@index([provider, providerStatus, createdAt])
 }
 
 model ReferralSetting {
@@ -560,20 +746,31 @@ model HeroSlide {
   id          String        @id @default(cuid())
   title       String
   subtitle    String?
+  description String?
+  badge       String?
   imageUrl    String
+  ctaText     String?
+  ctaLink     String?
   order       Int           @default(0)
+  isActive    Boolean       @default(true)
   status      ContentStatus @default(PUBLISHED)
   createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
 }
 
 model HomepageProduct {
   id          String        @id @default(cuid())
   name        String
   description String?
+  subtitle    String?
   imageUrl    String?
+  link        String?
+  badge       String?
   order       Int           @default(0)
+  isActive    Boolean       @default(true)
   status      ContentStatus @default(PUBLISHED)
   createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
 }
 
 model Product {
@@ -593,12 +790,16 @@ model Product {
 model Testimonial {
   id          String        @id @default(cuid())
   name        String
+  organization String?
   role        String?
   quote       String
   avatarUrl   String?
+  rating      Int           @default(5)
   order       Int           @default(0)
+  isActive    Boolean       @default(true)
   status      ContentStatus @default(PUBLISHED)
   createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
 }
 
 model Activity {
@@ -606,9 +807,12 @@ model Activity {
   title       String
   description String?
   imageUrl    String?
+  link        String?
   order       Int           @default(0)
+  isActive    Boolean       @default(true)
   status      ContentStatus @default(PUBLISHED)
   createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
 }
 
 model Article {
@@ -616,8 +820,14 @@ model Article {
   title       String
   slug        String        @unique
   summary     String?
+  excerpt     String?
+  category    String?
+  tags        Json?
   content     String
   imageUrl    String?
+  featuredImage String?
+  isPublished Boolean       @default(true)
+  viewCount   Int           @default(0)
   status      ContentStatus @default(PUBLISHED)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -626,11 +836,15 @@ model Article {
 model Banner {
   id          String        @id @default(cuid())
   title       String?
+  description String?
   imageUrl    String
+  type        String        @default("slider")
   linkUrl     String?
+  isActive    Boolean       @default(true)
   order       Int           @default(0)
   status      ContentStatus @default(PUBLISHED)
   createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
 }
 
 model MediaAsset {

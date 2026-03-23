@@ -1,16 +1,26 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import {
+  extractCoreScoringMetadata,
+  isProtectedCoreScoringQuestion,
+  mergeVariantsPreservingCore,
+} from '../scoring/core-scoring.constants';
 import { PrismaService } from '../prisma/prisma.service';
+import { DEFAULT_QUESTION_CATALOG } from './default-question-catalog';
 
 @Injectable()
 export class QuestionsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private mapQuestion(row: any) {
+    const coreScoringMetadata = extractCoreScoringMetadata(row.variants);
     return {
       ...row,
       _id: row.id,
       question: row.text,
       isFree: row.testType === 'free',
+      isCoreScoringProtected: !!coreScoringMetadata,
+      coreScoringMetadata,
       options: Array.isArray(row.options)
         ? row.options.map((option: any) => ({
             ...option,
@@ -21,6 +31,15 @@ export class QuestionsService {
     };
   }
 
+  private sanitizeAdminVariants(variants: any): Prisma.InputJsonValue {
+    const base =
+      variants && typeof variants === 'object' && !Array.isArray(variants)
+        ? { ...(variants as Record<string, unknown>) }
+        : {};
+    delete base.coreScoring;
+    return base as Prisma.InputJsonValue;
+  }
+
   async getAll() {
     const rows = await this.prisma.question.findMany({
       where: { isActive: true },
@@ -28,6 +47,11 @@ export class QuestionsService {
       orderBy: { order: 'asc' },
     });
     return rows.map((row) => this.mapQuestion(row));
+  }
+
+  async getPublicQuestions() {
+    const rows = await this.getAll();
+    return rows.filter((row) => !isProtectedCoreScoringQuestion(row.variants));
   }
 
   async getCategories() {
@@ -48,7 +72,7 @@ export class QuestionsService {
         isRequired: body.isRequired !== false,
         isActive: true,
         order: Number(body.order || 0),
-        variants: body.variants || null,
+        variants: this.sanitizeAdminVariants(body.variants),
         options: {
           create: options.map((opt: any, idx: number) => ({
             label: opt.text || opt.label || '',
@@ -69,26 +93,47 @@ export class QuestionsService {
   }
 
   async update(id: string, body: any) {
+    const existing = await this.prisma.question.findUnique({
+      where: { id },
+      include: { options: { orderBy: { order: 'asc' } } },
+    });
     await this.prisma.questionOption.deleteMany({ where: { questionId: id } });
+    const coreMetadata = extractCoreScoringMetadata(existing?.variants);
+
+    const updatedOptions = coreMetadata
+      ? (existing?.options || []).map((option: any, idx: number) => ({
+          label: body?.options?.[idx]?.text || body?.options?.[idx]?.label || option.label || '',
+          value: option.value,
+          scores: option.scores || {},
+          order: option.order,
+        }))
+      : (body.options || []).map((opt: any, idx: number) => ({
+          label: opt.text || opt.label || '',
+          value: opt.value || String(idx + 1),
+          scores: opt.scores || { kayu: 0, api: 0, tanah: 0, logam: 0, air: 0 },
+          order: idx,
+        }));
+
     const updated = await this.prisma.question.update({
       where: { id },
       data: {
-        text: body.text || body.question,
-        type: body.type,
-        category: body.category,
-        testType: body.testType,
-        socialDimension: body.socialDimension,
-        targetElement: body.targetElement,
-        isRequired: body.isRequired,
-        order: Number(body.order || 0),
-        variants: body.variants || null,
+        text: body.text || body.question || existing?.text,
+        type: coreMetadata ? existing?.type : body.type,
+        category: coreMetadata ? existing?.category : body.category,
+        testType: coreMetadata ? existing?.testType : body.testType,
+        socialDimension: coreMetadata ? existing?.socialDimension : body.socialDimension,
+        targetElement: coreMetadata ? existing?.targetElement : body.targetElement,
+        isRequired: coreMetadata ? existing?.isRequired : body.isRequired,
+        isActive: coreMetadata ? (body.isActive ?? existing?.isActive) : body.isActive,
+        order: coreMetadata ? Number(body.order ?? existing?.order ?? 0) : Number(body.order || 0),
+        variants: coreMetadata
+          ? ({
+              ...mergeVariantsPreservingCore(existing?.variants, body.variants),
+              coreScoring: coreMetadata,
+            } as Prisma.InputJsonValue)
+          : this.sanitizeAdminVariants(body.variants),
         options: {
-          create: (body.options || []).map((opt: any, idx: number) => ({
-            label: opt.text || opt.label || '',
-            value: opt.value || String(idx + 1),
-            scores: opt.scores || { kayu: 0, api: 0, tanah: 0, logam: 0, air: 0 },
-            order: idx,
-          })),
+          create: updatedOptions,
         },
       },
       include: { options: true },
@@ -105,45 +150,51 @@ export class QuestionsService {
   }
 
   async remove(id: string) {
+    const existing = await this.prisma.question.findUnique({
+      where: { id },
+      select: { variants: true },
+    });
+
+    if (isProtectedCoreScoringQuestion(existing?.variants)) {
+      throw new BadRequestException('Pertanyaan core scoring premium tidak dapat dihapus dari dashboard admin');
+    }
+
     await this.prisma.question.delete({ where: { id } });
     return { message: 'Deleted' };
   }
 
   async seedQuestions() {
-    const count = await this.prisma.question.count();
-    if (count > 0) return { message: 'Questions already seeded' };
+    const existingQuestions = await this.prisma.question.findMany({
+      select: { text: true, testType: true, order: true },
+      orderBy: { order: 'asc' },
+    });
+    const existingQuestionKeys = new Set(
+      existingQuestions.map((question) => `${question.text}::${question.testType}`),
+    );
+    let nextQuestionOrder =
+      existingQuestions.reduce((maxOrder, question) => Math.max(maxOrder, question.order), -1) + 1;
+    let seededCount = 0;
 
-    const seed = [
-      {
-        text: 'Saya nyaman memimpin diskusi kelompok.',
-        category: 'KAYU',
-        socialDimension: 'extrovert',
-        testType: 'free',
-        options: [
-          { text: 'Sangat setuju', value: 'A', scores: { kayu: 5, api: 2, tanah: 1, logam: 0, air: 0 } },
-          { text: 'Setuju', value: 'B', scores: { kayu: 4, api: 2, tanah: 1, logam: 0, air: 0 } },
-          { text: 'Netral', value: 'C', scores: { kayu: 2, api: 1, tanah: 1, logam: 1, air: 1 } },
-          { text: 'Tidak setuju', value: 'D', scores: { kayu: 0, api: 1, tanah: 2, logam: 3, air: 3 } },
-        ],
-      },
-      {
-        text: 'Saya lebih suka bekerja dengan struktur yang jelas.',
-        category: 'LOGAM',
-        socialDimension: 'introvert',
-        testType: 'paid',
-        options: [
-          { text: 'Sangat setuju', value: 'A', scores: { kayu: 1, api: 0, tanah: 2, logam: 5, air: 2 } },
-          { text: 'Setuju', value: 'B', scores: { kayu: 1, api: 0, tanah: 2, logam: 4, air: 2 } },
-          { text: 'Netral', value: 'C', scores: { kayu: 1, api: 1, tanah: 1, logam: 2, air: 1 } },
-          { text: 'Tidak setuju', value: 'D', scores: { kayu: 3, api: 3, tanah: 1, logam: 0, air: 2 } },
-        ],
-      },
-    ];
+    for (const question of DEFAULT_QUESTION_CATALOG) {
+      const questionKey = `${question.text}::${question.testType}`;
+      if (existingQuestionKeys.has(questionKey)) {
+        continue;
+      }
 
-    for (let i = 0; i < seed.length; i += 1) {
-      await this.create({ ...seed[i], type: 'multiple_choice', order: i });
+      await this.create({
+        ...question,
+        type: 'multiple_choice',
+        order: nextQuestionOrder,
+      });
+
+      nextQuestionOrder += 1;
+      seededCount += 1;
     }
 
-    return { message: 'Questions seeded successfully' };
+    if (seededCount === 0) {
+      return { message: 'Default questions already available' };
+    }
+
+    return { message: `Added ${seededCount} default questions successfully` };
   }
 }

@@ -8,24 +8,15 @@ import { useToast } from '../../hooks/use-toast';
 import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner, { CardGridSkeleton } from '../../components/ui/loading-spinner';
 import { mediaAPI } from '../../services/api';
-import axios from 'axios';
+import {
+  getMediaCategoryLabel,
+  MEDIA_CATEGORIES,
+  resolveBackendAssetUrl,
+  uploadAdminImage,
+} from '../../lib/admin-media';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-
-const MEDIA_CATEGORIES = [
-  { value: '', label: 'Semua' },
-  { value: 'hero-slides', label: 'Hero Slides' },
-  { value: 'banners', label: 'Banners' },
-  { value: 'products-home', label: 'Produk Homepage' },
-  { value: 'products-shop', label: 'Produk Shop' },
-  { value: 'testimonials', label: 'Testimonial' },
-  { value: 'activities', label: 'Kegiatan' },
-  { value: 'articles', label: 'Artikel' },
-  { value: 'team', label: 'Tim & Mitra' },
-  { value: 'general', label: 'Umum' },
-];
-
-const UploadModal = ({ onUploaded, onClose }) => {
+const UploadModal = ({ onUploaded, onClose, canUpload }) => {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
   const [category, setCategory] = useState('general');
@@ -49,27 +40,28 @@ const UploadModal = ({ onUploaded, onClose }) => {
   };
 
   const handleUpload = async () => {
+    if (!canUpload) return;
     if (!file) { toast({ title: 'Pilih file terlebih dahulu', variant: 'destructive' }); return; }
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const token = localStorage.getItem('admin_token');
-      const uploadRes = await axios.post(`${BACKEND_URL}/api/upload/image`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` },
+      const uploadRes = await uploadAdminImage(file, {
+        category,
+        name: file.name,
       });
-      if (uploadRes.data.url) {
-        const item = await mediaAPI.create({
-          url: uploadRes.data.url,
-          category,
-          name: file.name,
-          size: file.size,
-        });
+
+      if (uploadRes?.url) {
+        const item = uploadRes.asset
+          ? { data: uploadRes.asset }
+          : await mediaAPI.create({
+              url: uploadRes.url,
+              category,
+              name: file.name,
+            });
         toast({ title: 'Gambar berhasil diunggah' });
         onUploaded(item.data);
       }
     } catch (err) {
-      toast({ title: err.response.data.detail || 'Gagal upload', variant: 'destructive' });
+      toast({ title: err?.response?.data?.detail || err?.message || 'Gagal upload', variant: 'destructive' });
     } finally {
       setUploading(false);
     }
@@ -127,11 +119,15 @@ const UploadModal = ({ onUploaded, onClose }) => {
 
 const MediaGallery = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [media, setMedia] = useState([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('');
   const [showUpload, setShowUpload] = useState(false);
   const [copied, setCopied] = useState('');
+  const canCreateMedia = adminAccess.hasPermission('media.create');
+  const canDeleteMedia = adminAccess.hasPermission('media.delete');
+  const canManageMedia = adminAccess.hasPermission('media.manage');
 
   const load = async () => {
     setLoading(true);
@@ -149,6 +145,7 @@ const MediaGallery = () => {
   useEffect(() => { load(); }, [category]);
 
   const handleDelete = async (id) => {
+    if (!canDeleteMedia) return;
     if (!window.confirm('Hapus gambar ini dari galeri')) return;
     try {
       await mediaAPI.delete(id);
@@ -172,7 +169,21 @@ const MediaGallery = () => {
     setShowUpload(false);
   };
 
-  const catLabel = MEDIA_CATEGORIES.find((c) => c.value === category).label || 'Semua';
+  const handleSyncContentAssets = async () => {
+    if (!canManageMedia) return;
+    try {
+      const response = await mediaAPI.syncContentAssets();
+      toast({
+        title: 'Sinkronisasi selesai',
+        description: `${response.data?.inserted || 0} aset konten ditambahkan ke galeri.`,
+      });
+      await load();
+    } catch {
+      toast({ title: 'Gagal sinkronisasi galeri', variant: 'destructive' });
+    }
+  };
+
+  const catLabel = getMediaCategoryLabel(category || '');
   const totalSize = media.reduce((sum, m) => sum + (m.size || 0), 0);
   const formatSize = (bytes) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -180,12 +191,19 @@ const MediaGallery = () => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const resolveImageSrc = (url) => resolveBackendAssetUrl(url, 'https://placehold.co/200x200?text=No+Image');
+
   return (
     <div className="space-y-6">
       <PageHeader icon={Images} title="Media Gallery" description="Semua gambar yang diunggah ke sistem, terorganisir per kategori">
-        <Button onClick={() => setShowUpload(true)} className="bg-yellow-400 text-black hover:bg-yellow-500">
-          <Upload className="w-4 h-4 mr-2" /> Upload Gambar
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {canManageMedia ? <Button onClick={handleSyncContentAssets} variant="outline" className="border-yellow-400/30 text-yellow-400">
+            <RefreshCw className="w-4 h-4 mr-2" /> Sinkronkan dari Konten
+          </Button> : null}
+          {canCreateMedia ? <Button onClick={() => setShowUpload(true)} className="bg-yellow-400 text-black hover:bg-yellow-500">
+            <Upload className="w-4 h-4 mr-2" /> Upload Gambar
+          </Button> : null}
+        </div>
       </PageHeader>
 
       {/* Stats */}
@@ -227,9 +245,9 @@ const MediaGallery = () => {
             <p className="text-lg mb-4">
               {category ? `Belum ada gambar di kategori "${catLabel}"` : 'Galeri masih kosong'}
             </p>
-            <Button onClick={() => setShowUpload(true)} className="bg-yellow-400 text-black hover:bg-yellow-500">
+            {canCreateMedia ? <Button onClick={() => setShowUpload(true)} className="bg-yellow-400 text-black hover:bg-yellow-500">
               <Upload className="w-4 h-4 mr-2" /> Upload Gambar Pertama
-            </Button>
+            </Button> : null}
           </CardContent>
         </Card>
       ) : (
@@ -239,7 +257,7 @@ const MediaGallery = () => {
               {/* Image */}
               <div className="aspect-square overflow-hidden">
                 <img
-                  src={item.url}
+                  src={resolveImageSrc(item.url)}
                   alt={item.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   onError={(e) => { e.target.src = 'https://placehold.co/200x200?text=Error'; }}
@@ -254,18 +272,18 @@ const MediaGallery = () => {
                   {copied === item._id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied === item._id ? 'Disalin!' : 'Salin URL'}
                 </button>
-                <button
+                {canDeleteMedia ? <button
                   onClick={() => handleDelete(item._id)}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/80 text-white text-xs font-semibold rounded-lg hover:bg-red-500 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Hapus
-                </button>
+                </button> : null}
               </div>
               {/* Caption */}
               <div className="p-2 border-t border-yellow-400/10">
                 <p className="text-white text-xs truncate" title={item.name}>{item.name}</p>
                 <div className="flex items-center justify-between mt-0.5">
-                  <span className="text-yellow-400/60 text-[10px]">{MEDIA_CATEGORIES.find((c) => c.value === item.category).label || item.category}</span>
+                  <span className="text-yellow-400/60 text-[10px]">{getMediaCategoryLabel(item.category)}</span>
                   {item.size > 0 && <span className="text-gray-600 text-[10px]">{formatSize(item.size)}</span>}
                 </div>
               </div>
@@ -274,11 +292,9 @@ const MediaGallery = () => {
         </div>
       )}
 
-      {showUpload && <UploadModal onUploaded={handleUploaded} onClose={() => setShowUpload(false)} />}
+      {showUpload && <UploadModal onUploaded={handleUploaded} onClose={() => setShowUpload(false)} canUpload={canCreateMedia} />}
     </div>
   );
 };
 
 export default MediaGallery;
-
-

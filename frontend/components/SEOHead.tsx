@@ -2,13 +2,22 @@
 import { useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
+const BACKEND_URL = String(process.env.REACT_APP_BACKEND_URL || '').replace(/\/+$/, '');
+
+const buildAssetUrl = (value) => {
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  return value.startsWith('/') && BACKEND_URL ? `${BACKEND_URL}${value}` : value;
+};
+
 const SEOHead = () => {
   const { settings } = useTheme();
 
   useEffect(() => {
     if (!settings) return;
 
-    if (settings.siteTitle) document.title = settings.siteTitle;
+    const title = settings.siteTitle || settings.siteName || 'NEWME CLASS';
+    document.title = title;
 
     let metaDesc = document.querySelector('meta[name="description"]');
     if (!metaDesc) {
@@ -16,7 +25,8 @@ const SEOHead = () => {
       metaDesc.name = 'description';
       document.head.appendChild(metaDesc);
     }
-    metaDesc.content = settings.seoMetaDescription || settings.siteDescription || '';
+    const description = settings.seoMetaDescription || settings.siteDescription || '';
+    metaDesc.content = description;
 
     let metaKeywords = document.querySelector('meta[name="keywords"]');
     if (!metaKeywords) {
@@ -26,15 +36,42 @@ const SEOHead = () => {
     }
     metaKeywords.content = settings.seoKeywords || '';
 
-    if (settings.faviconUrl) {
+    const faviconUrl = buildAssetUrl(settings.faviconUrl);
+    if (faviconUrl) {
       let favicon = document.querySelector('link[rel="icon"]');
       if (!favicon) {
         favicon = document.createElement('link');
         favicon.rel = 'icon';
         document.head.appendChild(favicon);
       }
-      favicon.href = settings.faviconUrl;
+      favicon.href = faviconUrl;
+
+      let appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]');
+      if (!appleTouchIcon) {
+        appleTouchIcon = document.createElement('link');
+        appleTouchIcon.rel = 'apple-touch-icon';
+        document.head.appendChild(appleTouchIcon);
+      }
+      appleTouchIcon.href = faviconUrl;
     }
+
+    const ogImageUrl = buildAssetUrl(settings.logoUrl || settings.faviconUrl);
+    const metaDefinitions = [
+      { selector: 'meta[property="og:title"]', attribute: 'property', name: 'og:title', content: title },
+      { selector: 'meta[property="og:description"]', attribute: 'property', name: 'og:description', content: description },
+      { selector: 'meta[property="og:image"]', attribute: 'property', name: 'og:image', content: ogImageUrl || '' },
+      { selector: 'meta[name="theme-color"]', attribute: 'name', name: 'theme-color', content: settings.primaryColor || '#1a1a1a' },
+    ];
+
+    metaDefinitions.forEach((definition) => {
+      let element = document.querySelector(definition.selector);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute(definition.attribute, definition.name);
+        document.head.appendChild(element);
+      }
+      element.setAttribute('content', definition.content || '');
+    });
 
     if (settings.googleAnalyticsId) {
       const gaId = settings.googleAnalyticsId;

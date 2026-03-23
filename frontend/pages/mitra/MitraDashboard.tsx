@@ -14,6 +14,7 @@ import {
   Handshake,
   Link as LinkIcon,
   LogOut,
+  MessageCircle,
   Save,
   Settings,
   TrendingUp,
@@ -34,6 +35,10 @@ import { formatCurrency } from '../../lib/utils';
 import { buildFrontendUrl } from '../../lib/public-url';
 import { copyTextToClipboard } from '../../lib/clipboard';
 import ResponsiveTabs from '../../components/ui/responsive-tabs';
+import Pagination from '../../components/ui/pagination';
+import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
+import { useTheme } from '../../contexts/ThemeContext';
+import { buildMitraUpgradeWhatsappMessage, buildWhatsAppUrl } from '../../lib/mitra-whatsapp';
 
 const fmt = formatCurrency;
 const SHARE_BUDGET = 150000;
@@ -49,6 +54,7 @@ const TABS = [
 export default function MitraDashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { settings } = useTheme();
   const [mitra, setMitra] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -56,6 +62,15 @@ export default function MitraDashboard() {
   const [yayasanList, setYayasanList] = useState([]);
   const [wallet, setWallet] = useState({ balance: 0, transactions: [] });
   const [requests, setRequests] = useState([]);
+  const [yayasanPagination, setYayasanPagination] = useState(createEmptyPageState(10));
+  const [requestsPagination, setRequestsPagination] = useState(createEmptyPageState(10));
+  const [walletPagination, setWalletPagination] = useState(createEmptyPageState(10));
+  const [yayasanPage, setYayasanPage] = useState(1);
+  const [yayasanPageSize, setYayasanPageSize] = useState(10);
+  const [requestsPage, setRequestsPage] = useState(1);
+  const [requestsPageSize, setRequestsPageSize] = useState(10);
+  const [walletPage, setWalletPage] = useState(1);
+  const [walletPageSize, setWalletPageSize] = useState(10);
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', bankName: '', bankAccount: '', accountName: '' });
   const [withdrawing, setWithdrawing] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -68,6 +83,11 @@ export default function MitraDashboard() {
   const [profileForm, setProfileForm] = useState({ fullName: '', email: '', phone: '', address: '' });
 
   useEffect(() => { checkAuth(); }, []);
+  useEffect(() => {
+    if (mitra) {
+      void loadAll();
+    }
+  }, [mitra, yayasanPage, yayasanPageSize, requestsPage, requestsPageSize, walletPage, walletPageSize]);
 
   const checkAuth = async () => {
     try {
@@ -95,14 +115,27 @@ export default function MitraDashboard() {
   const loadAll = async () => {
     const [statsRes, yayasanRes, walletRes, requestsRes] = await Promise.allSettled([
       mitraAPI.getDashboardStats(),
-      mitraAPI.getYayasan(),
-      mitraAPI.getWallet(),
-      mitraAPI.getPriceChangeRequests(),
+      mitraAPI.getYayasan({ page: yayasanPage, pageSize: yayasanPageSize }),
+      mitraAPI.getWallet({ page: walletPage, pageSize: walletPageSize }),
+      mitraAPI.getPriceChangeRequests({ page: requestsPage, pageSize: requestsPageSize }),
     ]);
     if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
-    if (yayasanRes.status === 'fulfilled') setYayasanList(yayasanRes.value.data || []);
-    if (walletRes.status === 'fulfilled') setWallet(walletRes.value.data || { balance: 0, transactions: [] });
-    if (requestsRes.status === 'fulfilled') setRequests(requestsRes.value.data || []);
+    if (yayasanRes.status === 'fulfilled') {
+      const nextPage = extractPaginatedResponse(yayasanRes.value.data, yayasanPageSize);
+      setYayasanList(nextPage.items || []);
+      setYayasanPagination(nextPage);
+    }
+    if (walletRes.status === 'fulfilled') {
+      const walletData = walletRes.value.data || { balance: 0, transactions: [] };
+      const nextTransactions = extractPaginatedResponse(walletData.transactions, walletPageSize);
+      setWallet({ ...walletData, transactions: nextTransactions.items || [] });
+      setWalletPagination(nextTransactions);
+    }
+    if (requestsRes.status === 'fulfilled') {
+      const nextPage = extractPaginatedResponse(requestsRes.value.data, requestsPageSize);
+      setRequests(nextPage.items || []);
+      setRequestsPagination(nextPage);
+    }
   };
 
   const handleLogout = () => {
@@ -203,6 +236,18 @@ export default function MitraDashboard() {
     () => Math.max(SHARE_BUDGET - Number(requestForm.requestedYayasanShare || 0), 0),
     [requestForm.requestedYayasanShare],
   );
+  const capacityUsed = Number(stats?.capacityUsed ?? mitra?.capacityUsed ?? 0);
+  const capacityLimit = Number(stats?.capacityLimit ?? mitra?.capacityLimit ?? 0);
+  const capacityRemaining = Math.max(Number(stats?.capacityRemaining ?? mitra?.capacityRemaining ?? (capacityLimit - capacityUsed)), 0);
+  const isCapacityFull = Boolean(stats?.isCapacityFull ?? mitra?.isCapacityFull ?? (capacityLimit > 0 && capacityUsed >= capacityLimit));
+  const whatsappUpgradeUrl = buildWhatsAppUrl(
+    settings?.whatsapp,
+    buildMitraUpgradeWhatsappMessage({
+      mitraName: mitra?.name,
+      capacityUsed,
+      capacityLimit,
+    }),
+  );
 
   if (loading) return <LoadingSpinner size="lg" text="Memuat dashboard mitra..." className="min-h-screen" />;
 
@@ -230,6 +275,30 @@ export default function MitraDashboard() {
 
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
+            <Card className={`border ${isCapacityFull ? 'border-red-400/30 bg-red-400/10' : 'border-yellow-400/20 bg-[#2a2a2a]'}`}>
+              <CardContent className="p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-yellow-400">Kapasitas Yayasan</p>
+                    <h3 className="mt-2 text-xl font-bold text-white">{capacityUsed}/{capacityLimit} yayasan terkelola</h3>
+                    <p className="mt-2 text-sm text-gray-300">
+                      {isCapacityFull
+                        ? 'Kapasitas Anda saat ini sudah penuh. Untuk pembahasan penambahan kapasitas, silakan hubungi admin NEWME.'
+                        : `Sisa kapasitas aktif saat ini: ${capacityRemaining} yayasan.`}
+                    </p>
+                  </div>
+                  {isCapacityFull ? (
+                    <Button asChild className="bg-yellow-400 text-black hover:bg-yellow-500">
+                      <a href={whatsappUpgradeUrl || '#'} target="_blank" rel="noopener noreferrer">
+                        <MessageCircle className="mr-2 h-4 w-4" />
+                        Hubungi Admin
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { label: 'Total Yayasan', value: stats?.totalYayasan || 0, icon: Building2, color: 'yellow' },
@@ -262,131 +331,165 @@ export default function MitraDashboard() {
               <CardContent>
                 <div className="flex gap-2">
                   <Input value={buildFrontendUrl('/yayasan/register', { mitra: mitra.inviteCode || '' })} readOnly className="bg-[#1a1a1a] border-yellow-400/20 text-white" />
-                  <Button onClick={() => void handleCopyInvite()} className="bg-yellow-400 text-black hover:bg-yellow-500 shrink-0">
+                  <Button
+                    onClick={() => void handleCopyInvite()}
+                    className="bg-yellow-400 text-black hover:bg-yellow-500 shrink-0"
+                    disabled={isCapacityFull}
+                  >
                     <Copy className="w-4 h-4 mr-2" /> Salin
                   </Button>
                 </div>
-                <p className="text-gray-400 text-xs mt-2">Bagikan link ini ke yayasan yang ingin Anda ajak bergabung.</p>
+                <p className="text-gray-400 text-xs mt-2">
+                  {isCapacityFull
+                    ? 'Link undangan yayasan dinonaktifkan sementara karena kapasitas Anda sedang penuh.'
+                    : 'Bagikan link ini ke yayasan yang ingin Anda ajak bergabung.'}
+                </p>
               </CardContent>
             </Card>
           </div>
         )}
 
         {activeTab === 'yayasan' && (
-          <Card className="bg-[#2a2a2a] border-yellow-400/20">
-            <CardHeader>
-              <CardTitle className="text-white">Yayasan di Bawah Anda</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {yayasanList.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">Belum ada yayasan terdaftar</div>
-              ) : (
-                <div className="divide-y divide-yellow-400/10">
-                  {yayasanList.map((y) => {
-                    const isApproved = y.approvalStatus === 'APPROVED' || y.isMitraApproved;
-                    return (
-                      <div key={y._id} className="p-4 hover:bg-[#333]">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-white font-semibold">{y.name}</p>
-                              <span className={`px-2 py-0.5 rounded text-xs ${isApproved ? 'bg-green-400/20 text-green-400' : 'bg-yellow-400/20 text-yellow-400'}`}>
-                                {isApproved ? 'Approved' : 'Menunggu Approval'}
-                              </span>
+          <div className="space-y-4">
+            <Card className="bg-[#2a2a2a] border-yellow-400/20">
+              <CardHeader>
+                <CardTitle className="text-white">Yayasan di Bawah Anda</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {yayasanList.length === 0 ? (
+                  <div className="text-center py-12 text-gray-400">Belum ada yayasan terdaftar</div>
+                ) : (
+                  <div className="divide-y divide-yellow-400/10">
+                    {yayasanList.map((y) => {
+                      const isApproved = y.approvalStatus === 'APPROVED' || y.isMitraApproved;
+                      return (
+                        <div key={y._id} className="p-4 hover:bg-[#333]">
+                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-white font-semibold">{y.name}</p>
+                                <span className={`px-2 py-0.5 rounded text-xs ${isApproved ? 'bg-green-400/20 text-green-400' : 'bg-yellow-400/20 text-yellow-400'}`}>
+                                  {isApproved ? 'Approved' : 'Menunggu Approval'}
+                                </span>
+                              </div>
+                              <p className="text-gray-400 text-xs mt-1">{y.email}</p>
+                              <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                                <div className="inline-flex items-center gap-2 rounded-lg bg-blue-400/10 px-3 py-2 text-blue-400">
+                                  <Users className="w-4 h-4" />
+                                  <span className="font-semibold">{y.usersCount || 0}</span>
+                                  <span className="text-xs text-blue-300">pengguna</span>
+                                </div>
+                                <div className="rounded-lg bg-[#1a1a1a] px-3 py-2">
+                                  <p className="text-gray-500 text-xs">Komisi Yayasan</p>
+                                  <p className="text-yellow-400 font-semibold">{isApproved ? fmt(y.yayasanShare || 0) : '-'}</p>
+                                </div>
+                                <div className="rounded-lg bg-[#1a1a1a] px-3 py-2">
+                                  <p className="text-gray-500 text-xs">Komisi Mitra</p>
+                                  <p className="text-green-400 font-semibold">{isApproved ? fmt(y.mitraShare || 0) : '-'}</p>
+                                </div>
+                              </div>
                             </div>
-                            <p className="text-gray-400 text-xs mt-1">{y.email}</p>
-                            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-                              <div className="inline-flex items-center gap-2 rounded-lg bg-blue-400/10 px-3 py-2 text-blue-400">
-                                <Users className="w-4 h-4" />
-                                <span className="font-semibold">{y.usersCount || 0}</span>
-                                <span className="text-xs text-blue-300">pengguna</span>
-                              </div>
-                              <div className="rounded-lg bg-[#1a1a1a] px-3 py-2">
-                                <p className="text-gray-500 text-xs">Komisi Yayasan</p>
-                                <p className="text-yellow-400 font-semibold">{isApproved ? fmt(y.yayasanShare || 0) : '-'}</p>
-                              </div>
-                              <div className="rounded-lg bg-[#1a1a1a] px-3 py-2">
-                                <p className="text-gray-500 text-xs">Komisi Mitra</p>
-                                <p className="text-green-400 font-semibold">{isApproved ? fmt(y.mitraShare || 0) : '-'}</p>
-                              </div>
-                            </div>
-                          </div>
 
-                          <div className="flex flex-wrap gap-2 lg:justify-end">
-                            <Button size="sm" variant="outline" className="border-blue-400/50 text-blue-400" onClick={() => openDetail(y._id)}>
-                              <Eye className="w-4 h-4 mr-1" /> Lihat Detail
-                            </Button>
-                            {!isApproved ? (
-                              <Button
-                                size="sm"
-                                className="bg-yellow-400 text-black hover:bg-yellow-500"
-                                onClick={() => {
-                                  setApproveTarget(y);
-                                  setApproveShare(Number(y.yayasanShare || 50000));
-                                }}
-                              >
-                                <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                            <div className="flex flex-wrap gap-2 lg:justify-end">
+                              <Button size="sm" variant="outline" className="border-blue-400/50 text-blue-400" onClick={() => openDetail(y._id)}>
+                                <Eye className="w-4 h-4 mr-1" /> Lihat Detail
                               </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-yellow-400/50 text-yellow-400"
-                                onClick={() => {
-                                  setRequestTarget(y);
-                                  setRequestForm({
-                                    requestedYayasanShare: Number(y.yayasanShare || 50000),
-                                    reason: '',
-                                  });
-                                }}
-                              >
-                                <Edit className="w-4 h-4 mr-1" /> Ubah Harga
-                              </Button>
-                            )}
+                              {!isApproved ? (
+                                <Button
+                                  size="sm"
+                                  className="bg-yellow-400 text-black hover:bg-yellow-500"
+                                  onClick={() => {
+                                    setApproveTarget(y);
+                                    setApproveShare(Number(y.yayasanShare || 50000));
+                                  }}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-yellow-400/50 text-yellow-400"
+                                  onClick={() => {
+                                    setRequestTarget(y);
+                                    setRequestForm({
+                                      requestedYayasanShare: Number(y.yayasanShare || 50000),
+                                      reason: '',
+                                    });
+                                  }}
+                                >
+                                  <Edit className="w-4 h-4 mr-1" /> Ubah Harga
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <Pagination
+              currentPage={yayasanPagination.page}
+              totalPages={yayasanPagination.totalPages}
+              totalItems={yayasanPagination.total}
+              pageSize={yayasanPagination.pageSize}
+              onPageChange={setYayasanPage}
+              onPageSizeChange={(nextSize) => {
+                setYayasanPageSize(nextSize);
+                setYayasanPage(1);
+              }}
+            />
+          </div>
         )}
 
         {activeTab === 'requests' && (
-          <Card className="bg-[#2a2a2a] border-yellow-400/20">
-            <CardHeader>
-              <CardTitle className="text-white">Permintaan Ubah Harga</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {requests.length === 0 ? (
-                <p className="text-gray-400">Belum ada permintaan ubah harga.</p>
-              ) : requests.map((item) => (
-                <div key={item._id} className="rounded-lg border border-yellow-400/10 bg-[#1a1a1a] p-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-white font-medium">{item.yayasanName}</p>
-                      <p className="text-gray-500 text-xs">{item.yayasanEmail || '-'}</p>
-                      <p className="text-gray-400 text-sm mt-2">
-                        {fmt(item.currentYayasanShare || 0)} / {fmt(item.currentMitraShare || 0)} menjadi {fmt(item.requestedYayasanShare || 0)} / {fmt(item.requestedMitraShare || 0)}
-                      </p>
-                      <p className="text-gray-500 text-xs mt-1">{item.reason}</p>
+          <div className="space-y-4">
+            <Card className="bg-[#2a2a2a] border-yellow-400/20">
+              <CardHeader>
+                <CardTitle className="text-white">Permintaan Ubah Harga</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {requests.length === 0 ? (
+                  <p className="text-gray-400">Belum ada permintaan ubah harga.</p>
+                ) : requests.map((item) => (
+                  <div key={item._id} className="rounded-lg border border-yellow-400/10 bg-[#1a1a1a] p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-white font-medium">{item.yayasanName}</p>
+                        <p className="text-gray-500 text-xs">{item.yayasanEmail || '-'}</p>
+                        <p className="text-gray-400 text-sm mt-2">
+                          {fmt(item.currentYayasanShare || 0)} / {fmt(item.currentMitraShare || 0)} menjadi {fmt(item.requestedYayasanShare || 0)} / {fmt(item.requestedMitraShare || 0)}
+                        </p>
+                        <p className="text-gray-500 text-xs mt-1">{item.reason}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs ${
+                        item.status === 'approved'
+                          ? 'bg-green-400/20 text-green-400'
+                          : item.status === 'rejected'
+                            ? 'bg-red-400/20 text-red-400'
+                            : 'bg-yellow-400/20 text-yellow-400'
+                      }`}>
+                        {item.status === 'approved' ? 'Disetujui' : item.status === 'rejected' ? 'Ditolak' : 'Menunggu Review'}
+                      </span>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs ${
-                      item.status === 'approved'
-                        ? 'bg-green-400/20 text-green-400'
-                        : item.status === 'rejected'
-                          ? 'bg-red-400/20 text-red-400'
-                          : 'bg-yellow-400/20 text-yellow-400'
-                    }`}>
-                      {item.status === 'approved' ? 'Disetujui' : item.status === 'rejected' ? 'Ditolak' : 'Menunggu Review'}
-                    </span>
                   </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                ))}
+              </CardContent>
+            </Card>
+            <Pagination
+              currentPage={requestsPagination.page}
+              totalPages={requestsPagination.totalPages}
+              totalItems={requestsPagination.total}
+              pageSize={requestsPagination.pageSize}
+              onPageChange={setRequestsPage}
+              onPageSizeChange={(nextSize) => {
+                setRequestsPageSize(nextSize);
+                setRequestsPage(1);
+              }}
+            />
+          </div>
         )}
 
         {activeTab === 'wallet' && (
@@ -434,6 +537,41 @@ export default function MitraDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            <Card className="bg-[#2a2a2a] border-yellow-400/20">
+              <CardHeader>
+                <CardTitle className="text-white">Riwayat Penarikan</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {wallet.transactions.length === 0 ? (
+                  <p className="text-gray-400">Belum ada riwayat penarikan.</p>
+                ) : wallet.transactions.map((item) => (
+                  <div key={item._id || item.id} className="rounded-lg border border-yellow-400/10 bg-[#1a1a1a] p-4">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-white font-medium">{item.bankName || 'Rekening Mitra'}</p>
+                        <p className="text-xs text-gray-500">{item.bankAccount || '-'} / {item.accountName || '-'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-yellow-400 font-semibold">{fmt(item.amount || 0)}</p>
+                        <p className="text-xs text-gray-500">{item.createdAt ? new Date(item.createdAt).toLocaleString('id-ID') : '-'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+            <Pagination
+              currentPage={walletPagination.page}
+              totalPages={walletPagination.totalPages}
+              totalItems={walletPagination.total}
+              pageSize={walletPagination.pageSize}
+              onPageChange={setWalletPage}
+              onPageSizeChange={(nextSize) => {
+                setWalletPageSize(nextSize);
+                setWalletPage(1);
+              }}
+            />
           </div>
         )}
 

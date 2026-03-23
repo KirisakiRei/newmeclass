@@ -1,6 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DisbursementStatus, PaymentStatus, PaymentType, Role } from '@prisma/client';
 import { encodeWithdrawalNotes, mapDisbursementForClient, parseWithdrawalNotes, toClientPaymentStatus } from 'src/common/mappers/client-shapes';
+import { buildPaginatedResult, resolvePagination } from 'src/common/pagination';
+import { resolveCanonicalDevFeePercent, resolveCanonicalPaymentAmount } from 'src/common/settings/finance-settings';
+import { DisbursementsService } from '../disbursements/disbursements.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 type PeriodKey = 'this_month' | '3_months' | 'this_year' | 'all_time';
@@ -39,7 +42,10 @@ const RESERVED_DISBURSEMENT_STATUSES = new Set<DisbursementStatus>([
 
 @Injectable()
 export class FinanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly disbursementsService: DisbursementsService,
+  ) {}
 
   private getPeriodStart(period?: string) {
     const now = new Date();
@@ -68,16 +74,15 @@ export class FinanceService {
     });
     const settings = new Map(rows.map((row) => [row.key, row.value]));
     const general = (settings.get('general') as Record<string, any>) || {};
-    const devFeePercent = Math.max(
-      Number(settings.get('devFeePercent') ?? general.devFeePercent ?? 5) || 5,
-      0,
-    );
+    const devFeePercent = resolveCanonicalDevFeePercent({
+      devFeePercent: settings.get('devFeePercent') ?? general.devFeePercent,
+    });
 
     return {
-      testPrice: Math.max(
-        Number(settings.get('paymentAmount') ?? settings.get('testPrice') ?? general.paymentAmount ?? general.testPrice ?? 100000) || 100000,
-        100000,
-      ),
+      testPrice: resolveCanonicalPaymentAmount({
+        paymentAmount: settings.get('paymentAmount') ?? general.paymentAmount,
+        testPrice: settings.get('testPrice') ?? general.testPrice,
+      }),
       devFeePercent,
       devBankName: String(settings.get('devBankName') ?? general.devBankName ?? '').trim(),
       devBankAccount: String(settings.get('devBankAccount') ?? general.devBankAccount ?? '').trim(),
@@ -291,7 +296,7 @@ export class FinanceService {
     };
   }
 
-  async listTransactions(filters: { period?: string; jalur?: string; status?: string; search?: string }) {
+  async listTransactions(filters: { period?: string; jalur?: string; status?: string; search?: string; page?: string | number; pageSize?: string | number }) {
     const settings = await this.getFinanceSettings();
     const periodStart = this.getPeriodStart(filters.period);
     const orders = await this.prisma.paymentOrder.findMany({
@@ -323,7 +328,7 @@ export class FinanceService {
     const normalizedStatus = String(filters.status || '').trim().toLowerCase();
     const normalizedJalur = String(filters.jalur || '').trim().toLowerCase();
 
-    return orders
+    const filteredRows = orders
       .map((order) => {
         const pricing = (((order.metadata as Record<string, any> | null)?.pricing) || {}) as Record<string, any>;
         const ledger = ledgerMap.get(order.id) || null;
@@ -353,9 +358,15 @@ export class FinanceService {
         if (!normalizedSearch) return true;
         return `${row.user} ${row.email || ''} ${row.orderId}`.toLowerCase().includes(normalizedSearch);
       });
+
+    const { page, pageSize } = resolvePagination(filters, { pageSize: 10, maxPageSize: 100 });
+    const total = filteredRows.length;
+    const start = (page - 1) * pageSize;
+    const items = filteredRows.slice(start, start + pageSize);
+    return buildPaginatedResult(items, total, page, pageSize);
   }
 
-  async listDisbursements(filters: { type?: string; status?: string; search?: string }) {
+  async listDisbursements(filters: { type?: string; status?: string; search?: string; page?: string | number; pageSize?: string | number }) {
     const settings = await this.getFinanceSettings();
     const rows = await this.prisma.disbursement.findMany({
       where: {
@@ -383,9 +394,9 @@ export class FinanceService {
           type: row.type,
           name: owner?.fullName || (row.type === 'developer' ? 'Developer' : row.type === 'mitra' ? 'Mitra' : 'Yayasan'),
           email: owner?.email || (row.type === 'developer' ? null : null),
-          bankName: row.type === 'developer' ? parseWithdrawalNotes(row.notes).bankName || settings.devBankName : undefined,
-          bankAccount: row.type === 'developer' ? parseWithdrawalNotes(row.notes).bankAccount || settings.devBankAccount : undefined,
-          accountName: row.type === 'developer' ? parseWithdrawalNotes(row.notes).accountName || settings.devAccountName : undefined,
+          bankName: row.bankName || (row.type === 'developer' ? parseWithdrawalNotes(row.notes).bankName || settings.devBankName : undefined),
+          bankAccount: row.bankAccount || (row.type === 'developer' ? parseWithdrawalNotes(row.notes).bankAccount || settings.devBankAccount : undefined),
+          accountName: row.accountName || (row.type === 'developer' ? parseWithdrawalNotes(row.notes).accountName || settings.devAccountName : undefined),
         });
         return {
           ...mapped,
@@ -397,36 +408,21 @@ export class FinanceService {
         };
       });
 
-    return mappedRows
+    const filteredRows = mappedRows
       .filter((row) => {
         if (!normalizedSearch) return true;
         return `${row.name || ''} ${row.email || ''} ${row.bankName || ''} ${row.bankAccount || ''}`.toLowerCase().includes(normalizedSearch);
       });
+
+    const { page, pageSize } = resolvePagination(filters, { pageSize: 10, maxPageSize: 100 });
+    const total = filteredRows.length;
+    const start = (page - 1) * pageSize;
+    const items = filteredRows.slice(start, start + pageSize);
+    return buildPaginatedResult(items, total, page, pageSize);
   }
 
   async processDisbursement(id: string, body: Record<string, any>) {
-    const current = await this.prisma.disbursement.findUnique({ where: { id } });
-    if (!current) {
-      throw new BadRequestException('Disbursement not found');
-    }
-
-    const nextStatusRaw = String(body.status || 'APPROVED').toUpperCase();
-    const nextStatus = nextStatusRaw === 'REJECTED' ? DisbursementStatus.REJECTED : DisbursementStatus.APPROVED;
-    const meta = parseWithdrawalNotes(current.notes);
-    const updated = await this.prisma.disbursement.update({
-      where: { id },
-      data: {
-        status: nextStatus,
-        notes: encodeWithdrawalNotes({
-          notes: body.notes ?? meta.notes,
-          bankName: meta.bankName,
-          bankAccount: meta.bankAccount,
-          accountName: meta.accountName,
-        }),
-        processedAt: new Date(),
-      },
-    });
-    return mapDisbursementForClient(updated, { type: updated.type });
+    return this.disbursementsService.processDisbursement(id, body, { type: body.type });
   }
 
   async createDeveloperDisbursement(body: Record<string, any>) {
@@ -440,20 +436,13 @@ export class FinanceService {
       throw new BadRequestException('Saldo developer tidak mencukupi');
     }
 
-    const created = await this.prisma.disbursement.create({
-      data: {
-        type: 'developer',
-        amount,
-        status: DisbursementStatus.PENDING,
-        notes: encodeWithdrawalNotes({
-          notes: body.notes || null,
-          bankName: body.bankName || wallet.settings.devBankName || null,
-          bankAccount: body.bankAccount || wallet.settings.devBankAccount || null,
-          accountName: body.accountName || wallet.settings.devAccountName || null,
-        }),
-      },
+    return this.disbursementsService.createDisbursement({
+      type: 'developer',
+      amount,
+      notes: body.notes || null,
+      bankName: body.bankName || wallet.settings.devBankName || null,
+      bankAccount: body.bankAccount || wallet.settings.devBankAccount || null,
+      accountName: body.accountName || wallet.settings.devAccountName || null,
     });
-
-    return mapDisbursementForClient(created, { type: 'developer' });
   }
 }

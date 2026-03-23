@@ -10,9 +10,11 @@ import PageHeader from '../../components/ui/page-header';
 import StatsGrid from '../../components/ui/stats-grid';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import { formatCurrency } from '../../lib/utils';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const Referrals = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState(null);
@@ -30,6 +32,7 @@ const Referrals = () => {
   });
   const [newBenefit, setNewBenefit] = useState('');
   const safeStats = stats || {};
+  const canEditReferrals = adminAccess.hasPermission('referrals.edit');
 
   useEffect(() => {
     loadData();
@@ -68,6 +71,7 @@ const Referrals = () => {
   };
 
   const handleSaveSettings = async () => {
+    if (!canEditReferrals) return;
     setSaving(true);
     try {
       const data = new FormData();
@@ -100,6 +104,7 @@ const Referrals = () => {
   };
 
   const addBenefit = () => {
+    if (!canEditReferrals) return;
     if (newBenefit.trim()) {
       setFormData({
         ...formData,
@@ -110,6 +115,7 @@ const Referrals = () => {
   };
 
   const removeBenefit = (index) => {
+    if (!canEditReferrals) return;
     setFormData({
       ...formData,
       benefits: formData.benefits.filter((_, i) => i !== index)
@@ -125,18 +131,18 @@ const Referrals = () => {
       {/* Header */}
       <PageHeader icon={Gift} title="Program Referral" description="Kelola program referral dan bonus"
         action={
-          editingSettings ? (
+          editingSettings && canEditReferrals ? (
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setEditingSettings(false)} className="border-gray-600">Batal</Button>
               <Button onClick={handleSaveSettings} disabled={saving} className="bg-yellow-400 text-black hover:bg-yellow-500">
                 <Save className="w-4 h-4 mr-2" />{saving ? 'Menyimpan...' : 'Simpan'}
               </Button>
             </div>
-          ) : (
+          ) : canEditReferrals ? (
             <Button onClick={() => setEditingSettings(true)} className="bg-yellow-400 text-black hover:bg-yellow-500">
               <Edit2 className="w-4 h-4 mr-2" /> Edit Pengaturan
             </Button>
-          )
+          ) : null
         }
       />
 

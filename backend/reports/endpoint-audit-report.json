@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-03-14T09:32:27.599Z",
+  "generatedAt": "2026-03-17T17:11:05.099Z",
   "swaggerSource": "http://localhost:5000/api/docs-json",
   "summary": {
-    "backendRouteCount": 194,
-    "wrapperRouteCount": 159,
-    "directFrontendRouteCount": 49,
-    "usedFrontendRouteCount": 176,
-    "matchedRouteCount": 173,
-    "mismatchedRouteCount": 3,
+    "backendRouteCount": 207,
+    "wrapperRouteCount": 178,
+    "directFrontendRouteCount": 35,
+    "usedFrontendRouteCount": 186,
+    "matchedRouteCount": 186,
+    "mismatchedRouteCount": 0,
     "unusedBackendRouteCount": 22
   },
   "wrapperRoutes": [
@@ -144,6 +144,12 @@
       ]
     },
     {
+      "route": "/api/auth/refresh-session",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
       "route": "/api/auth/register",
       "sources": [
         "frontend\\services\\api.ts"
@@ -204,6 +210,12 @@
       ]
     },
     {
+      "route": "/api/certificates/preview-data/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
       "route": "/api/certificates/template",
       "sources": [
         "frontend\\services\\api.ts"
@@ -241,6 +253,36 @@
     },
     {
       "route": "/api/contacts/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/finance/disbursements",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/finance/disbursements/:param/process",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/finance/disbursements/developer",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/finance/revenue",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/finance/transactions",
       "sources": [
         "frontend\\services\\api.ts"
       ]
@@ -289,6 +331,12 @@
     },
     {
       "route": "/api/media/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/media/sync-content-assets",
       "sources": [
         "frontend\\services\\api.ts"
       ]
@@ -433,6 +481,36 @@
     },
     {
       "route": "/api/payments/:param/approve",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/payments/ops/alerts",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/payments/ops/alerts/:param/acknowledge",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/payments/ops/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/payments/ops/webhooks",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/payments/ops/webhooks/:param/replay",
       "sources": [
         "frontend\\services\\api.ts"
       ]
@@ -636,6 +714,12 @@
       ]
     },
     {
+      "route": "/api/settings/system-summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
       "route": "/api/settings/test-price",
       "sources": [
         "frontend\\services\\api.ts"
@@ -715,6 +799,12 @@
     },
     {
       "route": "/api/transactions/stats/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/user-payments/cancel-payment/:param",
       "sources": [
         "frontend\\services\\api.ts"
       ]
@@ -853,6 +943,30 @@
     },
     {
       "route": "/api/website-content/products/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/sections",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/sections/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/sections/reorder",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ]
+    },
+    {
+      "route": "/api/website-content/seed-defaults",
       "sources": [
         "frontend\\services\\api.ts"
       ]
@@ -999,37 +1113,6 @@
       ]
     },
     {
-      "route": "/api/finance/disbursements",
-      "sources": [
-        "frontend\\pages\\admin\\Transaksi.tsx"
-      ]
-    },
-    {
-      "route": "/api/finance/disbursements/:param/process",
-      "sources": [
-        "frontend\\pages\\admin\\Transaksi.tsx"
-      ]
-    },
-    {
-      "route": "/api/finance/disbursements/developer",
-      "sources": [
-        "frontend\\pages\\admin\\LaporanPendapatan.tsx"
-      ]
-    },
-    {
-      "route": "/api/finance/revenue",
-      "sources": [
-        "frontend\\pages\\admin\\LaporanPendapatan.tsx"
-      ]
-    },
-    {
-      "route": "/api/finance/transactions",
-      "sources": [
-        "frontend\\pages\\admin\\LaporanPendapatan.tsx",
-        "frontend\\pages\\admin\\Transaksi.tsx"
-      ]
-    },
-    {
       "route": "/api/mitra/admin/:param/detail",
       "sources": [
         "frontend\\pages\\admin\\AdminMitra.tsx"
@@ -1104,21 +1187,11 @@
     {
       "route": "/api/settings",
       "sources": [
-        "frontend\\contexts\\ThemeContext.tsx",
-        "frontend\\pages\\admin\\LaporanPendapatan.tsx",
-        "frontend\\pages\\admin\\Settings.tsx",
         "frontend\\pages\\admin\\TeamManagement.tsx",
         "frontend\\pages\\landingpage\\CompanyProfile.tsx",
         "frontend\\pages\\landingpage\\Contact.tsx",
-        "frontend\\pages\\landingpage\\Home.tsx",
         "frontend\\pages\\landingpage\\KelasGaliBakat.tsx",
         "frontend\\pages\\landingpage\\Services.tsx"
-      ]
-    },
-    {
-      "route": "/api/settings/upload/:param",
-      "sources": [
-        "frontend\\pages\\admin\\Settings.tsx"
       ]
     },
     {
@@ -1189,55 +1262,6 @@
       "route": "/api/users/stats/summary",
       "sources": [
         "frontend\\pages\\admin\\Users.tsx"
-      ]
-    },
-    {
-      "route": "/api/website-content/activities",
-      "sources": [
-        "frontend\\components\\ActivitiesSection.tsx"
-      ]
-    },
-    {
-      "route": "/api/website-content/hero-slides",
-      "sources": [
-        "frontend\\components\\HeroCarousel.tsx"
-      ]
-    },
-    {
-      "route": "/api/website-content/products",
-      "sources": [
-        "frontend\\components\\ProductSlider.tsx"
-      ]
-    },
-    {
-      "route": "/api/website-content/sections",
-      "sources": [
-        "frontend\\pages\\admin\\WebsiteContent.tsx",
-        "frontend\\pages\\landingpage\\Home.tsx"
-      ]
-    },
-    {
-      "route": "/api/website-content/sections/:param",
-      "sources": [
-        "frontend\\pages\\admin\\WebsiteContent.tsx"
-      ]
-    },
-    {
-      "route": "/api/website-content/sections/reorder",
-      "sources": [
-        "frontend\\pages\\admin\\WebsiteContent.tsx"
-      ]
-    },
-    {
-      "route": "/api/website-content/seed-defaults",
-      "sources": [
-        "frontend\\pages\\admin\\WebsiteContent.tsx"
-      ]
-    },
-    {
-      "route": "/api/website-content/testimonials",
-      "sources": [
-        "frontend\\components\\TestimonialSlider.tsx"
       ]
     },
     {
@@ -1443,6 +1467,13 @@
       "backendRoute": "/api/auth/referral-link"
     },
     {
+      "route": "/api/auth/refresh-session",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/auth/refresh-session"
+    },
+    {
       "route": "/api/auth/register",
       "sources": [
         "frontend\\services\\api.ts"
@@ -1527,6 +1558,13 @@
       "backendRoute": "/api/certificates/issued"
     },
     {
+      "route": "/api/certificates/preview-data/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/certificates/preview-data/:param"
+    },
+    {
       "route": "/api/certificates/template",
       "sources": [
         "frontend\\services\\api.ts"
@@ -1555,6 +1593,13 @@
       "backendRoute": "/api/contacts"
     },
     {
+      "route": "/api/contacts/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/contacts/:param"
+    },
+    {
       "route": "/api/contacts/:param/status",
       "sources": [
         "frontend\\services\\api.ts"
@@ -1571,36 +1616,35 @@
     {
       "route": "/api/finance/disbursements",
       "sources": [
-        "frontend\\pages\\admin\\Transaksi.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/finance/disbursements"
     },
     {
       "route": "/api/finance/disbursements/:param/process",
       "sources": [
-        "frontend\\pages\\admin\\Transaksi.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/finance/disbursements/:param/process"
     },
     {
       "route": "/api/finance/disbursements/developer",
       "sources": [
-        "frontend\\pages\\admin\\LaporanPendapatan.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/finance/disbursements/developer"
     },
     {
       "route": "/api/finance/revenue",
       "sources": [
-        "frontend\\pages\\admin\\LaporanPendapatan.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/finance/revenue"
     },
     {
       "route": "/api/finance/transactions",
       "sources": [
-        "frontend\\pages\\admin\\LaporanPendapatan.tsx",
-        "frontend\\pages\\admin\\Transaksi.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/finance/transactions"
     },
@@ -1619,6 +1663,13 @@
       "backendRoute": "/api/institutions"
     },
     {
+      "route": "/api/institutions/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/institutions/:param"
+    },
+    {
       "route": "/api/institutions/:param/status",
       "sources": [
         "frontend\\services\\api.ts"
@@ -1630,7 +1681,7 @@
       "sources": [
         "frontend\\services\\api.ts"
       ],
-      "backendRoute": "/api/institutions/inquiry"
+      "backendRoute": "/api/institutions/:param"
     },
     {
       "route": "/api/institutions/stats/summary",
@@ -1648,6 +1699,13 @@
     },
     {
       "route": "/api/media/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/media/:param"
+    },
+    {
+      "route": "/api/media/sync-content-assets",
       "sources": [
         "frontend\\services\\api.ts"
       ],
@@ -1831,6 +1889,41 @@
       "backendRoute": "/api/payments/:param/approve"
     },
     {
+      "route": "/api/payments/ops/alerts",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/payments/ops/alerts"
+    },
+    {
+      "route": "/api/payments/ops/alerts/:param/acknowledge",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/payments/ops/alerts/:param/acknowledge"
+    },
+    {
+      "route": "/api/payments/ops/summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/payments/ops/summary"
+    },
+    {
+      "route": "/api/payments/ops/webhooks",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/payments/ops/webhooks"
+    },
+    {
+      "route": "/api/payments/ops/webhooks/:param/replay",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/payments/ops/webhooks/:param/replay"
+    },
+    {
       "route": "/api/payments/registration/:param",
       "sources": [
         "frontend\\services\\api.ts"
@@ -2009,6 +2102,13 @@
       "backendRoute": "/api/registrations"
     },
     {
+      "route": "/api/registrations/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/registrations/:param"
+    },
+    {
       "route": "/api/registrations/stats/summary",
       "sources": [
         "frontend\\services\\api.ts"
@@ -2040,13 +2140,9 @@
       "route": "/api/settings",
       "sources": [
         "frontend\\services\\api.ts",
-        "frontend\\contexts\\ThemeContext.tsx",
-        "frontend\\pages\\admin\\LaporanPendapatan.tsx",
-        "frontend\\pages\\admin\\Settings.tsx",
         "frontend\\pages\\admin\\TeamManagement.tsx",
         "frontend\\pages\\landingpage\\CompanyProfile.tsx",
         "frontend\\pages\\landingpage\\Contact.tsx",
-        "frontend\\pages\\landingpage\\Home.tsx",
         "frontend\\pages\\landingpage\\KelasGaliBakat.tsx",
         "frontend\\pages\\landingpage\\Services.tsx"
       ],
@@ -2067,6 +2163,13 @@
       "backendRoute": "/api/settings/jenjang-config"
     },
     {
+      "route": "/api/settings/system-summary",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/settings/system-summary"
+    },
+    {
       "route": "/api/settings/test-price",
       "sources": [
         "frontend\\services\\api.ts"
@@ -2076,8 +2179,7 @@
     {
       "route": "/api/settings/upload/:param",
       "sources": [
-        "frontend\\services\\api.ts",
-        "frontend\\pages\\admin\\Settings.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/settings/upload/:param"
     },
@@ -2185,6 +2287,13 @@
         "frontend\\pages\\admin\\WebsiteContent.tsx"
       ],
       "backendRoute": "/api/upload/image"
+    },
+    {
+      "route": "/api/user-payments/cancel-payment/:param",
+      "sources": [
+        "frontend\\services\\api.ts"
+      ],
+      "backendRoute": "/api/user-payments/cancel-payment/:param"
     },
     {
       "route": "/api/user-payments/check-payment/:param",
@@ -2332,8 +2441,7 @@
     {
       "route": "/api/website-content/activities",
       "sources": [
-        "frontend\\services\\api.ts",
-        "frontend\\components\\ActivitiesSection.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/website-content/activities"
     },
@@ -2347,8 +2455,7 @@
     {
       "route": "/api/website-content/hero-slides",
       "sources": [
-        "frontend\\services\\api.ts",
-        "frontend\\components\\HeroCarousel.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/website-content/hero-slides"
     },
@@ -2362,8 +2469,7 @@
     {
       "route": "/api/website-content/products",
       "sources": [
-        "frontend\\services\\api.ts",
-        "frontend\\components\\ProductSlider.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/website-content/products"
     },
@@ -2377,37 +2483,35 @@
     {
       "route": "/api/website-content/sections",
       "sources": [
-        "frontend\\pages\\admin\\WebsiteContent.tsx",
-        "frontend\\pages\\landingpage\\Home.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/website-content/sections"
     },
     {
       "route": "/api/website-content/sections/:param",
       "sources": [
-        "frontend\\pages\\admin\\WebsiteContent.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/website-content/sections/:param"
     },
     {
       "route": "/api/website-content/sections/reorder",
       "sources": [
-        "frontend\\pages\\admin\\WebsiteContent.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/website-content/sections/:param"
     },
     {
       "route": "/api/website-content/seed-defaults",
       "sources": [
-        "frontend\\pages\\admin\\WebsiteContent.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/website-content/seed-defaults"
     },
     {
       "route": "/api/website-content/testimonials",
       "sources": [
-        "frontend\\services\\api.ts",
-        "frontend\\components\\TestimonialSlider.tsx"
+        "frontend\\services\\api.ts"
       ],
       "backendRoute": "/api/website-content/testimonials"
     },
@@ -2537,26 +2641,7 @@
       "backendRoute": "/api/yayasan/wallet/withdraw"
     }
   ],
-  "mismatchedRoutes": [
-    {
-      "route": "/api/contacts/:param",
-      "sources": [
-        "frontend\\services\\api.ts"
-      ]
-    },
-    {
-      "route": "/api/institutions/:param",
-      "sources": [
-        "frontend\\services\\api.ts"
-      ]
-    },
-    {
-      "route": "/api/registrations/:param",
-      "sources": [
-        "frontend\\services\\api.ts"
-      ]
-    }
-  ],
+  "mismatchedRoutes": [],
   "unusedBackendRoutes": [
     "/api/admin/mitra",
     "/api/admin/mitra/:param/reset-password",

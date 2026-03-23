@@ -1,0 +1,28 @@
+{
+  "sourceReport": "C:/Users/LENOVO/Documents/Project/2026/newme/backend/reports/qa-mitra-invite-flow-1774192176804.json",
+  "checks": [
+    {
+      "name": "Admin lowers capacity to current usage (3)",
+      "ok": true
+    },
+    {
+      "name": "Fourth yayasan is blocked when capacity is full",
+      "ok": true
+    },
+    {
+      "name": "Admin raises capacity to 80",
+      "ok": true
+    },
+    {
+      "name": "Capacity history records both changes",
+      "ok": true
+    }
+  ],
+  "summary": {
+    "mitraId": "cmn1w7p6b00awqkg4ip6nujp9",
+    "mitraEmail": "mitra.1774192176804.1@example.com",
+    "loweredTo": 3,
+    "raisedTo": 80,
+    "historyCount": 2
+  }
+}

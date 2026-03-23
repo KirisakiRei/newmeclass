@@ -97,4 +97,8 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
 }

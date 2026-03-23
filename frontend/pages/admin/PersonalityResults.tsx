@@ -7,6 +7,7 @@ import { useToast } from '../../hooks/use-toast';
 import { personalityResultsAPI } from '../../services/api';
 import PageHeader from '../../components/ui/page-header';
 import { TableSkeleton } from '../../components/ui/loading-spinner';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const SOCIAL_COLORS = {
   extrovert: { badge: 'text-green-400 bg-green-400/10 border border-green-400/30', dot: 'bg-green-400', heading: 'text-green-400' },
@@ -18,8 +19,10 @@ const SOCIAL_LABELS = { extrovert: 'Extrovert', introvert: 'Introvert', ambivert
 const PersonalityResults = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const adminAccess = useAdminAccess();
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
+  const canEditResults = adminAccess.hasPermission('personality_results.edit');
 
   useEffect(() => {
     personalityResultsAPI.getAll()
@@ -53,8 +56,8 @@ const PersonalityResults = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {grouped[socialType].map(result => (
                     <Card key={result.code}
-                      onClick={() => navigate(`/admin/personality-results/${result.code}`)}
-                      className="bg-[#2a2a2a] border-white/10 cursor-pointer hover:border-yellow-400/40 hover:bg-[#333] transition-all group">
+                      onClick={canEditResults ? () => navigate(`/admin/personality-results/${result.code}`) : undefined}
+                      className={`bg-[#2a2a2a] border-white/10 transition-all group ${canEditResults ? 'cursor-pointer hover:border-yellow-400/40 hover:bg-[#333]' : ''}`}>
                       <CardContent className="p-5">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-3 min-w-0">
@@ -62,12 +65,12 @@ const PersonalityResults = () => {
                               style={{ backgroundColor: result.color }}>
                               {result.code.toUpperCase()}
                             </div>
-                            <div className="min-w-0">
-                              <p className="text-white font-semibold text-sm truncate">{result.label}</p>
-                              <p className="text-gray-500 text-xs mt-0.5 font-mono">Elemen: {result.element.toUpperCase()}</p>
-                            </div>
+                          <div className="min-w-0">
+                            <p className="text-white font-semibold text-sm truncate">{result.label}</p>
+                            <p className="text-gray-500 text-xs mt-0.5 font-mono">Elemen: {result.element.toUpperCase()}</p>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-yellow-400 transition-colors shrink-0 mt-1" />
+                        </div>
+                          {canEditResults ? <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-yellow-400 transition-colors shrink-0 mt-1" /> : null}
                         </div>
 
                         <p className="text-gray-400 text-xs mt-3 line-clamp-2 leading-relaxed">

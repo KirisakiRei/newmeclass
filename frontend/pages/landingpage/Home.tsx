@@ -22,6 +22,7 @@ import ActivitiesSection from '../../components/ActivitiesSection';
 import VisiMisiSection from '../../components/VisiMisiSection';
 import axios from 'axios';
 import { DEFAULT_SITE_SETTINGS, normalizeSiteSettings } from '../../lib/site-settings';
+import { mergeWithDefaultSections } from '../../lib/website-sections';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -49,11 +50,10 @@ const Home = () => {
   const loadPageSections = async () => {
     try {
       const response = await axios.get(`${BACKEND_URL}/api/website-content/sections`);
-      const sorted = [...(response.data || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      setPageSections(sorted);
+      setPageSections(mergeWithDefaultSections(response.data || []));
     } catch {
       // fallback: use default order (all visible)
-      setPageSections([]);
+      setPageSections(mergeWithDefaultSections([]));
     }
   };
 
@@ -61,7 +61,7 @@ const Home = () => {
   const isSectionVisible = (key) => {
     if (!pageSections.length) return true;
     const sec = pageSections.find(s => s.key === key);
-    return sec ? sec.visible : true;
+    return sec ? (sec.isVisible !== false && sec.visible !== false) : true;
   };
 
   // Helper: get content of a section
@@ -72,7 +72,7 @@ const Home = () => {
 
   // Ordered list of section keys to render (only visible ones)
   const orderedSectionKeys = pageSections.length ?
-     pageSections.filter(s => s.visible).map(s => s.key)
+     pageSections.filter(s => s.isVisible !== false && s.visible !== false).map(s => s.key)
     : ['hero', 'about', 'services', 'promo', 'products', 'testimonials', 'benefits', 'activities', 'articles', 'visimisi', 'banners', 'cta'];
 
   const loadSettings = async () => {

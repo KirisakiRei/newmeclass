@@ -12,6 +12,9 @@ import { financeAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import { useToast } from '../../hooks/use-toast';
 import { formatCurrency } from '../../lib/utils';
+import Pagination from '../../components/ui/pagination';
+import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const fmt = formatCurrency;
 
@@ -44,6 +47,9 @@ function StatusBadge({ status }) {
   const normalized = String(status || '').toLowerCase();
   if (normalized === 'approved') {
     return <span className="inline-flex items-center gap-1 rounded-full bg-green-400/15 px-2.5 py-1 text-xs text-green-400"><CheckCircle className="h-3.5 w-3.5" />Disetujui</span>;
+  }
+  if (normalized === 'failed') {
+    return <span className="inline-flex items-center gap-1 rounded-full bg-red-400/15 px-2.5 py-1 text-xs text-red-300"><XCircle className="h-3.5 w-3.5" />Gagal Teknis</span>;
   }
   if (normalized === 'pending' || normalized === 'processing') {
     return <span className="inline-flex items-center gap-1 rounded-full bg-yellow-400/15 px-2.5 py-1 text-xs text-yellow-400"><Clock className="h-3.5 w-3.5" />Menunggu</span>;
@@ -78,10 +84,12 @@ function FilterSelect({ value, onChange, options }) {
 
 function ProcessDialog({ state, onClose, onSubmit, loading }) {
   const [notes, setNotes] = useState('');
+  const [providerMode, setProviderMode] = useState('mock');
 
   useEffect(() => {
     if (state.open) {
       setNotes(state.item?.notes || '');
+      setProviderMode('mock');
     }
   }, [state]);
 
@@ -104,8 +112,27 @@ function ProcessDialog({ state, onClose, onSubmit, loading }) {
             <Label className="text-gray-300">Catatan Admin</Label>
             <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="min-h-[120px] bg-[#1a1a1a] text-white" />
           </div>
+          {state.action === 'approved' ? (
+            <div>
+              <Label className="text-gray-300">Mode Proses</Label>
+              <select value={providerMode} onChange={(event) => setProviderMode(event.target.value)} className="mt-2 w-full rounded-lg border border-yellow-400/20 bg-[#1a1a1a] px-3 py-2 text-sm text-white">
+                <option value="midtrans_iris">Midtrans IRIS</option>
+                <option value="mock">Mock / QA</option>
+                <option value="manual">Manual Fallback</option>
+              </select>
+              <p className="mt-2 text-xs text-gray-500">Gunakan Midtrans IRIS sebagai jalur utama. Mock dipakai QA, manual dipakai bila provider sedang bermasalah.</p>
+            </div>
+          ) : null}
+          {state.item?.providerReferenceId || state.item?.providerStatus ? (
+            <div className="rounded-lg border border-yellow-400/10 bg-[#1a1a1a] p-4 text-xs text-gray-400">
+              <p>Provider: <span className="text-white">{state.item?.provider || '-'}</span></p>
+              <p className="mt-1">Status provider: <span className="text-white">{state.item?.providerStatus || '-'}</span></p>
+              <p className="mt-1">Reference: <span className="text-white">{state.item?.providerReferenceId || '-'}</span></p>
+              {state.item?.failureReason ? <p className="mt-1 text-red-300">Failure: {state.item.failureReason}</p> : null}
+            </div>
+          ) : null}
           <Button
-            onClick={() => onSubmit({ status: state.action, notes })}
+            onClick={() => onSubmit({ status: state.action, notes, providerMode })}
             disabled={loading}
             className={`w-full ${state.action === 'approved' ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-red-500 text-white hover:bg-red-600'}`}
           >
@@ -125,13 +152,16 @@ function UangMasuk() {
   const [search, setSearch] = useState('');
   const [jalur, setJalur] = useState('');
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [pagination, setPagination] = useState(createEmptyPageState(10));
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void load();
     }, 200);
     return () => window.clearTimeout(timer);
-  }, [jalur, search, status]);
+  }, [jalur, search, status, page, pageSize]);
 
   const load = async () => {
     setLoading(true);
@@ -140,8 +170,12 @@ function UangMasuk() {
         jalur: jalur || undefined,
         status: status || undefined,
         search: search || undefined,
+        page,
+        pageSize,
       });
-      setRows(response.data || []);
+      const nextPage = extractPaginatedResponse(response.data, pageSize);
+      setRows(nextPage.items || []);
+      setPagination(nextPage);
     } catch (error) {
       setRows([]);
       toast({ title: 'Gagal memuat uang masuk', description: getApiErrorMessage(error, 'Data uang masuk belum bisa dimuat.'), variant: 'destructive' });
@@ -151,12 +185,13 @@ function UangMasuk() {
   };
 
   const stats = useMemo(() => ({
-    total: rows.length,
+    total: pagination.total,
     pending: rows.filter((row) => row.status === 'pending').length,
     approved: rows.filter((row) => row.status === 'approved').length,
     rejected: rows.filter((row) => row.status === 'rejected').length,
+    failed: rows.filter((row) => row.status === 'failed').length,
     totalAmount: rows.filter((row) => row.status === 'approved').reduce((sum, row) => sum + (row.amount || 0), 0),
-  }), [rows]);
+  }), [rows, pagination.total]);
 
   return (
     <div className="space-y-4">
@@ -170,14 +205,23 @@ function UangMasuk() {
       <div className="flex flex-wrap gap-3">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama, email, atau order id..." className="bg-[#2a2a2a] pl-9 text-white" />
+          <Input value={search} onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(1);
+          }} placeholder="Cari nama, email, atau order id..." className="bg-[#2a2a2a] pl-9 text-white" />
         </div>
-        <FilterSelect value={jalur} onChange={setJalur} options={[
+        <FilterSelect value={jalur} onChange={(value) => {
+          setJalur(value);
+          setPage(1);
+        }} options={[
           { value: '', label: 'Semua jalur' },
           { value: 'individu', label: 'Individu' },
           { value: 'yayasan', label: 'Yayasan' },
         ]} />
-        <FilterSelect value={status} onChange={setStatus} options={[
+        <FilterSelect value={status} onChange={(value) => {
+          setStatus(value);
+          setPage(1);
+        }} options={[
           { value: '', label: 'Semua status' },
           { value: 'approved', label: 'Disetujui' },
           { value: 'pending', label: 'Pending' },
@@ -225,26 +269,43 @@ function UangMasuk() {
           )}
         </CardContent>
       </Card>
+
+      <Pagination
+        currentPage={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.total}
+        pageSize={pagination.pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(nextSize) => {
+          setPageSize(nextSize);
+          setPage(1);
+        }}
+      />
     </div>
   );
 }
 
 function UangKeluar() {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [type, setType] = useState('');
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [pagination, setPagination] = useState(createEmptyPageState(10));
   const [processState, setProcessState] = useState({ open: false, item: null, action: 'approved' });
   const [processing, setProcessing] = useState(false);
+  const canManageTransactions = adminAccess.hasPermission('transactions.manage');
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void load();
     }, 200);
     return () => window.clearTimeout(timer);
-  }, [search, status, type]);
+  }, [search, status, type, page, pageSize]);
 
   const load = async () => {
     setLoading(true);
@@ -253,8 +314,12 @@ function UangKeluar() {
         type: type || undefined,
         status: status || undefined,
         search: search || undefined,
+        page,
+        pageSize,
       });
-      setRows(response.data || []);
+      const nextPage = extractPaginatedResponse(response.data, pageSize);
+      setRows(nextPage.items || []);
+      setPagination(nextPage);
     } catch (error) {
       setRows([]);
       toast({ title: 'Gagal memuat uang keluar', description: getApiErrorMessage(error, 'Data pencairan belum bisa dimuat.'), variant: 'destructive' });
@@ -264,15 +329,15 @@ function UangKeluar() {
   };
 
   const stats = useMemo(() => ({
-    total: rows.length,
+    total: pagination.total,
     pending: rows.filter((row) => row.status === 'pending' || row.status === 'processing').length,
     approved: rows.filter((row) => row.status === 'approved').length,
     rejected: rows.filter((row) => row.status === 'rejected').length,
     totalAmount: rows.filter((row) => row.status === 'approved').reduce((sum, row) => sum + (row.amount || 0), 0),
-  }), [rows]);
+  }), [rows, pagination.total]);
 
   const handleProcess = async (payload) => {
-    if (!processState.item) return;
+    if (!canManageTransactions || !processState.item) return;
     setProcessing(true);
     try {
       await financeAPI.processDisbursement(processState.item.id || processState.item._id, payload);
@@ -296,23 +361,35 @@ function UangKeluar() {
         <MiniCard label="Menunggu" value={stats.pending} color="text-yellow-400" />
         <MiniCard label="Disetujui" value={stats.approved} note={fmt(stats.totalAmount)} color="text-green-400" />
         <MiniCard label="Ditolak" value={stats.rejected} color="text-red-400" />
+        <MiniCard label="Gagal Teknis" value={stats.failed} color="text-red-300" />
       </div>
 
       <div className="flex flex-wrap gap-3">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari penerima, email, atau rekening..." className="bg-[#2a2a2a] pl-9 text-white" />
+          <Input value={search} onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(1);
+          }} placeholder="Cari penerima, email, atau rekening..." className="bg-[#2a2a2a] pl-9 text-white" />
         </div>
-        <FilterSelect value={type} onChange={setType} options={[
+        <FilterSelect value={type} onChange={(value) => {
+          setType(value);
+          setPage(1);
+        }} options={[
           { value: '', label: 'Semua tipe' },
           { value: 'mitra', label: 'Mitra' },
           { value: 'yayasan', label: 'Yayasan' },
           { value: 'developer', label: 'Developer' },
         ]} />
-        <FilterSelect value={status} onChange={setStatus} options={[
+        <FilterSelect value={status} onChange={(value) => {
+          setStatus(value);
+          setPage(1);
+        }} options={[
           { value: '', label: 'Semua status' },
           { value: 'pending', label: 'Pending' },
+          { value: 'processing', label: 'Processing' },
           { value: 'approved', label: 'Disetujui' },
+          { value: 'failed', label: 'Gagal Teknis' },
           { value: 'rejected', label: 'Ditolak' },
         ]} />
       </div>
@@ -330,6 +407,7 @@ function UangKeluar() {
                     <th className="px-4 py-3 font-medium">Rekening</th>
                     <th className="px-4 py-3 text-right font-medium">Nominal</th>
                     <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Provider</th>
                     <th className="px-4 py-3 text-right font-medium">Aksi</th>
                   </tr>
                 </thead>
@@ -348,9 +426,14 @@ function UangKeluar() {
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-yellow-400">{fmt(row.amount || 0)}</td>
                       <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
+                      <td className="px-4 py-3 text-xs text-gray-300">
+                        <p className="uppercase">{row.provider || '-'}</p>
+                        <p className="mt-1 text-gray-500">{row.providerStatus || '-'}</p>
+                        {row.providerReferenceId ? <p className="mt-1 break-all text-[11px] text-gray-500">{row.providerReferenceId}</p> : null}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
-                          {row.status === 'pending' || row.status === 'processing' ? (
+                          {(row.status === 'pending' || row.status === 'processing') && canManageTransactions ? (
                             <>
                               <Button size="sm" className="bg-green-500 text-white hover:bg-green-600" onClick={() => setProcessState({ open: true, item: row, action: 'approved' })}>
                                 Setujui
@@ -368,7 +451,7 @@ function UangKeluar() {
                   ))}
                   {!rows.length ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-gray-500">Tidak ada uang keluar yang cocok dengan filter.</td>
+                      <td colSpan={8} className="px-4 py-10 text-center text-gray-500">Tidak ada uang keluar yang cocok dengan filter.</td>
                     </tr>
                   ) : null}
                 </tbody>
@@ -377,6 +460,18 @@ function UangKeluar() {
           )}
         </CardContent>
       </Card>
+
+      <Pagination
+        currentPage={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.total}
+        pageSize={pagination.pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(nextSize) => {
+          setPageSize(nextSize);
+          setPage(1);
+        }}
+      />
 
       <ProcessDialog
         state={processState}

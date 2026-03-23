@@ -11,6 +11,7 @@ import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner, { CardGridSkeleton } from '../../components/ui/loading-spinner';
 import SharedImageUploader from '../../components/admin/SharedImageUploader.jsx';
 import { productsAPI } from '../../services/api';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const CATEGORIES = ['Tes', 'Buku', 'Coaching', 'Workshop', 'Merchandise'];
 
@@ -161,10 +162,15 @@ const ProductModal = ({ product, onSave, onClose }) => {
 
 const ShopProducts = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [filterCategory, setFilterCategory] = useState('');
+  const canCreateProduct = adminAccess.hasPermission('shop_products.create');
+  const canEditProduct = adminAccess.hasPermission('shop_products.edit');
+  const canDeleteProduct = adminAccess.hasPermission('shop_products.delete');
+  const canManageProduct = adminAccess.hasPermission('shop_products.manage');
 
   const load = async () => {
     setLoading(true);
@@ -181,6 +187,7 @@ const ShopProducts = () => {
   useEffect(() => { load(); }, []);
 
   const handleSave = async (form) => {
+    if (form._id ? !canEditProduct : !canCreateProduct) return;
     try {
       if (form._id) {
         await productsAPI.update(form._id, form);
@@ -197,6 +204,7 @@ const ShopProducts = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!canDeleteProduct) return;
     if (!window.confirm('Hapus produk ini')) return;
     try {
       await productsAPI.delete(id);
@@ -208,6 +216,7 @@ const ShopProducts = () => {
   };
 
   const handleToggleActive = async (product) => {
+    if (!canManageProduct) return;
     try {
       const updated = { ...product, isActive: !product.isActive };
       await productsAPI.update(product._id, updated);
@@ -224,9 +233,9 @@ const ShopProducts = () => {
   return (
     <div className="space-y-6">
       <PageHeader icon={Package} title="Produk Shop" description="Kelola katalog produk untuk halaman toko">
-        <Button onClick={() => setModal(EMPTY_PRODUCT)} className="bg-yellow-400 text-black hover:bg-yellow-500">
+        {canCreateProduct ? <Button onClick={() => setModal(EMPTY_PRODUCT)} className="bg-yellow-400 text-black hover:bg-yellow-500">
           <Plus className="w-4 h-4 mr-2" /> Tambah Produk
-        </Button>
+        </Button> : null}
       </PageHeader>
 
       {/* Stats */}
@@ -265,11 +274,11 @@ const ShopProducts = () => {
           <CardContent className="p-12 text-center text-gray-400">
             <Package className="w-12 h-12 mx-auto mb-4 opacity-30" />
             <p className="text-lg mb-4">{filterCategory ? `Tidak ada produk kategori "${filterCategory}"` : 'Belum ada produk shop'}</p>
-            {!filterCategory && (
+            {!filterCategory && canCreateProduct ? (
               <Button onClick={() => setModal(EMPTY_PRODUCT)} className="bg-yellow-400 text-black hover:bg-yellow-500">
                 <Plus className="w-4 h-4 mr-2" /> Tambah Produk Pertama
               </Button>
-            )}
+            ) : null}
           </CardContent>
         </Card>
       ) : (
@@ -299,15 +308,15 @@ const ShopProducts = () => {
                 </div>
                 <p className="text-gray-500 text-xs mb-3">Stok: {product.stock}</p>
                 <div className="flex gap-2">
-                  <button onClick={() => handleToggleActive(product)} className={`p-1.5 rounded border transition-colors ${product.isActive ? 'border-green-400/30 text-green-400 hover:bg-green-400/10' : 'border-gray-500/30 text-gray-500 hover:bg-gray-500/10'}`} title={product.isActive ? 'Nonaktifkan' : 'Aktifkan'}>
+                  {canManageProduct ? <button onClick={() => handleToggleActive(product)} className={`p-1.5 rounded border transition-colors ${product.isActive ? 'border-green-400/30 text-green-400 hover:bg-green-400/10' : 'border-gray-500/30 text-gray-500 hover:bg-gray-500/10'}`} title={product.isActive ? 'Nonaktifkan' : 'Aktifkan'}>
                     {product.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                  </button>
-                  <Button size="sm" onClick={() => setModal(product)} variant="outline" className="border-yellow-400/40 text-yellow-400 flex-1 h-8">
+                  </button> : null}
+                  {canEditProduct ? <Button size="sm" onClick={() => setModal(product)} variant="outline" className="border-yellow-400/40 text-yellow-400 flex-1 h-8">
                     <Edit className="w-3.5 h-3.5 mr-1" /> Edit
-                  </Button>
-                  <Button size="sm" onClick={() => handleDelete(product._id)} variant="outline" className="border-red-400/40 text-red-400 h-8 w-8 p-0">
+                  </Button> : null}
+                  {canDeleteProduct ? <Button size="sm" onClick={() => handleDelete(product._id)} variant="outline" className="border-red-400/40 text-red-400 h-8 w-8 p-0">
                     <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  </Button> : null}
                 </div>
               </CardContent>
             </Card>
@@ -323,5 +332,3 @@ const ShopProducts = () => {
 };
 
 export default ShopProducts;
-
-

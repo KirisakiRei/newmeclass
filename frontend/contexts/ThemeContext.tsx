@@ -1,9 +1,8 @@
 ﻿// @ts-nocheck
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
 import { DEFAULT_SITE_SETTINGS, normalizeSiteSettings } from '../lib/site-settings';
+import { settingsAPI } from '../services/api';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const SETTINGS_CACHE_KEY = 'app_settings_cache';
 const SETTINGS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -42,7 +41,7 @@ export const ThemeProvider = ({ children }) => {
 
   const loadSettings = async () => {
     try {
-      const response = await axios.get(`${BACKEND_URL}/api/settings`);
+      const response = await settingsAPI.get();
       const normalizedSettings = normalizeSiteSettings(response.data);
       setSettings(normalizedSettings);
       applyTheme(normalizedSettings);
@@ -83,16 +82,6 @@ export const ThemeProvider = ({ children }) => {
       document.body.style.color = themeSettings.textColor;
     }
 
-    // Update favicon if provided
-    if (themeSettings.faviconUrl) {
-      updateFavicon(themeSettings.faviconUrl);
-    }
-
-    // Update page title
-    if (themeSettings.siteTitle) {
-      document.title = themeSettings.siteTitle;
-    }
-    
     console.log('Theme applied:', {
       primary: themeSettings.primaryColor,
       secondary: themeSettings.secondaryColor,
@@ -107,25 +96,6 @@ export const ThemeProvider = ({ children }) => {
     root.style.setProperty('--color-accent', '#2a2a2a');
     root.style.setProperty('--color-background', '#1a1a1a');
     root.style.setProperty('--color-text', '#ffffff');
-  };
-
-  const updateFavicon = (faviconUrl) => {
-    // Remove existing favicons
-    const existingLinks = document.querySelectorAll("link[rel*='icon']");
-    existingLinks.forEach(link => link.remove());
-
-    // Add new favicon
-    const link = document.createElement('link');
-    link.rel = 'icon';
-    link.type = 'image/x-icon';
-    link.href = faviconUrl.startsWith('http') ? faviconUrl : `${BACKEND_URL}${faviconUrl}`;
-    document.head.appendChild(link);
-
-    // Also add apple-touch-icon
-    const appleLink = document.createElement('link');
-    appleLink.rel = 'apple-touch-icon';
-    appleLink.href = faviconUrl.startsWith('http') ? faviconUrl : `${BACKEND_URL}${faviconUrl}`;
-    document.head.appendChild(appleLink);
   };
 
   const reloadSettings = async () => {

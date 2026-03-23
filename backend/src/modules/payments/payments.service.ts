@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentStatus, PaymentType, Prisma, Role, YayasanApprovalStatus } from '@prisma/client';
+import { MIN_PREMIUM_PRICE, resolveCanonicalPaymentAmount } from 'src/common/settings/finance-settings';
 
 type PriceMapEntry = {
   referralPrice: number;
@@ -28,7 +29,7 @@ type PricingContext = {
 
 type PrismaLike = Prisma.TransactionClient | PrismaService;
 
-const PLATFORM_BASE_PRICE = 100000;
+const PLATFORM_BASE_PRICE = MIN_PREMIUM_PRICE;
 const REFERRAL_TOTAL_PRICE = 250000;
 const REFERRAL_SHARE_BUDGET = REFERRAL_TOTAL_PRICE - PLATFORM_BASE_PRICE;
 const USER_REFERRAL_BONUS = 10000;
@@ -261,7 +262,7 @@ export class PaymentsService {
 
     const generalRow = await db.setting.findUnique({ where: { key: 'general' } });
     const generalValue = (generalRow?.value as Record<string, any>) || {};
-    return Math.max(Number(generalValue.paymentAmount || generalValue.testPrice || PLATFORM_BASE_PRICE), PLATFORM_BASE_PRICE);
+    return resolveCanonicalPaymentAmount(generalValue);
   }
 
   private async findMitraByCode(db: PrismaLike, code: string) {
@@ -401,6 +402,43 @@ export class PaymentsService {
     return defaultPricing;
   }
 
+  private getStoredPricingSnapshot(order: any): PricingContext | null {
+    const metadata = order?.metadata && typeof order.metadata === 'object'
+      ? (order.metadata as Record<string, any>)
+      : null;
+    const pricing = metadata?.pricing && typeof metadata.pricing === 'object'
+      ? (metadata.pricing as Record<string, any>)
+      : null;
+
+    if (!pricing) {
+      return null;
+    }
+
+    const normalizedShares = this.normalizePriceEntry({
+      referralPrice: pricing.referralPrice ?? pricing.yayasanShare ?? 0,
+      mitraShare: pricing.mitraShare ?? 0,
+    });
+    const grossAmount = Math.max(Number(order?.amount || pricing.totalPrice || pricing.basePrice || PLATFORM_BASE_PRICE), 0);
+    const cappedYayasanShare = Math.min(normalizedShares.yayasanShare, grossAmount);
+    const cappedMitraShare = Math.min(normalizedShares.mitraShare, Math.max(grossAmount - cappedYayasanShare, 0));
+
+    return {
+      basePrice: Math.max(Number(pricing.basePrice || PLATFORM_BASE_PRICE), PLATFORM_BASE_PRICE),
+      totalPrice: Math.max(Number(pricing.totalPrice || grossAmount || PLATFORM_BASE_PRICE), PLATFORM_BASE_PRICE),
+      referralCode: pricing.referralCode ? String(pricing.referralCode) : null,
+      referrerRole: pricing.referrerRole ? (String(pricing.referrerRole).toUpperCase() as Role) : null,
+      approvalStatus: pricing.approvalStatus ? String(pricing.approvalStatus) : null,
+      referralActive: Boolean(pricing.referralActive),
+      yayasanShare: cappedYayasanShare,
+      mitraShare: cappedMitraShare,
+      yayasanReferralCode: pricing.yayasanReferralCode ? String(pricing.yayasanReferralCode) : null,
+      mitraReferralCode: pricing.mitraReferralCode ? String(pricing.mitraReferralCode) : null,
+      yayasanId: pricing.yayasanId ? String(pricing.yayasanId) : null,
+      mitraId: pricing.mitraId ? String(pricing.mitraId) : null,
+      userReferrerId: pricing.userReferrerId ? String(pricing.userReferrerId) : null,
+    };
+  }
+
   generateOrderId(prefix = 'TXN') {
     return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
   }
@@ -506,7 +544,12 @@ export class PaymentsService {
     return this.prisma.paymentOrder.findUnique({ where: { orderId } });
   }
 
-  async syncOrderStatusFromMidtrans(orderId: string) {
+  async syncOrderStatusFromMidtrans(
+    orderId: string,
+    options?: {
+      source?: string;
+    },
+  ) {
     const order = await this.getOrderByOrderId(orderId);
     if (!order || !this.hasUsableSnapSession(order)) {
       return order;
@@ -534,7 +577,7 @@ export class PaymentsService {
       return order;
     }
     const nextStatus = this.mapMidtransStatus(payload.transaction_status, payload.fraud_status);
-    await this.applyOrderTransition(orderId, nextStatus, 'midtrans.status-check', payload);
+    await this.applyOrderTransition(orderId, nextStatus, options?.source || 'midtrans.status-check', payload);
     return this.getOrderByOrderId(orderId);
   }
 
@@ -825,7 +868,7 @@ export class PaymentsService {
   }
 
   private async applyTestPaymentSideEffects(tx: Prisma.TransactionClient, order: any) {
-    const pricing = await this.getTestPricing(order.userId, undefined, tx);
+    const pricing = this.getStoredPricingSnapshot(order) || await this.getTestPricing(order.userId, undefined, tx);
     const payingUser = await tx.user.findUnique({
       where: { id: order.userId },
       include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
@@ -975,7 +1018,7 @@ export class PaymentsService {
     let fixed = 0;
     for (const order of pending) {
       const before = order.status;
-      const after = await this.syncOrderStatusFromMidtrans(order.orderId);
+      const after = await this.syncOrderStatusFromMidtrans(order.orderId, { source: 'midtrans.reconcile' });
       if (after?.status && after.status !== before) {
         fixed += 1;
       }

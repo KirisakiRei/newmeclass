@@ -28,4 +28,8 @@ export class UsersQueryDto {
   @IsOptional()
   @IsString()
   limit?: string;
+
+  @IsOptional()
+  @IsString()
+  pageSize?: string;
 }

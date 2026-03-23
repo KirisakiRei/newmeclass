@@ -12,8 +12,12 @@ const Pagination = ({
   showInfo = true,
   totalItems,
   pageSize,
+  onPageSizeChange,
+  pageSizeOptions = [10, 20, 50, 100],
+  compact = false,
 }) => {
-  if (totalPages <= 1) return null;
+  const shouldRenderControls = totalPages > 1 || typeof onPageSizeChange === 'function';
+  if (!shouldRenderControls) return null;
 
   const getVisiblePages = () => {
     const pages = [];
@@ -35,15 +39,91 @@ const Pagination = ({
   const startItem = (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);
 
+  if (compact) {
+    return (
+      <div className={cn('flex flex-col gap-3 pt-4 sm:flex-row sm:items-end sm:justify-between', className)}>
+        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+          {showInfo && totalItems != null ? (
+            <p>
+              Menampilkan {startItem}–{endItem} dari {totalItems}
+            </p>
+          ) : null}
+          {typeof onPageSizeChange === 'function' ? (
+            <label className="flex items-center gap-2">
+              <span>Tampilkan</span>
+              <select
+                value={pageSize}
+                onChange={(event) => onPageSizeChange(Number(event.target.value))}
+                className="rounded-md border border-yellow-400/20 bg-[#1a1a1a] px-2 py-1 text-white"
+              >
+                {pageSizeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              <span>data</span>
+            </label>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-1 self-end">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7 border-yellow-400/20 text-gray-400 hover:text-yellow-400 disabled:opacity-30"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            aria-label="Halaman sebelumnya"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </Button>
+          <div className="min-w-[48px] rounded-md border border-yellow-400/20 bg-[#1a1a1a] px-2 py-1 text-center text-xs font-semibold text-yellow-400">
+            {currentPage}/{Math.max(totalPages, 1)}
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7 border-yellow-400/20 text-gray-400 hover:text-yellow-400 disabled:opacity-30"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            aria-label="Halaman berikutnya"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={cn('flex flex-col sm:flex-row items-center justify-between gap-3 pt-4', className)}>
-      {showInfo && totalItems != null && (
-        <p className="text-gray-400 text-sm">
-          Menampilkan {startItem}–{endItem} dari {totalItems}
-        </p>
-      )}
+    <div className={cn('flex flex-col gap-3 pt-4 lg:flex-row lg:items-center lg:justify-between', className)}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        {showInfo && totalItems != null && (
+          <p className="text-gray-400 text-sm">
+            Menampilkan {startItem}–{endItem} dari {totalItems}
+          </p>
+        )}
+        {typeof onPageSizeChange === 'function' ? (
+          <label className="flex items-center gap-2 text-sm text-gray-400">
+            <span>Tampilkan</span>
+            <select
+              value={pageSize}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+              className="rounded-md border border-yellow-400/20 bg-[#1a1a1a] px-2 py-1 text-white"
+            >
+              {pageSizeOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <span>data</span>
+          </label>
+        ) : null}
+      </div>
       
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         <Button
           variant="outline"
           size="icon"
@@ -141,4 +221,3 @@ export const usePagination = (items, pageSize = 10) => {
 };
 
 export default Pagination;
-

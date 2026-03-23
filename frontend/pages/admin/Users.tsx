@@ -14,11 +14,15 @@ import StatsGrid from '../../components/ui/stats-grid';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import { formatDateTime } from '../../lib/utils';
 import { getApiErrorMessage } from '../../services/api-error';
+import Pagination from '../../components/ui/pagination';
+import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const Users = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -32,13 +36,19 @@ const Users = () => {
   const [banReason, setBanReason] = useState('');
   const [editForm, setEditForm] = useState({});
   const [openAccordion, setOpenAccordion] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [pagination, setPagination] = useState(createEmptyPageState(10));
   const selectedUserName = selectedUser?.fullName || selectedUser?.email || 'user ini';
   const selectedUserIsBanned = Boolean(selectedUser?.isBanned);
+  const canEditUser = adminAccess.hasPermission('users.edit');
+  const canDeleteUser = adminAccess.hasPermission('users.delete');
+  const canManageUser = adminAccess.hasPermission('users.manage');
 
   useEffect(() => {
     loadUsers();
     loadStats();
-  }, [searchTerm, filterStatus]);
+  }, [searchTerm, filterStatus, page, pageSize]);
 
   const loadUsers = async () => {
     try {
@@ -48,12 +58,16 @@ const Users = () => {
       if (filterStatus === 'banned') params.isBanned = true;
       if (filterStatus === 'paid') params.paymentStatus = 'approved';
       if (filterStatus === 'pending') params.paymentStatus = 'pending';
+      params.page = page;
+      params.pageSize = pageSize;
       
       const response = await axios.get(`${API_URL}/api/users`, {
         headers: { Authorization: `Bearer ${token}` },
         params
       });
-      setUsers(response.data);
+      const nextPage = extractPaginatedResponse(response.data, pageSize);
+      setUsers(nextPage.items || []);
+      setPagination(nextPage);
     } catch (error) {
       toast({
         title: 'Error',
@@ -95,6 +109,7 @@ const Users = () => {
   };
 
   const handleEdit = (user) => {
+    if (!canEditUser) return;
     setSelectedUser(user);
     setEditForm({
       fullName: user.fullName,
@@ -115,18 +130,20 @@ const Users = () => {
   };
 
   const handleDelete = (user) => {
+    if (!canDeleteUser) return;
     setSelectedUser(user);
     setShowDeleteDialog(true);
   };
 
   const handleBan = (user) => {
+    if (!canManageUser) return;
     setSelectedUser(user);
     setBanReason('');
     setShowBanDialog(true);
   };
 
   const confirmEdit = async () => {
-    if (!selectedUser?._id) return;
+    if (!canEditUser || !selectedUser?._id) return;
     try {
       const token = localStorage.getItem('admin_token');
       await axios.put(
@@ -153,7 +170,7 @@ const Users = () => {
   };
 
   const confirmDelete = async () => {
-    if (!selectedUser?._id) return;
+    if (!canDeleteUser || !selectedUser?._id) return;
     try {
       const token = localStorage.getItem('admin_token');
       await axios.delete(`${API_URL}/api/users/${selectedUser._id}`, {
@@ -178,7 +195,7 @@ const Users = () => {
   };
 
   const confirmBan = async () => {
-    if (!selectedUser?._id) return;
+    if (!canManageUser || !selectedUser?._id) return;
     try {
       const token = localStorage.getItem('admin_token');
       const endpoint = selectedUserIsBanned ?
@@ -207,6 +224,7 @@ const Users = () => {
   };
 
   const handleResetPassword = async (user) => {
+    if (!canManageUser) return;
     if (!window.confirm(`Reset password untuk ${user.fullName || user.email}`)) return;
     try {
       const token = localStorage.getItem('admin_token');
@@ -278,11 +296,17 @@ const Users = () => {
             type="text"
             placeholder="Cari berdasarkan nama, email, atau WhatsApp..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
             className="pl-10 bg-[#2a2a2a] border-yellow-400/30 text-white"
           />
         </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
+        <Select value={filterStatus} onValueChange={(value) => {
+          setFilterStatus(value);
+          setPage(1);
+        }}>
           <SelectTrigger className="w-full md:w-48 bg-[#2a2a2a] border-yellow-400/30 text-white">
             <SelectValue placeholder="Filter Status" />
           </SelectTrigger>
@@ -298,7 +322,7 @@ const Users = () => {
       {/* Users Table */}
       <Card className="bg-[#2a2a2a] border-yellow-400/20">
         <CardHeader>
-          <CardTitle className="text-white">Daftar User ({users.length})</CardTitle>
+          <CardTitle className="text-white">Daftar User ({pagination.total})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {/* Mobile accordion */}
@@ -354,13 +378,13 @@ const Users = () => {
                     </div>
                     <div className="flex gap-1 flex-wrap">
                       <Button size="sm" variant="ghost" onClick={() => handleViewDetail(user)} className="text-blue-400 hover:bg-blue-400/10 h-8 px-2"><Eye className="w-4 h-4 mr-1" /> Detail</Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleEdit(user)} className="text-yellow-400 hover:bg-yellow-400/10 h-8 px-2"><Edit className="w-4 h-4 mr-1" /> Edit</Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleBan(user)} className={`h-8 px-2 ${user.isBanned ? 'text-green-400 hover:bg-green-400/10' : 'text-orange-400 hover:bg-orange-400/10'}`}>
+                      {canEditUser ? <Button size="sm" variant="ghost" onClick={() => handleEdit(user)} className="text-yellow-400 hover:bg-yellow-400/10 h-8 px-2"><Edit className="w-4 h-4 mr-1" /> Edit</Button> : null}
+                      {canManageUser ? <Button size="sm" variant="ghost" onClick={() => handleBan(user)} className={`h-8 px-2 ${user.isBanned ? 'text-green-400 hover:bg-green-400/10' : 'text-orange-400 hover:bg-orange-400/10'}`}>
                         {user.isBanned ? <CheckCircle className="w-4 h-4 mr-1" /> : <Ban className="w-4 h-4 mr-1" />}
                         {user.isBanned ? 'Unban' : 'Blokir'}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleResetPassword(user)} className="text-purple-400 hover:bg-purple-400/10 h-8 px-2"><KeyRound className="w-4 h-4 mr-1" /> Reset PW</Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleDelete(user)} className="text-red-400 hover:bg-red-400/10 h-8 px-2"><Trash2 className="w-4 h-4 mr-1" /> Hapus</Button>
+                      </Button> : null}
+                      {canManageUser ? <Button size="sm" variant="ghost" onClick={() => handleResetPassword(user)} className="text-purple-400 hover:bg-purple-400/10 h-8 px-2"><KeyRound className="w-4 h-4 mr-1" /> Reset PW</Button> : null}
+                      {canDeleteUser ? <Button size="sm" variant="ghost" onClick={() => handleDelete(user)} className="text-red-400 hover:bg-red-400/10 h-8 px-2"><Trash2 className="w-4 h-4 mr-1" /> Hapus</Button> : null}
                     </div>
                   </div>
                 )}
@@ -432,18 +456,10 @@ const Users = () => {
                         <Button size="sm" variant="ghost" onClick={() => handleViewDetail(user)} className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10">
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleEdit(user)} className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-400/10">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleBan(user)} className={user.isBanned ? 'text-green-400 hover:text-green-300 hover:bg-green-400/10' : 'text-orange-400 hover:text-orange-300 hover:bg-orange-400/10'}>
-                          {user.isBanned ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleResetPassword(user)} className="text-purple-400 hover:text-purple-300 hover:bg-purple-400/10" title="Reset Password">
-                          <KeyRound className="w-4 h-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => handleDelete(user)} className="text-red-400 hover:text-red-300 hover:bg-red-400/10">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {canEditUser ? <Button size="sm" variant="ghost" onClick={() => handleEdit(user)} className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-400/10"><Edit className="w-4 h-4" /></Button> : null}
+                        {canManageUser ? <Button size="sm" variant="ghost" onClick={() => handleBan(user)} className={user.isBanned ? 'text-green-400 hover:text-green-300 hover:bg-green-400/10' : 'text-orange-400 hover:text-orange-300 hover:bg-orange-400/10'}>{user.isBanned ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}</Button> : null}
+                        {canManageUser ? <Button size="sm" variant="ghost" onClick={() => handleResetPassword(user)} className="text-purple-400 hover:text-purple-300 hover:bg-purple-400/10" title="Reset Password"><KeyRound className="w-4 h-4" /></Button> : null}
+                        {canDeleteUser ? <Button size="sm" variant="ghost" onClick={() => handleDelete(user)} className="text-red-400 hover:text-red-300 hover:bg-red-400/10"><Trash2 className="w-4 h-4" /></Button> : null}
                       </div>
                     </td>
                   </tr>
@@ -460,6 +476,18 @@ const Users = () => {
           )}
         </CardContent>
       </Card>
+
+      <Pagination
+        currentPage={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.total}
+        pageSize={pagination.pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(nextSize) => {
+          setPageSize(nextSize);
+          setPage(1);
+        }}
+      />
 
       {/* Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>

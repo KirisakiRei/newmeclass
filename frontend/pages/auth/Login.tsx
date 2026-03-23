@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
-import { authAPI, settingsAPI } from '../../services/api';
+import { authAPI, clearAuthStorage, settingsAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import { DEFAULT_SITE_SETTINGS } from '../../lib/site-settings';
 
@@ -48,7 +48,8 @@ const Login = () => {
       const response = await authAPI.login(formData);
       
       if (response.data.success) {
-        localStorage.setItem('user_token', response.data.token);
+        clearAuthStorage('user_token');
+        localStorage.setItem('user_token', response.data.token || response.data.access_token);
         localStorage.setItem('user_data', JSON.stringify(response.data.user));
         
         toast({

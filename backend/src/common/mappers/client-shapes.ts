@@ -90,6 +90,8 @@ export function mapUserForClient(user: AnyRecord | null | undefined, extra: AnyR
   const yayasanProfile = user.yayasanProfile || {};
   const mitraProfile = user.mitraProfile || {};
   const wallet = user.wallet || {};
+  const capacityLimit = extra.capacityLimit ?? mitraProfile.capacityLimit ?? null;
+  const capacityUsed = extra.capacityUsed ?? mitraProfile.capacityUsed ?? 0;
 
   const phone = extra.whatsapp || user.phone || profile.whatsapp || null;
   const referralPrice = extra.referralPrice ?? yayasanProfile.referralPrice ?? 0;
@@ -109,8 +111,12 @@ export function mapUserForClient(user: AnyRecord | null | undefined, extra: AnyR
     businessId: extra.businessId ?? user.myReferralCode ?? null,
     memberCode: extra.memberCode ?? user.myReferralCode ?? null,
     name: extra.name || user.fullName,
-    username: extra.username || user.fullName,
+    username: extra.username || user.username || user.fullName,
     fullName: user.fullName,
+    adminRoleId: extra.adminRoleId ?? user.adminRoleId ?? null,
+    adminRole: extra.adminRole ?? user.adminRole ?? null,
+    permissionKeys: extra.permissionKeys ?? user.permissionKeys ?? [],
+    isProtectedAdminRole: extra.isProtectedAdminRole ?? user.isProtectedAdminRole ?? false,
     phone,
     whatsapp: phone,
     birthDate: extra.birthDate ?? formatClientDate(profile.birthDate),
@@ -146,6 +152,17 @@ export function mapUserForClient(user: AnyRecord | null | undefined, extra: AnyR
     referralBonus: extra.referralBonus ?? 0,
     institutionName: extra.institutionName ?? profileExtra.institutionName ?? yayasanProfile.institutionName ?? null,
     inviteCode: extra.inviteCode ?? mitraProfile.inviteCode ?? null,
+    inviteStatus: extra.inviteStatus ?? null,
+    inviteExpiresAt: extra.inviteExpiresAt ?? null,
+    inviteClaimedAt: extra.inviteClaimedAt ?? null,
+    capacityLimit,
+    capacityUsed,
+    capacityRemaining:
+      extra.capacityRemaining
+      ?? (capacityLimit === null ? null : Math.max(Number(capacityLimit || 0) - Number(capacityUsed || 0), 0)),
+    isCapacityFull:
+      extra.isCapacityFull
+      ?? (capacityLimit === null ? false : Number(capacityUsed || 0) >= Number(capacityLimit || 0)),
     referralMeta: extra.referralMeta ?? profileExtra.referralMeta ?? null,
     referralOwnerRole: extra.referralOwnerRole ?? profileExtra.referralOwnerRole ?? profileExtra.referralMeta?.referrerRole ?? null,
     affiliationType: extra.affiliationType ?? profileExtra.affiliationType ?? null,
@@ -181,8 +198,15 @@ export function mapDisbursementForClient(disbursement: AnyRecord, extra: AnyReco
     type: extra.type || 'withdrawal',
     status: String(disbursement.status || '').toLowerCase(),
     notes: extra.notes ?? meta.notes,
-    bankName: extra.bankName ?? meta.bankName,
-    bankAccount: extra.bankAccount ?? meta.bankAccount,
-    accountName: extra.accountName ?? meta.accountName,
+    bankName: extra.bankName ?? disbursement.bankName ?? meta.bankName,
+    bankAccount: extra.bankAccount ?? disbursement.bankAccount ?? meta.bankAccount,
+    accountName: extra.accountName ?? disbursement.accountName ?? meta.accountName,
+    provider: extra.provider ?? disbursement.provider ?? 'manual',
+    providerReferenceId: extra.providerReferenceId ?? disbursement.providerReferenceId ?? null,
+    providerStatus: extra.providerStatus ?? disbursement.providerStatus ?? null,
+    providerPayload: extra.providerPayload ?? disbursement.providerPayload ?? null,
+    failureReason: extra.failureReason ?? disbursement.failureReason ?? null,
+    submittedAt: extra.submittedAt ?? disbursement.submittedAt ?? null,
+    completedAt: extra.completedAt ?? disbursement.completedAt ?? null,
   };
 }

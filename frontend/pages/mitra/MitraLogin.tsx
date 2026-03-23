@@ -130,9 +130,9 @@ const MitraLogin = () => {
 
           <div className="mt-4 text-center space-y-2">
             <p className="text-gray-400 text-sm">
-              Belum punya akun mitra{' '}
+              Ingin bergabung sebagai mitra{' '}
               <Link to="/mitra/register" className="text-yellow-400 hover:underline">
-                Daftar Disini
+                Lihat informasinya
               </Link>
             </p>
             <Link to="/" className="text-gray-400 text-sm hover:text-white inline-flex items-center">
@@ -146,4 +146,3 @@ const MitraLogin = () => {
 };
 
 export default MitraLogin;
-

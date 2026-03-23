@@ -5,6 +5,7 @@ import {
   buildLegacyPremiumInsights,
   buildTemplateInsights,
 } from 'src/common/personality-result-shape';
+import { pickPreferredPersonalityTemplate } from 'src/common/personality-template-catalog';
 import { PrismaService } from '../prisma/prisma.service';
 
 type ScoringInput = {
@@ -59,22 +60,28 @@ export class ScoringService {
     const dominantElement = Object.entries(raw).sort((a, b) => b[1] - a[1])[0]?.[0] || 'KAYU';
     const socialType = Object.entries(social).sort((a, b) => b[1] - a[1])[0]?.[0] || 'ambivert';
 
-    const template = await this.prisma.personalityResultTemplate.findFirst({ where: { socialType, element: dominantElement.toLowerCase() } })
-      || await this.prisma.personalityResultTemplate.findFirst({ where: { socialType } });
+    const fallbackPersonalityCode = `${socialType[0]}${dominantElement[0]}`;
+    const templateRows = await this.prisma.personalityResultTemplate.findMany({
+      where: { socialType, element: dominantElement.toLowerCase() },
+    });
+    const template = pickPreferredPersonalityTemplate(templateRows, fallbackPersonalityCode);
 
-    const personalityCode = template?.code || `${socialType[0]}${dominantElement[0]}`;
+    const personalityCode = template?.code || fallbackPersonalityCode;
 
     const normalized = this.normalize(raw);
-    const basicInsights = buildTemplateInsights(template, personalityCode);
+    const fallbackMeta = { socialType, dominantElement };
+    const basicInsights = buildTemplateInsights(template, personalityCode, fallbackMeta);
     const displayAnalysis = buildDisplayAnalysis(
       template,
       normalized,
       template?.label || `Tipe ${dominantElement}`,
+      fallbackMeta,
     );
     const legacyPremiumInsights = buildLegacyPremiumInsights(
       template,
       normalized,
       displayAnalysis.personalityType,
+      fallbackMeta,
     );
 
     const paidInsights = input.testType === 'paid'

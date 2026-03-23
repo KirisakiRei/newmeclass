@@ -20,6 +20,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { useToast } from '../../hooks/use-toast';
 import { authAPI, walletAPI } from '../../services/api';
 import { formatCurrency, getErrorMsg } from '../../lib/utils';
+import Pagination from '../../components/ui/pagination';
+import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
 
 const Wallet = () => {
   const navigate = useNavigate();
@@ -33,10 +35,19 @@ const Wallet = () => {
   const [qrData, setQrData] = useState(null);
   const [processingTopup, setProcessingTopup] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [pagination, setPagination] = useState(createEmptyPageState(10));
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      loadWalletData(user.id || user._id);
+    }
+  }, [user, page, pageSize]);
 
   const checkAuth = async () => {
     try {
@@ -58,10 +69,12 @@ const Wallet = () => {
       setLoading(true);
       const [balanceRes, transactionsRes] = await Promise.all([
         walletAPI.getBalance(userId),
-        walletAPI.getTransactions(userId)
+        walletAPI.getTransactions(userId, { page, pageSize })
       ]);
       setBalance(balanceRes.data.balance || 0);
-      setTransactions(transactionsRes.data || []);
+      const nextPage = extractPaginatedResponse(transactionsRes.data, pageSize);
+      setTransactions(nextPage.items || []);
+      setPagination(nextPage);
     } catch (error) {
       console.error('Failed to load wallet data:', error);
     } finally {
@@ -371,6 +384,18 @@ const Wallet = () => {
           </CardContent>
         </Card>
 
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.total}
+          pageSize={pagination.pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(nextSize) => {
+            setPageSize(nextSize);
+            setPage(1);
+          }}
+        />
+
         {/* Info */}
         <div className="mt-6 p-4 bg-yellow-400/10 border border-yellow-400/30 rounded-lg">
           <p className="text-yellow-400 text-sm">
@@ -384,4 +409,3 @@ const Wallet = () => {
 };
 
 export default Wallet;
-

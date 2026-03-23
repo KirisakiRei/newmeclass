@@ -38,6 +38,7 @@ import { BannersModule } from './modules/banners/banners.module';
 import { RunningInfoModule } from './modules/running-info/running-info.module';
 import { QueueModule } from './modules/queue/queue.module';
 import { ScoringModule } from './modules/scoring/scoring.module';
+import { AdminRbacModule } from './modules/admin-rbac/admin-rbac.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { SmartThrottlerGuard } from './common/guards/smart-throttler.guard';
 import { validateEnv } from './config/env.validation';
@@ -61,6 +62,7 @@ import { validateEnv } from './config/env.validation';
       },
       prefix: process.env.BULLMQ_PREFIX || 'newme',
     }),
+    AdminRbacModule,
     PrismaModule,
     QueueModule,
     HealthModule,

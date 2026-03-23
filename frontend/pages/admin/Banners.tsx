@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash2, X, Eye, EyeOff, Loader2, Upload, Monitor, Maximize2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit, Trash2, X, Eye, EyeOff, Monitor, Maximize2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -10,79 +10,15 @@ import { bannersAPI } from '../../services/api';
 import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner, { CardGridSkeleton } from '../../components/ui/loading-spinner';
 import EmptyState from '../../components/ui/empty-state';
-import axios from 'axios';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-
-// ── ImageUploader ──
-const ImageUploader = ({ value, onChange, placeholder = 'Upload gambar' }) => {
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const handleFileSelect = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowed.includes(file.type)) { alert('Format: JPG, PNG, GIF, atau WEBP'); return; }
-    if (file.size > 5 * 1024 * 1024) { alert('Ukuran maksimal 5MB'); return; }
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const token = localStorage.getItem('admin_token');
-      const res = await axios.post(`${BACKEND_URL}/api/upload/image`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
-      });
-      if (res.data.url) onChange(res.data.url);
-    } catch { alert('Gagal upload gambar'); }
-    finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const src = value ? (value.startsWith('http') ? value : `${BACKEND_URL}${value}`) : '';
-
-  return (
-    <div className="space-y-2">
-      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleFileSelect} className="hidden" />
-      {src ? (
-        <div className="relative">
-          <img src={src} alt="Preview" className="w-full h-48 object-cover rounded-lg border-2 border-yellow-400/30" />
-          <div className="absolute top-2 right-2 flex gap-1">
-            <button onClick={() => fileInputRef.current.click()} type="button"
-              className="bg-black/60 hover:bg-black/80 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
-              <Upload className="w-3 h-3" /> Ganti
-            </button>
-            <button onClick={() => onChange('')} type="button"
-              className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600">
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => fileInputRef.current.click()} disabled={uploading} type="button"
-          className="w-full h-48 border-2 border-dashed border-yellow-400/30 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-yellow-400 hover:text-yellow-400 transition bg-[#1a1a1a]">
-          {uploading ? <Loader2 className="w-8 h-8 animate-spin" /> : (
-            <>
-              <Upload className="w-10 h-10 mb-2" />
-              <span className="text-sm">{placeholder}</span>
-              <span className="text-xs text-gray-600 mt-1">JPG, PNG, WEBP · maks 5MB</span>
-            </>
-          )}
-        </button>
-      )}
-    </div>
-  );
-};
+import SharedImageUploader from '../../components/admin/SharedImageUploader.tsx';
+import { resolveBackendAssetUrl } from '../../lib/admin-media';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 // ── BannerPreviewModal ── full-screen preview
 const BannerPreviewModal = ({ banner, onClose }) => {
   if (!banner) return null;
   const isSlider = banner.type === 'slider';
-  const imgSrc = banner.imageUrl
-    ? (banner.imageUrl.startsWith('http') ? banner.imageUrl : `${BACKEND_URL}${banner.imageUrl}`)
-    : null;
+  const imgSrc = resolveBackendAssetUrl(banner.imageUrl);
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/90 flex flex-col">
@@ -165,6 +101,7 @@ const BannerPreviewModal = ({ banner, onClose }) => {
 
 const Banners = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -174,6 +111,10 @@ const Banners = () => {
     title: '', description: '', link: '', type: 'slider', order: 0, imageUrl: '',
   });
   const [activeTab, setActiveTab] = useState('slider');
+  const canCreateBanner = adminAccess.hasPermission('banners.create');
+  const canEditBanner = adminAccess.hasPermission('banners.edit');
+  const canDeleteBanner = adminAccess.hasPermission('banners.delete');
+  const canManageBanner = adminAccess.hasPermission('banners.manage');
 
   useEffect(() => { loadBanners(); }, []);
 
@@ -188,6 +129,7 @@ const Banners = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (editingBanner ? !canEditBanner : !canCreateBanner) return;
     if (!formData.imageUrl && !editingBanner) {
       toast({ title: 'Error', description: 'Upload gambar terlebih dahulu', variant: 'destructive' });
       return;
@@ -217,6 +159,7 @@ const Banners = () => {
   };
 
   const handleEdit = (banner) => {
+    if (!canEditBanner) return;
     setEditingBanner(banner);
     setFormData({
       title: banner.title, description: banner.description || '',
@@ -227,6 +170,7 @@ const Banners = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!canDeleteBanner) return;
     if (!window.confirm('Yakin ingin menghapus banner ini')) return;
     try {
       await bannersAPI.delete(id);
@@ -236,6 +180,7 @@ const Banners = () => {
   };
 
   const toggleStatus = async (banner) => {
+    if (!canManageBanner) return;
     try {
       await bannersAPI.update(banner._id, { ...banner, isActive: !banner.isActive });
       loadBanners();
@@ -247,7 +192,12 @@ const Banners = () => {
     setEditingBanner(null);
   };
 
-  const openCreate = () => { resetForm(); setFormData(f => ({ ...f, type: activeTab })); setShowModal(true); };
+  const openCreate = () => {
+    if (!canCreateBanner) return;
+    resetForm();
+    setFormData(f => ({ ...f, type: activeTab }));
+    setShowModal(true);
+  };
   const filteredBanners = banners.filter(b => b.type === activeTab);
 
   return (
@@ -255,9 +205,9 @@ const Banners = () => {
       {previewBanner && <BannerPreviewModal banner={previewBanner} onClose={() => setPreviewBanner(null)} />}
 
       <PageHeader icon={Monitor} title="Banners" description="Kelola banner slider dan popup website">
-        <Button onClick={openCreate} className="bg-yellow-400 text-black hover:bg-yellow-500">
+        {canCreateBanner ? <Button onClick={openCreate} className="bg-yellow-400 text-black hover:bg-yellow-500">
           <Plus className="w-4 h-4 mr-2" /> Tambah Banner
-        </Button>
+        </Button> : null}
       </PageHeader>
 
       {/* Tabs */}
@@ -276,13 +226,11 @@ const Banners = () => {
       {loading ? (
         <CardGridSkeleton cols={3} cards={6} />
       ) : filteredBanners.length === 0 ? (
-        <EmptyState icon={Monitor} title={`Belum ada banner ${activeTab}`} description="Klik Tambah Banner untuk menambahkan" />
+        <EmptyState icon={Monitor} title={`Belum ada banner ${activeTab}`} description={canCreateBanner ? 'Klik Tambah Banner untuk menambahkan' : 'Belum ada banner yang bisa ditampilkan.'} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {filteredBanners.sort((a, b) => a.order - b.order).map(banner => {
-            const imgSrc = banner.imageUrl
-              ? (banner.imageUrl.startsWith('http') ? banner.imageUrl : `${BACKEND_URL}${banner.imageUrl}`)
-              : null;
+            const imgSrc = resolveBackendAssetUrl(banner.imageUrl);
             return (
               <Card key={banner._id} className="bg-[#2a2a2a] border-yellow-400/20 overflow-hidden group">
                 {/* Visual mockup area */}
@@ -328,18 +276,18 @@ const Banners = () => {
                     {banner.link && <p className="text-yellow-400/70 text-xs mt-1 truncate">🔗 {banner.link}</p>}
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="flex-1 border-yellow-400/50 text-yellow-400 h-8" onClick={() => handleEdit(banner)}>
+                    {canEditBanner ? <Button size="sm" variant="outline" className="flex-1 border-yellow-400/50 text-yellow-400 h-8" onClick={() => handleEdit(banner)}>
                       <Edit className="w-3 h-3 mr-1" /> Edit
-                    </Button>
+                    </Button> : null}
                     <Button size="sm" variant="outline" className="border-blue-400/50 text-blue-400 h-8 px-2" onClick={() => setPreviewBanner(banner)}>
                       <Maximize2 className="w-3 h-3" />
                     </Button>
-                    <Button size="sm" variant="outline" className="border-gray-400/50 text-gray-400 h-8 px-2" onClick={() => toggleStatus(banner)}>
+                    {canManageBanner ? <Button size="sm" variant="outline" className="border-gray-400/50 text-gray-400 h-8 px-2" onClick={() => toggleStatus(banner)}>
                       {banner.isActive ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    </Button>
-                    <Button size="sm" variant="outline" className="border-red-400/50 text-red-400 h-8 px-2" onClick={() => handleDelete(banner._id)}>
+                    </Button> : null}
+                    {canDeleteBanner ? <Button size="sm" variant="outline" className="border-red-400/50 text-red-400 h-8 px-2" onClick={() => handleDelete(banner._id)}>
                       <Trash2 className="w-3 h-3" />
-                    </Button>
+                    </Button> : null}
                   </div>
                 </CardContent>
               </Card>
@@ -361,9 +309,11 @@ const Banners = () => {
             <form onSubmit={handleSubmit} className="p-5 space-y-5">
               <div>
                 <Label className="text-white mb-2 block">Gambar Banner {!editingBanner && '*'}</Label>
-                <ImageUploader
+                <SharedImageUploader
                   value={formData.imageUrl}
                   onChange={url => setFormData(f => ({ ...f, imageUrl: url }))}
+                  category="banners"
+                  size="md"
                   placeholder="Klik untuk upload gambar banner"
                 />
               </div>
@@ -412,7 +362,7 @@ const Banners = () => {
                   </p>
                   <div className={`relative overflow-hidden rounded ${formData.type === 'slider' ? 'aspect-video' : 'h-40 w-32'}`}>
                     <img
-                      src={formData.imageUrl.startsWith('http') ? formData.imageUrl : `${BACKEND_URL}${formData.imageUrl}`}
+                      src={resolveBackendAssetUrl(formData.imageUrl)}
                       alt="preview" className="w-full h-full object-cover"
                     />
                     {formData.type === 'slider' && (

@@ -19,7 +19,9 @@ async function bootstrap() {
   }
 
   app.setGlobalPrefix(process.env.API_PREFIX || 'api');
-  app.use(helmet());
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }));
   app.useStaticAssets(uploadsDir, { prefix: '/uploads/' });
   app.enableCors({
     origin: (process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean),

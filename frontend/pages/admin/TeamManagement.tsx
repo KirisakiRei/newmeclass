@@ -1,20 +1,22 @@
 ﻿// @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Upload, Users, Briefcase, Handshake } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Briefcase, Handshake } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useToast } from '../../hooks/use-toast';
-import axios from 'axios';
 import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import { DEFAULT_SITE_SETTINGS, normalizeSiteSettings } from '../../lib/site-settings';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+import SharedImageUploader from '../../components/admin/SharedImageUploader.tsx';
+import { resolveBackendAssetUrl } from '../../lib/admin-media';
+import { settingsAPI } from '../../services/api';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const TeamManagement = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState(DEFAULT_SITE_SETTINGS);
   const [activeTab, setActiveTab] = useState('bod'); // 'bod', 'team', 'partners'
@@ -34,7 +36,7 @@ const TeamManagement = () => {
 
   const loadSettings = async () => {
     try {
-      const response = await axios.get(`${BACKEND_URL}/api/settings`);
+      const response = await settingsAPI.getTeamManagement();
       setSettings(normalizeSiteSettings(response.data));
     } catch (error) {
       toast({ title: 'Error', description: 'Gagal memuat data', variant: 'destructive' });
@@ -79,18 +81,17 @@ const TeamManagement = () => {
   };
 
   const handleDelete = async (index) => {
+    if (!adminAccess.hasPermission('team_management.delete')) {
+      toast({ title: 'Akses ditolak', description: 'Permission hapus Team & Mitra belum diaktifkan.', variant: 'destructive' });
+      return;
+    }
     if (!window.confirm('Yakin ingin menghapus')) return;
 
     try {
       const currentList = getCurrentList();
       const newList = currentList.filter((_, i) => i !== index);
-      
-      const token = localStorage.getItem('admin_token');
-      await axios.put(
-        `${BACKEND_URL}/api/settings`,
-        { [getFieldName()]: newList },
-        { headers: { Authorization: `Bearer ${token}` }}
-      );
+
+      await settingsAPI.updateTeamManagementSection(getFieldName(), newList);
 
       await loadSettings();
       toast({ title: 'Sukses', description: 'Data berhasil dihapus' });
@@ -100,6 +101,12 @@ const TeamManagement = () => {
   };
 
   const handleSave = async () => {
+    const requiredPermission = editingItem !== null ? 'team_management.edit' : 'team_management.create';
+    if (!adminAccess.hasPermission(requiredPermission)) {
+      toast({ title: 'Akses ditolak', description: 'Permission simpan Team & Mitra belum diaktifkan.', variant: 'destructive' });
+      return;
+    }
+
     if (!formData.name || !formData.position) {
       toast({ title: 'Error', description: 'Nama dan posisi wajib diisi', variant: 'destructive' });
       return;
@@ -117,12 +124,7 @@ const TeamManagement = () => {
         newList = [...currentList, formData];
       }
 
-      const token = localStorage.getItem('admin_token');
-      await axios.put(
-        `${BACKEND_URL}/api/settings`,
-        { [getFieldName()]: newList },
-        { headers: { Authorization: `Bearer ${token}` }}
-      );
+      await settingsAPI.updateTeamManagementSection(getFieldName(), newList);
 
       await loadSettings();
       setShowModal(false);
@@ -132,38 +134,14 @@ const TeamManagement = () => {
     }
   };
 
-  const handleUploadPhoto = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const formDataUpload = new FormData();
-    formDataUpload.append('file', file);
-
-    try {
-      const token = localStorage.getItem('admin_token');
-      const response = await axios.post(
-        `${BACKEND_URL}/api/settings/upload/team`,
-        formDataUpload,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-
-      setFormData({ ...formData, photo: response.data.url });
-      toast({ title: 'Sukses', description: 'Foto berhasil diupload' });
-    } catch (error) {
-      toast({ title: 'Error', description: 'Gagal upload foto', variant: 'destructive' });
-    }
-  };
-
   const tabs = [
     { id: 'bod', label: 'Board of Directors', icon: Briefcase, color: 'yellow' },
     { id: 'team', label: 'Team Support', icon: Users, color: 'blue' },
     { id: 'partners', label: 'Mitra Yayasan & Korporasi', icon: Handshake, color: 'green' }
   ];
+  const canCreateItems = adminAccess.hasPermission('team_management.create');
+  const canEditItems = adminAccess.hasPermission('team_management.edit');
+  const canDeleteItems = adminAccess.hasPermission('team_management.delete');
 
   if (loading) {
     return <LoadingSpinner size="lg" text="Memuat data tim..." className="min-h-[60vh]" />;
@@ -197,7 +175,7 @@ const TeamManagement = () => {
 
       {/* Add Button */}
       <div className="flex justify-end">
-        <Button onClick={handleAdd} className="bg-yellow-400 text-black hover:bg-yellow-500">
+        <Button onClick={handleAdd} className="bg-yellow-400 text-black hover:bg-yellow-500" disabled={!canCreateItems}>
           <Plus className="w-4 h-4 mr-2" />
           Tambah {activeTab === 'bod' ? 'BOD' : activeTab === 'team' ? 'Team' : 'Mitra'}
         </Button>
@@ -211,7 +189,7 @@ const TeamManagement = () => {
               {item.photo && (
                 <div className="mb-4">
                   <img
-                    src={item.photo.startsWith('http') ? item.photo : `${BACKEND_URL}${item.photo}`}
+                    src={resolveBackendAssetUrl(item.photo)}
                     alt={item.name}
                     className="w-full h-48 object-cover rounded-lg"
                     onError={(e) => {
@@ -226,24 +204,28 @@ const TeamManagement = () => {
                 <p className="text-gray-400 text-sm mb-4 line-clamp-3">{item.description}</p>
               )}
               <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleEdit(item, index)}
-                  className="flex-1 text-yellow-400 hover:bg-yellow-400/10"
-                >
-                  <Edit className="w-4 h-4 mr-1" />
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleDelete(index)}
-                  className="flex-1 text-red-400 hover:bg-red-400/10"
-                >
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  Hapus
-                </Button>
+                {canEditItems ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleEdit(item, index)}
+                    className="flex-1 text-yellow-400 hover:bg-yellow-400/10"
+                  >
+                    <Edit className="w-4 h-4 mr-1" />
+                    Edit
+                  </Button>
+                ) : null}
+                {canDeleteItems ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDelete(index)}
+                    className="flex-1 text-red-400 hover:bg-red-400/10"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Hapus
+                  </Button>
+                ) : null}
               </div>
             </CardContent>
           </Card>
@@ -255,6 +237,14 @@ const TeamManagement = () => {
           </div>
         )}
       </div>
+
+      {!canCreateItems && !canEditItems && !canDeleteItems ? (
+        <Card className="bg-yellow-400/10 border-yellow-400/30">
+          <CardContent className="p-4 text-sm text-yellow-100">
+            Permission Team & Mitra Anda saat ini hanya mengizinkan mode lihat. Aksi tambah, edit, dan hapus akan muncul jika role Anda diberi izin yang sesuai.
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Modal */}
       {showModal && (
@@ -304,27 +294,19 @@ const TeamManagement = () => {
                 {formData.photo && (
                   <div className="mb-2">
                     <img
-                      src={formData.photo.startsWith('http') ? formData.photo : `${BACKEND_URL}${formData.photo}`}
+                      src={resolveBackendAssetUrl(formData.photo)}
                       alt="Preview"
                       className="w-full h-48 object-cover rounded-lg"
                     />
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleUploadPhoto}
-                    className="bg-[#1a1a1a] text-white border-yellow-400/20"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-yellow-400/20 text-yellow-400"
-                  >
-                    <Upload className="w-4 h-4" />
-                  </Button>
-                </div>
+                <SharedImageUploader
+                  value={formData.photo || ''}
+                  onChange={(url) => setFormData((prev) => ({ ...prev, photo: url }))}
+                  category="team"
+                  size="md"
+                  placeholder="Upload foto tim atau mitra"
+                />
                 <p className="text-xs text-gray-400 mt-1">
                   Atau paste URL gambar langsung di field Photo URL
                 </p>
@@ -340,6 +322,7 @@ const TeamManagement = () => {
                 <Button
                   onClick={handleSave}
                   className="flex-1 bg-yellow-400 text-black hover:bg-yellow-500"
+                  disabled={editingItem !== null ? !canEditItems : !canCreateItems}
                 >
                   Simpan
                 </Button>

@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail } from 'lucide-react';
+import { Lock, UserRound } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -14,7 +14,7 @@ const AdminLogin = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: ''
   });
   const [loading, setLoading] = useState(false);
@@ -53,7 +53,7 @@ const AdminLogin = () => {
         navigate('/admin/dashboard');
       }, 1000);
     } catch (error) {
-      const errorMessage = getApiErrorMessage(error, 'Login gagal. Periksa email dan password Anda.');
+      const errorMessage = getApiErrorMessage(error, 'Login gagal. Periksa username dan password Anda.');
       toast({
         title: 'Login Gagal',
         description: errorMessage,
@@ -85,16 +85,16 @@ const AdminLogin = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-white flex items-center space-x-2">
-                  <Mail className="w-4 h-4" />
-                  <span>Email</span>
+                <Label htmlFor="username" className="text-white flex items-center space-x-2">
+                  <UserRound className="w-4 h-4" />
+                  <span>Username</span>
                 </Label>
                 <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="admin@company.com"
-                  value={formData.email}
+                  id="username"
+                  name="username"
+                  type="text"
+                  placeholder="superadmin"
+                  value={formData.username}
                   onChange={handleInputChange}
                   className="bg-[#1a1a1a] border-yellow-400/30 text-white placeholder:text-gray-500 focus:border-yellow-400"
                   required

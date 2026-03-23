@@ -2,11 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaymentsOpsService } from '../payments/payments-ops.service';
 
 @Injectable()
 export class HealthService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly paymentsOpsService: PaymentsOpsService,
     @InjectQueue('payment') private readonly paymentQueue: Queue,
   ) {}
 
@@ -35,11 +37,28 @@ export class HealthService {
       redis = { ok: false, error: error?.message || 'redis_unreachable' };
     }
 
+    let paymentOps: Record<string, any> = { ok: false };
+    try {
+      const summary = await this.paymentsOpsService.getOpsSummary();
+      paymentOps = {
+        ok: true,
+        queueBacklog: summary.queueBacklog,
+        failedJobs: summary.failedJobs,
+        stalePendingPayments: summary.stalePendingPayments,
+        openAlerts: summary.openAlerts,
+        avgProcessingLatencyMs: summary.avgProcessingLatencyMs,
+        p95ProcessingLatencyMs: summary.p95ProcessingLatencyMs,
+      };
+    } catch (error: any) {
+      paymentOps = { ok: false, error: error?.message || 'payment_ops_unavailable' };
+    }
+
     return {
       status: database.ok && redis.ok ? 'ok' : 'degraded',
       timestamp,
       database,
       redis,
+      paymentOps,
     };
   }
 }

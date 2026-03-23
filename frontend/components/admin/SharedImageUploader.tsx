@@ -1,11 +1,8 @@
 ﻿// @ts-nocheck
 import React, { useState, useRef } from 'react';
 import { Upload, X, Loader2, Images } from 'lucide-react';
-import axios from 'axios';
-import { mediaAPI } from '../../services/api';
 import MediaPickerModal from './MediaPickerModal.jsx';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+import { resolveBackendAssetUrl, uploadAdminImage } from '../../lib/admin-media';
 
 /**
  * SharedImageUploader
@@ -38,51 +35,23 @@ const SharedImageUploader = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowed.includes(file.type)) {
-      alert('Format file harus JPG, PNG, GIF, atau WEBP');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Ukuran file maksimal 5MB');
-      return;
-    }
-
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const token = localStorage.getItem('admin_token');
-      const uploadRes = await axios.post(`${BACKEND_URL}/api/upload/image`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const uploadRes = await uploadAdminImage(file, { category, name: file.name });
 
-      if (uploadRes.data.url) {
-        const url = uploadRes.data.url;
-        // Also register in media gallery
-        try {
-          await mediaAPI.create({ url, category, name: file.name, size: file.size });
-        } catch {
-          // non-fatal: gallery registration failure shouldn't block the upload
-        }
+      if (uploadRes?.url) {
+        const url = uploadRes.url;
         onChange(url);
       }
     } catch (err) {
-      alert(err.response.data.detail || 'Gagal upload gambar');
+      alert(err?.response?.data?.detail || err?.message || 'Gagal upload gambar');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const getImageSrc = (url) => {
-    if (!url) return '';
-    if (url.startsWith('http') || url.startsWith('/')) return url;
-    return `${BACKEND_URL}${url}`;
-  };
+  const getImageSrc = (url) => resolveBackendAssetUrl(url);
 
   return (
     <>
@@ -163,5 +132,3 @@ const SharedImageUploader = ({
 };
 
 export default SharedImageUploader;
-
-

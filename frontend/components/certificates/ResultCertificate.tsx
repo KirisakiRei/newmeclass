@@ -9,15 +9,21 @@ export default function ResultCertificate({
   certificateNumber,
   issuedAt,
   certType = 'individu',
+  identityLabel = 'ID',
+  identityValue = '',
+  lockPremiumSections = false,
 }) {
   return (
     <OfficialCertificateRenderer
-      template={template}
+      template={template && Object.keys(template).length ? template : (result?.template || {})}
       certType={certType}
       recipientName={result?.userName || 'Peserta NEWME'}
       certificateNumber={certificateNumber || resultId || result?.resultId || result?.id}
+      identityLabel={identityLabel}
+      identityValue={identityValue}
       issuedAt={issuedAt || result?.createdAt}
       result={result}
+      lockPremiumSections={lockPremiumSections}
     />
   );
 }

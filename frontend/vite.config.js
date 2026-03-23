@@ -50,6 +50,8 @@ export default defineConfig(({ mode }) => {
     define: {
       // Bridge CRA-style process.env to Vite
       'process.env.REACT_APP_BACKEND_URL': JSON.stringify(env.REACT_APP_BACKEND_URL || ''),
+      'process.env.REACT_APP_MIDTRANS_CLIENT_KEY': JSON.stringify(env.REACT_APP_MIDTRANS_CLIENT_KEY || ''),
+      'process.env.REACT_APP_MIDTRANS_IS_PRODUCTION': JSON.stringify(env.REACT_APP_MIDTRANS_IS_PRODUCTION || ''),
     },
     build: {
       minify: 'esbuild',

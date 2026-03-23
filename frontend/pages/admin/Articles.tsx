@@ -18,52 +18,10 @@ import PageHeader from '../../components/ui/page-header';
 import StatsGrid from '../../components/ui/stats-grid';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import EmptyState from '../../components/ui/empty-state';
-import axios from 'axios';
 import { getApiErrorMessage } from '../../services/api-error';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
-
-// ── ImageUploader ──
-const ImageUploader = ({ value, onChange, placeholder = 'Upload gambar artikel' }) => {
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const handleFile = async (file) => {
-    if (!file) return;
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await axios.post(`${BACKEND_URL}/api/upload/image`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      onChange(res.data.url);
-    } catch { onChange(URL.createObjectURL(file)); }
-    finally { setUploading(false); }
-  };
-
-  const previewSrc = value ? (value.startsWith('http') ? value : `${BACKEND_URL}${value}`) : null;
-
-  return (
-    <div className="space-y-2">
-      {previewSrc ? (
-        <div className="relative w-full h-48 rounded-xl overflow-hidden border border-yellow-400/20">
-          <img src={previewSrc} alt="preview" className="w-full h-full object-cover" />
-          <button type="button" onClick={() => onChange('')} className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1">
-            <X className="w-3.5 h-3.5" />
-          </button>
-          <button type="button" onClick={() => fileInputRef.current.click()} className="absolute bottom-2 right-2 bg-black/60 hover:bg-black/80 text-white text-xs px-3 py-1.5 rounded-lg backdrop-blur-sm">
-            Ganti Gambar
-          </button>
-        </div>
-      ) : (
-        <button type="button" onClick={() => fileInputRef.current.click()} disabled={uploading}
-          className="w-full h-48 border-2 border-dashed border-yellow-400/30 hover:border-yellow-400/60 rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-yellow-400 transition-colors">
-          {uploading ? <Loader2 className="w-8 h-8 animate-spin" /> : <><Upload className="w-8 h-8" /><span className="text-sm">{placeholder}</span></>}
-        </button>
-      )}
-      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => handleFile(e.target.files[0])} />
-    </div>
-  );
-};
+import SharedImageUploader from '../../components/admin/SharedImageUploader.tsx';
+import { resolveBackendAssetUrl, uploadAdminImage } from '../../lib/admin-media';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 // ── RichTextEditor Toolbar ──
 const ToolbarButton = ({ active, onClick, title, children }) => (
@@ -97,10 +55,13 @@ const RichTextEditor = ({ content, onChange }) => {
     if (!file || !editor) return;
     setUploadingInline(true);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await axios.post(`${BACKEND_URL}/api/upload/image`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      editor.chain().focus().setImage({ src: res.data.url }).run();
+      const res = await uploadAdminImage(file, {
+        category: 'articles',
+        name: file.name,
+      });
+      if (res?.url) {
+        editor.chain().focus().setImage({ src: res.url }).run();
+      }
     } catch {
       const url = URL.createObjectURL(file);
       editor.chain().focus().setImage({ src: url }).run();
@@ -155,6 +116,7 @@ const RichTextEditor = ({ content, onChange }) => {
 
 const Articles = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
@@ -166,6 +128,10 @@ const Articles = () => {
     title: '', content: '', excerpt: '', category: 'berita', tags: '', isPublished: true, imageUrl: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const canCreateArticle = adminAccess.hasPermission('articles.create');
+  const canEditArticle = adminAccess.hasPermission('articles.edit');
+  const canDeleteArticle = adminAccess.hasPermission('articles.delete');
+  const canManageArticle = adminAccess.hasPermission('articles.manage');
 
   useEffect(() => { loadData(); }, []);
 
@@ -180,6 +146,7 @@ const Articles = () => {
   };
 
   const handleOpenCreate = () => {
+    if (!canCreateArticle) return;
     setEditingArticle(null);
     setFormData({ title: '', content: '', excerpt: '', category: 'berita', tags: '', isPublished: true, imageUrl: '' });
     setPreviewMode('edit');
@@ -187,6 +154,7 @@ const Articles = () => {
   };
 
   const handleOpenEdit = (article) => {
+    if (!canEditArticle) return;
     setEditingArticle(article);
     setFormData({
       title: article.title, content: article.content, excerpt: article.excerpt || '',
@@ -199,6 +167,7 @@ const Articles = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (editingArticle ? !canEditArticle : !canCreateArticle) return;
     setSubmitting(true);
     try {
       const payload = {
@@ -221,6 +190,7 @@ const Articles = () => {
   };
 
   const handleDelete = async (article) => {
+    if (!canDeleteArticle) return;
     if (!window.confirm(`Hapus artikel "${article.title}"`)) return;
     try {
       await articlesAPI.delete(article._id);
@@ -230,6 +200,7 @@ const Articles = () => {
   };
 
   const togglePublish = async (article) => {
+    if (!canManageArticle) return;
     try {
       await articlesAPI.update(article._id, { ...article, isPublished: !article.isPublished });
       toast({ title: 'Berhasil', description: `Artikel ${!article.isPublished ? 'dipublikasikan' : 'disembunyikan'}` });
@@ -242,9 +213,7 @@ const Articles = () => {
     article.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const previewImgSrc = formData.imageUrl
-    ? (formData.imageUrl.startsWith('http') ? formData.imageUrl : `${BACKEND_URL}${formData.imageUrl}`)
-    : null;
+  const previewImgSrc = resolveBackendAssetUrl(formData.imageUrl);
   const safeStats = stats || {};
 
   if (loading) return <LoadingSpinner size="lg" text="Memuat artikel..." className="min-h-[60vh]" />;
@@ -252,7 +221,7 @@ const Articles = () => {
   return (
     <div className="space-y-6">
       <PageHeader icon={FileText} title="Artikel & Berita" description="Kelola artikel untuk halaman berita">
-        <Button onClick={handleOpenCreate} className="bg-yellow-400 text-black hover:bg-yellow-500"><Plus className="w-4 h-4 mr-2" /> Tambah Artikel</Button>
+        {canCreateArticle ? <Button onClick={handleOpenCreate} className="bg-yellow-400 text-black hover:bg-yellow-500"><Plus className="w-4 h-4 mr-2" /> Tambah Artikel</Button> : null}
       </PageHeader>
 
       <StatsGrid stats={[
@@ -271,9 +240,7 @@ const Articles = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredArticles.map((article) => {
-          const imgSrc = article.featuredImage
-            ? (article.featuredImage.startsWith('http') ? article.featuredImage : `${BACKEND_URL}${article.featuredImage}`)
-            : null;
+          const imgSrc = resolveBackendAssetUrl(article.featuredImage);
           return (
             <Card key={article._id} className="bg-[#2a2a2a] border-yellow-400/20 overflow-hidden">
               {imgSrc && <img src={imgSrc} alt={article.title} className="w-full h-40 object-cover" />}
@@ -289,15 +256,15 @@ const Articles = () => {
                 <div className="flex items-center justify-between mt-4">
                   <span className="text-gray-500 text-xs">{article.viewCount || 0} views</span>
                   <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => togglePublish(article)} className="text-gray-400 hover:text-white">
+                    {canManageArticle ? <Button size="sm" variant="ghost" onClick={() => togglePublish(article)} className="text-gray-400 hover:text-white">
                       {article.isPublished ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleOpenEdit(article)} className="text-yellow-400 hover:text-yellow-300">
+                    </Button> : null}
+                    {canEditArticle ? <Button size="sm" variant="ghost" onClick={() => handleOpenEdit(article)} className="text-yellow-400 hover:text-yellow-300">
                       <Edit2 className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDelete(article)} className="text-red-400 hover:text-red-300">
+                    </Button> : null}
+                    {canDeleteArticle ? <Button size="sm" variant="ghost" onClick={() => handleDelete(article)} className="text-red-400 hover:text-red-300">
                       <Trash2 className="w-4 h-4" />
-                    </Button>
+                    </Button> : null}
                   </div>
                 </div>
               </CardContent>
@@ -345,7 +312,13 @@ const Articles = () => {
                 {/* Gambar Utama */}
                 <div>
                   <Label className="text-white mb-2 block">Gambar Utama</Label>
-                  <ImageUploader value={formData.imageUrl} onChange={url => setFormData(f => ({ ...f, imageUrl: url }))} />
+                  <SharedImageUploader
+                    value={formData.imageUrl}
+                    onChange={url => setFormData(f => ({ ...f, imageUrl: url }))}
+                    category="articles"
+                    size="md"
+                    placeholder="Upload gambar artikel"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -393,7 +366,7 @@ const Articles = () => {
 
                 <div className="flex gap-3 pt-2 border-t border-yellow-400/20">
                   <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="flex-1 border-gray-600 text-gray-300">Batal</Button>
-                  <Button type="submit" disabled={submitting} className="flex-1 bg-yellow-400 text-black hover:bg-yellow-500">
+                  <Button type="submit" disabled={submitting || (editingArticle ? !canEditArticle : !canCreateArticle)} className="flex-1 bg-yellow-400 text-black hover:bg-yellow-500">
                     {submitting ? 'Menyimpan...' : editingArticle ? 'Simpan Perubahan' : 'Terbitkan Artikel'}
                   </Button>
                 </div>

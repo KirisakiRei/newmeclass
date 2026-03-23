@@ -10,6 +10,7 @@ import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner, { CardGridSkeleton } from '../../components/ui/loading-spinner';
 import SharedImageUploader from '../../components/admin/SharedImageUploader.jsx';
 import { websiteContentAPI } from '../../services/api';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const EMPTY_SLIDE = {
   title: '', subtitle: '', description: '', badge: '',
@@ -102,9 +103,14 @@ const SlideModal = ({ slide, onSave, onClose }) => {
 
 const HeroSlides = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [slides, setSlides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalSlide, setModalSlide] = useState(null); // null = closed, {} = add, {...slide} = edit
+  const canCreateSlide = adminAccess.hasPermission('hero_slides.create');
+  const canEditSlide = adminAccess.hasPermission('hero_slides.edit');
+  const canDeleteSlide = adminAccess.hasPermission('hero_slides.delete');
+  const canManageSlide = adminAccess.hasPermission('hero_slides.manage');
 
   const load = async () => {
     setLoading(true);
@@ -121,6 +127,7 @@ const HeroSlides = () => {
   useEffect(() => { load(); }, []);
 
   const handleSave = async (form) => {
+    if (form._id ? !canEditSlide : !canCreateSlide) return;
     try {
       if (form._id) {
         await websiteContentAPI.updateHeroSlide(form._id, form);
@@ -137,6 +144,7 @@ const HeroSlides = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!canDeleteSlide) return;
     if (!window.confirm('Hapus slide ini')) return;
     try {
       await websiteContentAPI.deleteHeroSlide(id);
@@ -148,6 +156,7 @@ const HeroSlides = () => {
   };
 
   const handleToggleActive = async (slide) => {
+    if (!canManageSlide) return;
     try {
       const updated = { ...slide, isActive: !slide.isActive };
       await websiteContentAPI.updateHeroSlide(slide._id, updated);
@@ -159,6 +168,7 @@ const HeroSlides = () => {
   };
 
   const handleMove = async (index, direction) => {
+    if (!canManageSlide) return;
     const sorted = [...slides];
     const swapIdx = direction === 'up' ? index - 1 : index + 1;
     if (swapIdx < 0 || swapIdx >= sorted.length) return;
@@ -183,9 +193,9 @@ const HeroSlides = () => {
   return (
     <div className="space-y-6">
       <PageHeader icon={Layers} title="Hero Slides" description="Kelola slide carousel utama di halaman beranda">
-        <Button onClick={() => setModalSlide(EMPTY_SLIDE)} className="bg-yellow-400 text-black hover:bg-yellow-500">
+        {canCreateSlide ? <Button onClick={() => setModalSlide(EMPTY_SLIDE)} className="bg-yellow-400 text-black hover:bg-yellow-500">
           <Plus className="w-4 h-4 mr-2" /> Tambah Slide
-        </Button>
+        </Button> : null}
       </PageHeader>
 
       {/* Stats */}
@@ -211,9 +221,9 @@ const HeroSlides = () => {
           <CardContent className="p-12 text-center text-gray-400">
             <Layers className="w-12 h-12 mx-auto mb-4 opacity-30" />
             <p className="text-lg mb-4">Belum ada hero slide</p>
-            <Button onClick={() => setModalSlide(EMPTY_SLIDE)} className="bg-yellow-400 text-black hover:bg-yellow-500">
+            {canCreateSlide ? <Button onClick={() => setModalSlide(EMPTY_SLIDE)} className="bg-yellow-400 text-black hover:bg-yellow-500">
               <Plus className="w-4 h-4 mr-2" /> Tambah Slide Pertama
-            </Button>
+            </Button> : null}
           </CardContent>
         </Card>
       ) : (
@@ -223,15 +233,15 @@ const HeroSlides = () => {
               <CardContent className="p-4 flex items-center gap-4">
                 {/* Order controls */}
                 <div className="flex flex-col items-center gap-1 shrink-0">
-                  <button onClick={() => handleMove(index, 'up')} disabled={index === 0} className="p-1 text-gray-500 hover:text-yellow-400 disabled:opacity-30 transition-colors">
+                  {canManageSlide ? <button onClick={() => handleMove(index, 'up')} disabled={index === 0} className="p-1 text-gray-500 hover:text-yellow-400 disabled:opacity-30 transition-colors">
                     <ArrowUp className="w-4 h-4" />
-                  </button>
+                  </button> : <div className="h-6" />}
                   <div className="w-7 h-7 rounded bg-yellow-400/20 flex items-center justify-center">
                     <span className="text-yellow-400 text-xs font-bold">{index + 1}</span>
                   </div>
-                  <button onClick={() => handleMove(index, 'down')} disabled={index === slides.length - 1} className="p-1 text-gray-500 hover:text-yellow-400 disabled:opacity-30 transition-colors">
+                  {canManageSlide ? <button onClick={() => handleMove(index, 'down')} disabled={index === slides.length - 1} className="p-1 text-gray-500 hover:text-yellow-400 disabled:opacity-30 transition-colors">
                     <ArrowDown className="w-4 h-4" />
-                  </button>
+                  </button> : <div className="h-6" />}
                 </div>
 
                 {/* Thumbnail */}
@@ -257,15 +267,15 @@ const HeroSlides = () => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => handleToggleActive(slide)} className={`p-1.5 rounded transition-colors ${slide.isActive ? 'text-green-400 hover:text-green-300' : 'text-gray-500 hover:text-gray-400'}`} title={slide.isActive ? 'Nonaktifkan' : 'Aktifkan'}>
+                  {canManageSlide ? <button onClick={() => handleToggleActive(slide)} className={`p-1.5 rounded transition-colors ${slide.isActive ? 'text-green-400 hover:text-green-300' : 'text-gray-500 hover:text-gray-400'}`} title={slide.isActive ? 'Nonaktifkan' : 'Aktifkan'}>
                     {slide.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  </button>
-                  <Button size="sm" onClick={() => setModalSlide(slide)} variant="outline" className="border-yellow-400/40 text-yellow-400 h-8 w-8 p-0">
+                  </button> : null}
+                  {canEditSlide ? <Button size="sm" onClick={() => setModalSlide(slide)} variant="outline" className="border-yellow-400/40 text-yellow-400 h-8 w-8 p-0">
                     <Edit className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button size="sm" onClick={() => handleDelete(slide._id)} variant="outline" className="border-red-400/40 text-red-400 h-8 w-8 p-0">
+                  </Button> : null}
+                  {canDeleteSlide ? <Button size="sm" onClick={() => handleDelete(slide._id)} variant="outline" className="border-red-400/40 text-red-400 h-8 w-8 p-0">
                     <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  </Button> : null}
                 </div>
               </CardContent>
             </Card>
@@ -285,4 +295,3 @@ const HeroSlides = () => {
 };
 
 export default HeroSlides;
-

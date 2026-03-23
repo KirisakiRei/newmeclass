@@ -6,6 +6,12 @@ const ELEMENT_FALLBACK_LABELS: Record<string, string> = {
   AIR: 'Si Adaptif',
 };
 
+const SOCIAL_FALLBACK_LABELS: Record<string, string> = {
+  extrovert: 'Extrovert',
+  introvert: 'Introvert',
+  ambivert: 'Ambivert',
+};
+
 const safeObject = (value: unknown) =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, any>)
@@ -22,6 +28,52 @@ const formatLabel = (input: string) =>
     .replace(/[_-]+/g, ' ')
     .trim()
     .replace(/^\w/, (char) => char.toUpperCase());
+
+const toUpper = (value: unknown) => safeString(value).toUpperCase();
+
+export function buildFallbackPersonalityType(
+  socialType: unknown,
+  dominantElement: unknown,
+  fallbackLabel = 'Hasil Kepribadian',
+) {
+  const socialKey = safeString(socialType).toLowerCase();
+  const elementKey = toUpper(dominantElement);
+  const socialLabel = SOCIAL_FALLBACK_LABELS[socialKey];
+  const elementLabel = ELEMENT_FALLBACK_LABELS[elementKey];
+
+  if (socialLabel && elementLabel) {
+    return `${socialLabel} ${elementLabel}`;
+  }
+
+  if (socialLabel && elementKey) {
+    return `${socialLabel} ${formatLabel(elementKey.toLowerCase())}`;
+  }
+
+  if (elementLabel) {
+    return elementLabel;
+  }
+
+  if (elementKey) {
+    return formatLabel(elementKey.toLowerCase());
+  }
+
+  return fallbackLabel;
+}
+
+export function buildFallbackSummary(
+  socialType: unknown,
+  dominantElement: unknown,
+  fallbackLabel = 'Hasil Kepribadian',
+) {
+  const socialKey = safeString(socialType).toLowerCase();
+  const socialLabel = SOCIAL_FALLBACK_LABELS[socialKey] || 'Kepribadian';
+  const elementKey = toUpper(dominantElement);
+  const elementLabel =
+    ELEMENT_FALLBACK_LABELS[elementKey]
+    || (elementKey ? formatLabel(elementKey.toLowerCase()) : fallbackLabel);
+
+  return `Hasil Anda saat ini menunjukkan kecenderungan ${socialLabel} dengan elemen dominan ${elementLabel}. Template narasi detail untuk kombinasi ini belum disiapkan, tetapi skor elemen utamanya sudah dihitung sesuai jawaban yang Anda berikan.`;
+}
 
 export function normalizeElementScoreMap(value: unknown) {
   const source = safeObject(value);
@@ -55,18 +107,30 @@ export function buildDisplayElementScores(template: unknown, scores: unknown) {
   );
 }
 
-export function buildDisplayAnalysis(template: unknown, scores: unknown, fallbackLabel = 'Hasil Kepribadian') {
+export function buildDisplayAnalysis(
+  template: unknown,
+  scores: unknown,
+  fallbackLabel = 'Hasil Kepribadian',
+  fallbackMeta?: { socialType?: unknown; dominantElement?: unknown },
+) {
   const templateRow = safeObject(template);
   const aiAnalysis = safeObject(templateRow.aiAnalysis);
   const insights = safeObject(templateRow.insights);
+  const fallbackPersonalityType = buildFallbackPersonalityType(
+    fallbackMeta?.socialType,
+    fallbackMeta?.dominantElement,
+    fallbackLabel,
+  );
 
   return {
     personalityType:
       safeString(aiAnalysis.personalityType)
       || safeString(insights.personalityLabel)
       || safeString(templateRow.label)
-      || fallbackLabel,
-    summary: safeString(aiAnalysis.summary),
+      || fallbackPersonalityType,
+    summary:
+      safeString(aiAnalysis.summary)
+      || buildFallbackSummary(fallbackMeta?.socialType, fallbackMeta?.dominantElement, fallbackPersonalityType),
     elementScores: buildDisplayElementScores(templateRow, scores),
     strengths: safeArray(aiAnalysis.strengths),
     areasToImprove: safeArray(aiAnalysis.areasToImprove),
@@ -74,9 +138,17 @@ export function buildDisplayAnalysis(template: unknown, scores: unknown, fallbac
   };
 }
 
-export function buildTemplateInsights(template: unknown, fallbackCode?: string) {
+export function buildTemplateInsights(
+  template: unknown,
+  fallbackCode?: string,
+  fallbackMeta?: { socialType?: unknown; dominantElement?: unknown },
+) {
   const templateRow = safeObject(template);
   const insights = safeObject(templateRow.insights);
+  const fallbackPersonalityLabel = buildFallbackPersonalityType(
+    fallbackMeta?.socialType,
+    fallbackMeta?.dominantElement,
+  );
 
   return {
     ...insights,
@@ -84,14 +156,20 @@ export function buildTemplateInsights(template: unknown, fallbackCode?: string) 
     personalityLabel:
       safeString(insights.personalityLabel)
       || safeString(templateRow.label)
+      || fallbackPersonalityLabel
       || null,
   };
 }
 
-export function buildLegacyPremiumInsights(template: unknown, scores: unknown, fallbackLabel = 'Hasil Kepribadian') {
+export function buildLegacyPremiumInsights(
+  template: unknown,
+  scores: unknown,
+  fallbackLabel = 'Hasil Kepribadian',
+  fallbackMeta?: { socialType?: unknown; dominantElement?: unknown },
+) {
   const templateRow = safeObject(template);
   const insights = safeObject(templateRow.insights);
-  const displayAnalysis = buildDisplayAnalysis(templateRow, scores, fallbackLabel);
+  const displayAnalysis = buildDisplayAnalysis(templateRow, scores, fallbackLabel, fallbackMeta);
   const kompilasiAdaptasi = safeObject(insights.kompilasiAdaptasi);
 
   return {

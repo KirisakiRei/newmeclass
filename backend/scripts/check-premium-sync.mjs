@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { Prisma, PrismaClient } from '@prisma/client';
 import {
+  extractItems,
   requestJson,
   saveReport,
   uniqueEmail,
@@ -325,8 +326,9 @@ async function main() {
 
   const adminPremiumList = await requestJson('/test-results/admin/premium-results', { token: adminToken });
   requireOk('admin premium list', adminPremiumList);
-  requireCondition(Array.isArray(adminPremiumList.data), 'admin premium list harus berupa array.');
-  const adminListItem = adminPremiumList.data.find((item) => item.userId === testUser._id);
+  const adminPremiumItems = extractItems(adminPremiumList.body);
+  requireCondition(Array.isArray(adminPremiumItems), 'admin premium list harus berupa array.');
+  const adminListItem = adminPremiumItems.find((item) => item.userId === testUser._id);
   requireCondition(!!adminListItem, 'User hasil premium tidak ditemukan di admin premium list.');
   assertStandardResult('admin premium list item', adminListItem, expected);
 
@@ -347,8 +349,9 @@ async function main() {
 
   const yayasanResults = await requestJson('/yayasan/test-results', { token: yayasanToken });
   requireOk('yayasan test results', yayasanResults);
-  requireCondition(Array.isArray(yayasanResults.data), 'yayasan test results harus berupa array.');
-  const yayasanListItem = yayasanResults.data.find((item) => item.userId === testUser._id);
+  const yayasanResultItems = extractItems(yayasanResults.body);
+  requireCondition(Array.isArray(yayasanResultItems), 'yayasan test results harus berupa array.');
+  const yayasanListItem = yayasanResultItems.find((item) => item.userId === testUser._id);
   requireCondition(!!yayasanListItem, 'User hasil premium tidak ditemukan di yayasan test results.');
   assertStandardResult('yayasan test results item', yayasanListItem, expected);
 

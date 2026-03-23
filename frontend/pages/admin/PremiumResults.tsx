@@ -12,11 +12,17 @@ import StatsGrid from '../../components/ui/stats-grid';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import EmptyState from '../../components/ui/empty-state';
 import { formatDateTime } from '../../lib/utils';
+import Pagination from '../../components/ui/pagination';
+import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const asArray = (value) => (Array.isArray(value) ? value : []);
 const asObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
 const extractPayload = (value) => (value && typeof value === 'object' && 'data' in value ? value.data : value);
+const asNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 const PremiumResults = () => {
   const { toast } = useToast();
@@ -27,20 +33,29 @@ const PremiumResults = () => {
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [stats, setStats] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [pagination, setPagination] = useState(createEmptyPageState(10));
 
   useEffect(() => {
     loadResults();
     loadStats();
-  }, []);
+  }, [page, pageSize, searchTerm]);
 
   const loadResults = async () => {
     try {
       const token = localStorage.getItem('admin_token');
       const response = await axios.get(`${API_URL}/api/test-results/admin/premium-results`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          page,
+          pageSize,
+          search: searchTerm || undefined,
+        },
       });
-      const payload = extractPayload(response.data);
-      setResults(Array.isArray(payload) ? payload : payload?.results || []);
+      const nextPage = extractPaginatedResponse(response.data, pageSize);
+      setResults(nextPage.items || []);
+      setPagination(nextPage);
     } catch (error) {
       toast({
         title: 'Error',
@@ -89,13 +104,6 @@ const PremiumResults = () => {
     return formatDateTime(dateString);
   };
 
-  const filteredResults = results.filter(r => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (r.userName || '').toLowerCase().includes(search) ||
-           (r.userEmail || '').toLowerCase().includes(search);
-  });
-
   const getElementColor = (element) => {
     const colors = {
       'KAYU': 'text-green-400 bg-green-400/20',
@@ -112,13 +120,31 @@ const PremiumResults = () => {
   }
 
   const selectedAnalysis = asObject(selectedResult?.displayAnalysis);
-  const selectedElementScores = asObject(selectedAnalysis.elementScores);
+  const selectedCoreScoring = asObject(selectedResult?.coreScoring || selectedResult?.analysis?.coreScoring);
   const selectedStrengths = asArray(selectedAnalysis.strengths);
   const selectedAreasToImprove = asArray(selectedAnalysis.areasToImprove);
   const selectedCareerRecommendations = asArray(selectedAnalysis.careerRecommendations);
   const selectedLocation = [selectedResult?.userProvince, selectedResult?.userCity].filter(Boolean).join(', ') || '-';
   const selectedTitle = selectedResult?.userName || selectedResult?.userEmail || 'Pengguna Premium';
-
+  const selectedDominantRanks = Object.keys(selectedCoreScoring).length > 0
+    ? [
+        {
+          rank: 'Dominan I',
+          element: selectedCoreScoring.dominan_1_elemen,
+          percentage: asNumber(selectedCoreScoring.dominan_1_persentase),
+        },
+        {
+          rank: 'Dominan II',
+          element: selectedCoreScoring.dominan_2_elemen,
+          percentage: asNumber(selectedCoreScoring.dominan_2_persentase),
+        },
+        {
+          rank: 'Dominan III',
+          element: selectedCoreScoring.dominan_3_elemen,
+          percentage: asNumber(selectedCoreScoring.dominan_3_persentase),
+        },
+      ].filter((item) => item.element)
+    : [];
   return (
     <div className="space-y-6" data-testid="admin-premium-results">
       {/* Header */}
@@ -136,19 +162,22 @@ const PremiumResults = () => {
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-        <Input
-          type="text"
-          placeholder="Cari berdasarkan nama atau email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 bg-[#2a2a2a] border-yellow-400/30 text-white"
-        />
+          <Input
+            type="text"
+            placeholder="Cari berdasarkan nama atau email..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
+            className="pl-10 bg-[#2a2a2a] border-yellow-400/30 text-white"
+          />
       </div>
 
       {/* Results List */}
       <Card className="bg-[#2a2a2a] border-yellow-400/20">
         <CardHeader>
-          <CardTitle className="text-white">Daftar Hasil Premium ({filteredResults.length})</CardTitle>
+          <CardTitle className="text-white">Daftar Hasil Premium ({pagination.total})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -163,7 +192,7 @@ const PremiumResults = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredResults.map((result, idx) => (
+                {results.map((result, idx) => (
                   <tr key={idx} className="border-b border-gray-700 hover:bg-[#1a1a1a]">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
@@ -203,11 +232,23 @@ const PremiumResults = () => {
             </table>
           </div>
 
-          {filteredResults.length === 0 && (
+          {results.length === 0 && (
             <EmptyState icon={Trophy} title="Tidak ada hasil premium ditemukan" className="py-8" />
           )}
         </CardContent>
       </Card>
+
+      <Pagination
+        currentPage={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.total}
+        pageSize={pagination.pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(nextSize) => {
+          setPageSize(nextSize);
+          setPage(1);
+        }}
+      />
 
       {/* Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
@@ -259,36 +300,31 @@ const PremiumResults = () => {
                           <p className="text-gray-400">
                             Dominan: {selectedResult.dominantElement || '-'}
                           </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="rounded-full bg-black/20 px-3 py-1 text-xs font-bold text-yellow-100">
+                              Kode: {selectedResult.personalityCode || '-'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <p className="text-gray-300">{selectedAnalysis.summary || 'Ringkasan hasil kepribadian belum tersedia.'}</p>
                     </CardContent>
                   </Card>
 
-                  {/* Element Scores */}
-                  {Object.keys(selectedElementScores).length > 0 && (
+                  {selectedDominantRanks.length > 0 && (
                     <Card className="bg-[#1a1a1a] border-yellow-400/20">
                       <CardHeader>
                         <CardTitle className="text-white flex items-center gap-2">
-                          <Star className="w-5 h-5 text-yellow-400" /> Skor 5 Elemen
+                          <Trophy className="w-5 h-5 text-yellow-400" /> Dominan Core Scoring
                         </CardTitle>
                       </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          {Object.entries(selectedElementScores).map(([element, data]) => (
-                            <div key={element} className="space-y-1">
-                              <div className="flex items-center justify-between">
-                                <span className={getElementColor(element).split(' ')[0]}>
-                                  {element} - {data?.label || element}
-                                </span>
-                                <span className="text-white font-bold">{data?.percentage || 0}%</span>
-                              </div>
-                              <div className="h-2 bg-[#2a2a2a] rounded-full overflow-hidden">
-                                <div 
-                                  className={`h-full ${getElementColor(element).split(' ')[1]}`}
-                                  style={{ width: `${data?.percentage || 0}%` }}
-                                />
-                              </div>
+                      <CardContent className="space-y-4">
+                        <div className="grid gap-3 md:grid-cols-3">
+                          {selectedDominantRanks.map((item) => (
+                            <div key={item.rank} className="rounded-lg border border-yellow-400/15 bg-yellow-400/5 p-4">
+                              <p className="text-xs font-bold uppercase tracking-wider text-yellow-300">{item.rank}</p>
+                              <p className="mt-2 text-lg font-bold text-white">{item.element}</p>
+                              <p className="mt-1 text-2xl font-black text-yellow-400">{item.percentage.toFixed(2)}%</p>
                             </div>
                           ))}
                         </div>

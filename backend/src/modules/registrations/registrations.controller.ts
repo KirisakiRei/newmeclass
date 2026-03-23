@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('registrations')
@@ -13,6 +13,11 @@ export class RegistrationsController {
   @Get()
   getAll() {
     return this.prisma.registrationLead.findMany({ orderBy: { createdAt: 'desc' } });
+  }
+
+  @Get(':id')
+  getById(@Param('id') id: string) {
+    return this.prisma.registrationLead.findUnique({ where: { id } });
   }
 
   @Get('stats/summary')

@@ -35,6 +35,13 @@ import {
   serializeCertificateTemplateForStorage,
 } from 'src/common/demo-frontend-reference';
 import { mapTestResultForClient } from 'src/common/mappers/test-result-client-shapes';
+import {
+  pickPreferredPersonalityTemplate,
+  stripPersonalityCodeModifier,
+} from 'src/common/personality-template-catalog';
+import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
+import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
+import { AdminRbacService } from '../admin-rbac/admin-rbac.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const CERT_DOWNLOAD_RATE_LIMIT_TTL_MS = Number(process.env.CERT_DOWNLOAD_RATE_LIMIT_TTL || 60) * 1000;
@@ -44,7 +51,10 @@ const CERT_GENERATE_RATE_LIMIT = Number(process.env.CERT_GENERATE_RATE_LIMIT || 
 
 @Controller('certificates')
 export class CertificatesController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly adminRbacService: AdminRbacService,
+  ) {}
 
   private safeObject(value: unknown) {
     return value && typeof value === 'object' && !Array.isArray(value)
@@ -82,6 +92,7 @@ export class CertificatesController {
               email: true,
               fullName: true,
               phone: true,
+              myReferralCode: true,
               role: true,
               profile: {
                 select: {
@@ -180,22 +191,28 @@ export class CertificatesController {
     dominantElement?: string | null;
   }) {
     await ensureDemoPersonalityTemplates(this.prisma);
+    const preferredCode = stripPersonalityCodeModifier(result.personalityCode);
 
-    if (result.personalityCode) {
+    for (const candidateCode of [result.personalityCode, preferredCode]) {
+      if (!candidateCode) continue;
       const byCode = await this.prisma.personalityResultTemplate.findUnique({
-        where: { code: result.personalityCode },
+        where: { code: candidateCode },
       });
       if (byCode) return byCode;
     }
 
     if (result.socialType && result.dominantElement) {
-      const byElement = await this.prisma.personalityResultTemplate.findFirst({
+      const byElement = await this.prisma.personalityResultTemplate.findMany({
         where: {
           socialType: result.socialType,
           element: result.dominantElement.toLowerCase(),
         },
       });
-      if (byElement) return byElement;
+      const preferredTemplate = pickPreferredPersonalityTemplate(
+        byElement,
+        preferredCode || result.personalityCode || null,
+      );
+      if (preferredTemplate) return preferredTemplate;
     }
 
     return null;
@@ -309,8 +326,13 @@ export class CertificatesController {
   }
 
   private async assertCertificateAccess(currentUser: any, userId: string) {
-    const isSelfOrAdmin =
-      currentUser.sub === userId || [Role.ADMIN, Role.SUPERADMIN].includes(currentUser.role);
+    const isAdminActor =
+      currentUser && [Role.ADMIN, Role.SUPERADMIN, Role.OPERATOR, Role.DEVELOPER].includes(currentUser.role);
+    const isSelfOrAdmin = currentUser.sub === userId || isAdminActor;
+
+    if (isAdminActor) {
+      await this.adminRbacService.assertPermission(currentUser.sub, 'certificates.view');
+    }
 
     if (!isSelfOrAdmin && currentUser.role === Role.YAYASAN) {
       const yayasan = await this.prisma.user.findUnique({
@@ -340,6 +362,7 @@ export class CertificatesController {
         id: true,
         fullName: true,
         email: true,
+        myReferralCode: true,
         profile: {
           select: {
             extra: true,
@@ -403,8 +426,9 @@ export class CertificatesController {
     };
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('certificates.view')
   @Get('template')
   async getTemplate(@Query('certType') certType?: string) {
     const resolvedType = this.toCertificateType(certType);
@@ -415,8 +439,9 @@ export class CertificatesController {
     return mapCertificateTemplateForClient(this.prisma, row);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('certificates.edit')
   @Put('template')
   async updateTemplate(@Body() body: any) {
     const resolvedType = this.toCertificateType(body.certType);
@@ -439,8 +464,9 @@ export class CertificatesController {
     return mapCertificateTemplateForClient(this.prisma, updated);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('certificates.manage')
   @UseInterceptors(FileInterceptor('file', {
     storage: diskStorage({
       destination: (_req, _file, callback) => {
@@ -477,16 +503,36 @@ export class CertificatesController {
     };
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('certificates.view')
   @Get('issued')
-  async issued() {
+  async issued(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('search') search?: string,
+  ) {
     const rows = await this.prisma.issuedCertificate.findMany({ orderBy: { issuedAt: 'desc' } });
-    return Promise.all(rows.map((row) => this.enrichCertificate(row)));
+    const enriched = await Promise.all(rows.map((row) => this.enrichCertificate(row)));
+    const normalizedSearch = String(search || '').trim().toLowerCase();
+    const filtered = normalizedSearch
+      ? enriched.filter((row) => `${row?.certificateNumber || ''} ${row?.userName || ''} ${row?.userEmail || ''} ${row?.courseName || ''}`.toLowerCase().includes(normalizedSearch))
+      : enriched;
+    const safePage = Math.max(Number(page || 1), 1);
+    const safePageSize = Math.min(Math.max(Number(pageSize || 10), 1), 100);
+    const start = (safePage - 1) * safePageSize;
+    return {
+      items: filtered.slice(start, start + safePageSize),
+      total: filtered.length,
+      page: safePage,
+      pageSize: safePageSize,
+      totalPages: Math.max(Math.ceil(filtered.length / safePageSize), 1),
+    };
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('certificates.create')
   @Post('issue')
   async issue(@Body() body: any) {
     const certType = this.toCertificateType(body.certType);
@@ -527,8 +573,9 @@ export class CertificatesController {
     return this.enrichCertificate(created);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPERADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('certificates.view')
   @Get('detail/:id')
   async detail(@Param('id') id: string) {
     const cert = await this.prisma.issuedCertificate.findUnique({ where: { id } });
@@ -575,6 +622,11 @@ export class CertificatesController {
       userId: targetUser.id,
       userName: targetUser.fullName,
       userEmail: targetUser.email,
+      memberCode:
+        this.safeObject(targetUser.profile?.extra).memberCode
+        || this.safeObject(targetUser.profile?.extra).publicCode
+        || targetUser.myReferralCode
+        || null,
       template,
       result,
     };

@@ -57,6 +57,7 @@ const normalizeArticle = (item: Record<string, any>) => {
 const normalizeBanner = (item: Record<string, any>) => {
   const next = { ...item };
   if (typeof next.isActive === "undefined") next.isActive = PUBLISHED_STATUS.has(next.status);
+  if (!next.link && next.linkUrl) next.link = next.linkUrl;
   return next;
 };
 

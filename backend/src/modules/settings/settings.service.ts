@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
+import { DEFAULT_DEV_FEE_PERCENT, MIN_PREMIUM_PRICE, resolveCanonicalDevFeePercent, resolveCanonicalPaymentAmount } from 'src/common/settings/finance-settings';
 import { PrismaService } from '../prisma/prisma.service';
 
 const DEFAULT_SETTINGS: Record<string, any> = {
@@ -145,6 +147,9 @@ const DEFAULT_SETTINGS: Record<string, any> = {
   },
 };
 
+const REMOVED_SETTING_KEYS = new Set(['paydisiniApiId', 'paydisiniApiKey']);
+const TEAM_MANAGEMENT_KEYS = new Set(['boardOfDirectors', 'teamSupport', 'partners']);
+
 @Injectable()
 export class SettingsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -161,18 +166,66 @@ export class SettingsService {
   async getAll() {
     const rows = await this.prisma.setting.findMany();
     const obj: Record<string, any> = { ...DEFAULT_SETTINGS };
-    for (const row of rows) obj[row.key] = row.value;
-    obj.paymentAmount = Math.max(Number(obj.paymentAmount || obj.testPrice || 100000), 100000);
-    obj.testPrice = Math.max(Number(obj.testPrice || obj.paymentAmount || 100000), 100000);
+    for (const row of rows) {
+      if (REMOVED_SETTING_KEYS.has(row.key)) continue;
+      obj[row.key] = row.value;
+    }
+    delete obj.paydisiniApiId;
+    delete obj.paydisiniApiKey;
+    obj.paymentAmount = resolveCanonicalPaymentAmount(obj);
+    obj.testPrice = obj.paymentAmount;
+    obj.devFeePercent = resolveCanonicalDevFeePercent(obj);
     return obj;
   }
 
   async updateAll(data: Record<string, unknown>) {
-    const entries = Object.entries(data || {});
+    const current = await this.getAll();
+    const payload = { ...(data || {}) } as Record<string, any>;
+    const nextPaymentAmount = resolveCanonicalPaymentAmount(payload.paymentAmount !== undefined || payload.testPrice !== undefined
+      ? { ...current, ...payload }
+      : current);
+    const nextDevFeePercent = resolveCanonicalDevFeePercent(payload.devFeePercent !== undefined ? { ...current, ...payload } : current);
+    const pricingChanged =
+      nextPaymentAmount !== resolveCanonicalPaymentAmount(current)
+      || nextDevFeePercent !== resolveCanonicalDevFeePercent(current);
+
+    if (pricingChanged && String(payload.confirmationText || '').trim().toUpperCase() !== 'KONFIRMASI') {
+      throw new BadRequestException('Perubahan pricing memerlukan konfirmasi teks KONFIRMASI.');
+    }
+
+    delete payload.confirmationText;
+    if (payload.paymentAmount !== undefined || payload.testPrice !== undefined) {
+      payload.paymentAmount = nextPaymentAmount;
+      payload.testPrice = nextPaymentAmount;
+    }
+    if (payload.devFeePercent !== undefined) {
+      payload.devFeePercent = nextDevFeePercent;
+    }
+
+    const entries = Object.entries(payload).filter(([key]) => !REMOVED_SETTING_KEYS.has(key));
     for (const [key, value] of entries) {
       await this.prisma.setting.upsert({ where: { key }, create: { key, value: value as any }, update: { value: value as any } });
     }
     return this.getAll();
+  }
+
+  async getTeamManagement() {
+    const all = await this.getAll();
+    return {
+      boardOfDirectors: Array.isArray(all.boardOfDirectors) ? all.boardOfDirectors : [],
+      teamSupport: Array.isArray(all.teamSupport) ? all.teamSupport : [],
+      partners: Array.isArray(all.partners) ? all.partners : [],
+    };
+  }
+
+  async updateTeamManagementSection(sectionKey: string, items: unknown) {
+    if (!TEAM_MANAGEMENT_KEYS.has(sectionKey)) {
+      throw new Error(`Unsupported team management section: ${sectionKey}`);
+    }
+    await this.updateAll({
+      [sectionKey]: Array.isArray(items) ? items : [],
+    });
+    return this.getTeamManagement();
   }
 
   async getJenjangConfig() {
@@ -200,45 +253,57 @@ export class SettingsService {
   async getTestPrice() {
     const paymentAmountRow = await this.prisma.setting.findUnique({ where: { key: 'paymentAmount' } });
     if (typeof paymentAmountRow?.value === 'number') {
-      return { testPrice: Math.max(Number(paymentAmountRow.value), 100000) };
+      return { testPrice: Math.max(Number(paymentAmountRow.value), MIN_PREMIUM_PRICE) };
     }
 
     const row = await this.prisma.setting.findUnique({ where: { key: 'general' } });
     const value = (row?.value as any) || {};
-    return { testPrice: Math.max(Number(value.paymentAmount || value.testPrice || 100000), 100000) };
+    return { testPrice: resolveCanonicalPaymentAmount(value) };
   }
 
   async getGeneral() {
     const row = await this.prisma.setting.findUnique({ where: { key: 'general' } });
-    const value = (row?.value as any) || { testPriceSettings: { basePrice: 100000 } };
+    const value = (row?.value as any) || { testPriceSettings: { basePrice: MIN_PREMIUM_PRICE } };
     if (!value.testPriceSettings) {
-      value.testPriceSettings = { basePrice: value.testPrice || 100000 };
+      value.testPriceSettings = { basePrice: value.testPrice || MIN_PREMIUM_PRICE };
     }
-    value.testPriceSettings.basePrice = Math.max(Number(value.testPriceSettings.basePrice || value.testPrice || 100000), 100000);
+    value.testPriceSettings.basePrice = resolveCanonicalPaymentAmount({
+      paymentAmount: value.testPriceSettings.basePrice,
+      testPrice: value.testPrice,
+    });
     return value;
   }
 
   async getSystemSummary() {
     const all = await this.getAll();
     const gatewayConfigured = !!String(process.env.MIDTRANS_SERVER_KEY || '').trim();
+    const payoutProvider = String(process.env.DISBURSEMENT_PROVIDER || 'manual').trim().toLowerCase() || 'manual';
     return {
       pricing: {
-        testPrice: Math.max(Number(all.paymentAmount || all.testPrice || 100000), 100000),
+        testPrice: resolveCanonicalPaymentAmount(all),
         referralTotalPrice: 250000,
         referralShareBudget: 150000,
         yayasanPricingManagedBy: 'mitra_approval_and_admin_review',
       },
       developerFee: {
-        percent: Math.max(Number(all.devFeePercent || 5), 0),
+        percent: resolveCanonicalDevFeePercent(all),
         bankName: all.devBankName || '',
         bankAccount: all.devBankAccount || '',
         accountName: all.devAccountName || '',
       },
       paymentGateway: {
+        provider: 'MIDTRANS',
         activeProvider: 'MIDTRANS',
         mode: String(process.env.MIDTRANS_IS_PRODUCTION || 'false').toLowerCase() === 'true' ? 'production' : 'sandbox',
         isConfigured: gatewayConfigured,
-        legacyPaydisiniConfigured: !!String(all.paydisiniApiKey || '').trim(),
+      },
+      payoutGateway: {
+        provider: payoutProvider,
+        activeProvider: payoutProvider,
+        mode: String(process.env.MIDTRANS_IS_PRODUCTION || 'false').toLowerCase() === 'true' ? 'production' : 'sandbox',
+        isConfigured: payoutProvider === 'manual' || payoutProvider === 'mock'
+          ? true
+          : !!String(process.env.MIDTRANS_IRIS_API_KEY || process.env.MIDTRANS_IRIS_SANDBOX_API_KEY || process.env.MIDTRANS_IRIS_PRODUCTION_API_KEY || '').trim(),
       },
       featureFlags: {
         allowRegistration: !!all.allowRegistration,

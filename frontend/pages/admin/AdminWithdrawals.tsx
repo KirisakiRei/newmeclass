@@ -13,18 +13,22 @@ import LoadingSpinner from '../../components/ui/loading-spinner';
 import EmptyState from '../../components/ui/empty-state';
 import { formatCurrency } from '../../lib/utils';
 import axios from 'axios';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 export default function AdminWithdrawals() {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [withdrawals, setWithdrawals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showDialog, setShowDialog] = useState(false);
   const [actionType, setActionType] = useState('approve');
   const [notes, setNotes] = useState('');
+  const [providerMode, setProviderMode] = useState('mock');
   const [processing, setProcessing] = useState(false);
+  const canManageWithdrawals = adminAccess.hasPermission('yayasan_withdrawals.manage');
 
   const token = () => localStorage.getItem('admin_token');
   const headers = () => ({ Authorization: `Bearer ${token()}` });
@@ -34,7 +38,8 @@ export default function AdminWithdrawals() {
   const loadWithdrawals = async () => {
     try {
       const res = await axios.get(`${API_URL}/api/yayasan/admin/withdrawals`, { headers: headers() });
-      setWithdrawals(res.data);
+      const payload = res?.data?.data ?? res?.data;
+      setWithdrawals(Array.isArray(payload) ? payload : payload?.items || []);
     } catch (e) {
       console.error('Error loading withdrawals:', e);
     } finally {
@@ -43,19 +48,30 @@ export default function AdminWithdrawals() {
   };
 
   const handleAction = (item, type) => {
+    if (!canManageWithdrawals) return;
     setSelectedItem(item);
     setActionType(type);
     setNotes('');
+    setProviderMode('mock');
     setShowDialog(true);
   };
 
   const confirmAction = async () => {
-    if (!selectedItem) return;
+    if (!canManageWithdrawals || !selectedItem) return;
+    const withdrawalId = selectedItem?.id || selectedItem?._id;
+    if (!withdrawalId) {
+      toast({
+        title: 'ID penarikan tidak ditemukan',
+        description: 'Data penarikan ini belum memiliki identitas yang valid. Silakan refresh daftar lalu coba lagi.',
+        variant: 'destructive'
+      });
+      return;
+    }
     setProcessing(true);
     try {
       await axios.put(
-        `${API_URL}/api/yayasan/admin/withdrawals/${selectedItem._id}/approve`,
-        { status: actionType === 'approve' ? 'approved' : 'rejected', notes },
+        `${API_URL}/api/yayasan/admin/withdrawals/${withdrawalId}/${actionType === 'approve' ? 'approve' : 'reject'}`,
+        { status: actionType === 'approve' ? 'APPROVED' : 'REJECTED', notes, providerMode },
         { headers: headers() }
       );
       toast({
@@ -112,7 +128,7 @@ export default function AdminWithdrawals() {
           ) : (
             <div className="divide-y divide-yellow-400/10">
               {withdrawals.map((w) => (
-                <div key={w._id} className="p-4 hover:bg-[#333]">
+                <div key={w.id || w._id} className="p-4 hover:bg-[#333]">
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 bg-yellow-400/20 rounded-full flex items-center justify-center shrink-0">
@@ -140,13 +156,14 @@ export default function AdminWithdrawals() {
                         {w.status === 'rejected' && <XCircle className="w-3 h-3" />}
                         {w.status === 'pending' ? 'Menunggu' : w.status === 'approved' ? 'Disetujui' : 'Ditolak'}
                       </span>
-                      <p className="text-gray-500 text-xs mt-1">
-                        {w.createdAt ? new Date(w.createdAt).toLocaleDateString('id-ID') : '-'}
-                      </p>
+                        <p className="text-gray-500 text-xs mt-1">
+                          {w.createdAt ? new Date(w.createdAt).toLocaleDateString('id-ID') : '-'}
+                        </p>
+                        {w.providerStatus ? <p className="mt-1 text-[11px] text-gray-500">{String(w.provider || '-').toUpperCase()} / {w.providerStatus}</p> : null}
+                      </div>
                     </div>
-                  </div>
 
-                  {w.status === 'pending' && (
+                  {w.status === 'pending' && canManageWithdrawals && (
                     <div className="flex gap-2 mt-3 justify-end">
                       <Button
                         size="sm"
@@ -195,6 +212,16 @@ export default function AdminWithdrawals() {
                 className="bg-[#1a1a1a] border-yellow-400/30 text-white mt-1"
               />
             </div>
+            {actionType === 'approve' ? (
+              <div>
+                <Label className="text-gray-400">Mode Proses</Label>
+                <select value={providerMode} onChange={(event) => setProviderMode(event.target.value)} className="mt-1 w-full rounded-lg border border-yellow-400/30 bg-[#1a1a1a] px-3 py-2 text-white">
+                  <option value="midtrans_iris">Midtrans IRIS</option>
+                  <option value="mock">Mock / QA</option>
+                  <option value="manual">Manual Fallback</option>
+                </select>
+              </div>
+            ) : null}
           </div>
 
           <div className="flex gap-3 mt-4">

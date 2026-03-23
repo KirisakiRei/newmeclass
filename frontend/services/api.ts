@@ -6,6 +6,35 @@ import { normalizeSiteSettings } from '../lib/site-settings';
 const API_BASE_URL = String(process.env.REACT_APP_BACKEND_URL || '').trim().replace(/\/+$/, '');
 const API_URL = API_BASE_URL ? `${API_BASE_URL}/api` : '/api';
 const getStoredToken = (...keys) => keys.map((key) => localStorage.getItem(key)).find(Boolean);
+const TOKEN_REFRESH_THRESHOLD_MS = 2 * 60 * 1000;
+const SESSION_META_PREFIX = 'session_meta_';
+const SESSION_ACTIVITY_PREFIX = 'session_last_activity_';
+const TOKEN_KEY_CONFIG = {
+  admin_token: {
+    idleTimeoutMs: 10 * 60 * 1000,
+    warningThresholdMs: 2 * 60 * 1000,
+    redirectTo: '/admin/login',
+    dataKeys: ['admin_token'],
+  },
+  mitra_token: {
+    idleTimeoutMs: 10 * 60 * 1000,
+    warningThresholdMs: 2 * 60 * 1000,
+    redirectTo: '/mitra/login',
+    dataKeys: ['mitra_token', 'mitra_data'],
+  },
+  yayasan_token: {
+    idleTimeoutMs: 10 * 60 * 1000,
+    warningThresholdMs: 2 * 60 * 1000,
+    redirectTo: '/yayasan/login',
+    dataKeys: ['yayasan_token', 'yayasan_data'],
+  },
+  user_token: {
+    idleTimeoutMs: 20 * 60 * 1000,
+    warningThresholdMs: 3 * 60 * 1000,
+    redirectTo: '/login',
+    dataKeys: ['user_token', 'user_data'],
+  },
+};
 const isAdminEndpoint = (url = '') => (
   url.startsWith('/admin/')
   || url.startsWith('/users')
@@ -65,24 +94,158 @@ const apiClient = axios.create({
 });
 setupInstanceAxiosNormalizer(apiClient);
 
+const refreshPromiseByTokenKey = new Map();
+
+const getRefreshPromiseKey = (tokenKey, token) => `${String(tokenKey || '')}:${String(token || '')}`;
+
+const persistSessionMeta = (tokenKey, session) => {
+  if (!tokenKey || !session) return;
+  try {
+    localStorage.setItem(`${SESSION_META_PREFIX}${tokenKey}`, JSON.stringify(session));
+  } catch {}
+};
+
+export const getSessionPolicy = (tokenKey) => TOKEN_KEY_CONFIG[tokenKey] || null;
+
+export const getSessionMeta = (tokenKey) => {
+  if (!tokenKey) return null;
+  try {
+    const raw = localStorage.getItem(`${SESSION_META_PREFIX}${tokenKey}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const recordSessionActivity = (tokenKey, ts = Date.now()) => {
+  if (!tokenKey) return;
+  try {
+    sessionStorage.setItem(`${SESSION_ACTIVITY_PREFIX}${tokenKey}`, String(ts));
+  } catch {}
+};
+
+export const getLastSessionActivity = (tokenKey) => {
+  if (!tokenKey) return Date.now();
+  try {
+    const raw = sessionStorage.getItem(`${SESSION_ACTIVITY_PREFIX}${tokenKey}`);
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : Date.now();
+  } catch {
+    return Date.now();
+  }
+};
+
+export const clearAuthStorage = (tokenKey) => {
+  const config = TOKEN_KEY_CONFIG[tokenKey];
+  if (config) {
+    config.dataKeys.forEach((key) => localStorage.removeItem(key));
+  } else if (tokenKey) {
+    localStorage.removeItem(tokenKey);
+  }
+  localStorage.removeItem(`${SESSION_META_PREFIX}${tokenKey}`);
+  sessionStorage.removeItem(`${SESSION_ACTIVITY_PREFIX}${tokenKey}`);
+};
+
+const decodeJwtPayload = (token) => {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4 || 4)) % 4);
+    return JSON.parse(window.atob(padded));
+  } catch {
+    return null;
+  }
+};
+
+const isTokenNearExpiry = (token) => {
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) return false;
+  const expiresAt = Number(payload.exp) * 1000;
+  if (!Number.isFinite(expiresAt)) return false;
+  return (expiresAt - Date.now()) <= TOKEN_REFRESH_THRESHOLD_MS;
+};
+
+const resolveTokenConfig = (url = '', method = 'get') => {
+  if (isAdminEndpoint(url) || isCertificateAdminEndpoint(url) || isReferralAdminEndpoint(url, method)) {
+    return { tokenKey: 'admin_token', token: getStoredToken('admin_token') };
+  }
+  if (isYayasanEndpoint(url)) {
+    return { tokenKey: 'yayasan_token', token: getStoredToken('yayasan_token') };
+  }
+  if (isMitraEndpoint(url)) {
+    return { tokenKey: 'mitra_token', token: getStoredToken('mitra_token') };
+  }
+  if (isCertificateUserEndpoint(url)) {
+    const tokenKey = localStorage.getItem('user_token') ? 'user_token' : 'yayasan_token';
+    return { tokenKey, token: getStoredToken('user_token', 'yayasan_token') };
+  }
+  if (url.startsWith('/auth/')) {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin') && localStorage.getItem('admin_token')) {
+      return { tokenKey: 'admin_token', token: getStoredToken('admin_token') };
+    }
+    if (localStorage.getItem('user_token')) return { tokenKey: 'user_token', token: getStoredToken('user_token') };
+    if (localStorage.getItem('yayasan_token')) return { tokenKey: 'yayasan_token', token: getStoredToken('yayasan_token') };
+    if (localStorage.getItem('mitra_token')) return { tokenKey: 'mitra_token', token: getStoredToken('mitra_token') };
+    if (localStorage.getItem('admin_token')) return { tokenKey: 'admin_token', token: getStoredToken('admin_token') };
+    return { tokenKey: null, token: null };
+  }
+  if (isUserEndpoint(url)) {
+    return { tokenKey: 'user_token', token: getStoredToken('user_token') };
+  }
+  return { tokenKey: null, token: getStoredToken('admin_token', 'user_token', 'yayasan_token', 'mitra_token') };
+};
+
+const refreshSessionToken = async (tokenKey, token, options = {}) => {
+  const { swallowError = true } = options;
+  if (!tokenKey || !token) return token;
+
+  const refreshKey = getRefreshPromiseKey(tokenKey, token);
+  const existing = refreshPromiseByTokenKey.get(refreshKey);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = axios.post(`${API_URL}/auth/refresh-session`, {}, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  }).then((response) => {
+    const refreshedToken = response?.data?.token || response?.data?.access_token || token;
+    const currentStoredToken = localStorage.getItem(tokenKey);
+    if (refreshedToken && currentStoredToken === token) {
+      localStorage.setItem(tokenKey, refreshedToken);
+      if (response?.data?.session) {
+        persistSessionMeta(tokenKey, response.data.session);
+      }
+      recordSessionActivity(tokenKey);
+    }
+    return refreshedToken;
+  }).catch((error) => {
+    if (swallowError) return token;
+    throw error;
+  }).finally(() => {
+    refreshPromiseByTokenKey.delete(refreshKey);
+  });
+
+  refreshPromiseByTokenKey.set(refreshKey, promise);
+  return promise;
+};
+
 // Add request interceptor for auth token
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
     const url = config.url || '';
     const method = config.method || 'get';
-    const token = isAdminEndpoint(url) || isCertificateAdminEndpoint(url) || isReferralAdminEndpoint(url, method) ?
-       getStoredToken('admin_token')
-      : isYayasanEndpoint(url) ?
-       getStoredToken('yayasan_token')
-      : isMitraEndpoint(url) ?
-       getStoredToken('mitra_token')
-      : isCertificateUserEndpoint(url) ?
-       getStoredToken('user_token', 'yayasan_token')
-      : url.startsWith('/auth/') ?
-       getStoredToken('user_token', 'yayasan_token', 'mitra_token')
-      : isUserEndpoint(url) ?
-       getStoredToken('user_token')
-      : getStoredToken('admin_token', 'user_token', 'yayasan_token', 'mitra_token');
+    const tokenConfig = resolveTokenConfig(url, method);
+    let token = tokenConfig.token;
+
+    if (token && url !== '/auth/refresh-session' && isTokenNearExpiry(token)) {
+      token = await refreshSessionToken(tokenConfig.tokenKey, token);
+    }
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -134,9 +297,14 @@ export const adminAPI = {
   login: (data) => apiClient.post('/admin/login', data),
   getDashboardStats: () => apiClient.get('/admin/dashboard/stats'),
   getCurrentAdmin: () => apiClient.get('/admin/me'),
-  // Admin User Management
-  getAdminUsers: () => apiClient.get('/admin/users'),
-  createAdminUser: (data) => apiClient.post('/admin/users/create', data),
+  getPermissionCatalog: () => apiClient.get('/admin/permissions'),
+  getAdminRoles: () => apiClient.get('/admin/roles'),
+  createAdminRole: (data) => apiClient.post('/admin/roles', data),
+  updateAdminRole: (roleId, data) => apiClient.put(`/admin/roles/${roleId}`, data),
+  deleteAdminRole: (roleId) => apiClient.delete(`/admin/roles/${roleId}`),
+  getAdminUsers: (params) => apiClient.get('/admin/users', { params }),
+  createAdminUser: (data) => apiClient.post('/admin/users', data),
+  updateAdminUser: (adminId, data) => apiClient.put(`/admin/users/${adminId}`, data),
   changeAdminPassword: (adminId, data) => apiClient.put(`/admin/users/${adminId}/change-password`, data),
   deleteAdminUser: (adminId) => apiClient.delete(`/admin/users/${adminId}`),
 };
@@ -164,6 +332,11 @@ export const paymentAPI = {
   approve: (id, data) => apiClient.put(`/payments/${id}/approve`, data),
   getByRegistration: (registrationId) => apiClient.get(`/payments/registration/${registrationId}`),
   getStats: () => apiClient.get('/payments/stats/summary'),
+  getOpsSummary: () => apiClient.get('/payments/ops/summary'),
+  getOpsWebhooks: (params) => apiClient.get('/payments/ops/webhooks', { params }),
+  getOpsAlerts: (params) => apiClient.get('/payments/ops/alerts', { params }),
+  acknowledgeOpsAlert: (id) => apiClient.post(`/payments/ops/alerts/${id}/acknowledge`),
+  replayWebhook: (id) => apiClient.post(`/payments/ops/webhooks/${id}/replay`),
 };
 
 // Products API
@@ -188,6 +361,7 @@ export const productsAPI = {
 export const mediaAPI = {
   getAll: (params) => apiClient.get('/media', { params }),
   create: (data) => apiClient.post('/media', data),
+  syncContentAssets: () => apiClient.post('/media/sync-content-assets'),
   delete: (id) => apiClient.delete(`/media/${id}`),
 };
 
@@ -209,11 +383,16 @@ export const websiteContentAPI = {
   createActivity: (data) => apiClient.post('/website-content/activities', data),
   updateActivity: (id, data) => apiClient.put(`/website-content/activities/${id}`, data),
   deleteActivity: (id) => apiClient.delete(`/website-content/activities/${id}`),
+  getSections: () => apiClient.get('/website-content/sections'),
+  reorderSections: (sections) => apiClient.put('/website-content/sections/reorder', { sections }),
+  updateSection: (id, data) => apiClient.put(`/website-content/sections/${id}`, data),
+  seedDefaults: () => apiClient.post('/website-content/seed-defaults'),
 };
 
 // Questions API
 export const questionsAPI = {
   getAll: (params) => apiClient.get('/questions', { params }),
+  getPublic: (params) => apiClient.get('/questions/public', { params }),
   getById: (id) => apiClient.get(`/questions/${id}`),
   seed: () => apiClient.post('/questions/seed-questions'),
   create: (data) => apiClient.post('/questions', data),
@@ -303,6 +482,8 @@ export const settingsAPI = {
       data: normalizeSiteSettings(response.data),
     };
   },
+  getTeamManagement: () => apiClient.get('/settings/team-management'),
+  updateTeamManagementSection: (sectionKey, items) => apiClient.put(`/settings/team-management/${sectionKey}`, { items }),
   getTestPrice: () => apiClient.get('/settings/test-price'),
   getSystemSummary: () => apiClient.get('/settings/system-summary'),
   update: (data) => apiClient.put('/settings', data),
@@ -323,9 +504,17 @@ export const authAPI = {
   register: (data) => apiClient.post('/auth/register', data),
   login: (data) => apiClient.post('/auth/login', data),
   getProfile: () => apiClient.get('/auth/me'),
+  refreshSession: () => apiClient.post('/auth/refresh-session'),
   updateProfile: (data) => apiClient.put('/auth/profile', data),
   changePassword: (data) => apiClient.put('/auth/change-password', data),
   getReferralLink: () => apiClient.get('/auth/referral-link'),
+};
+
+export const touchSessionForTokenKey = async (tokenKey) => {
+  const token = tokenKey ? localStorage.getItem(tokenKey) : null;
+  if (!tokenKey || !token) return null;
+  const refreshedToken = await refreshSessionToken(tokenKey, token, { swallowError: false });
+  return refreshedToken;
 };
 
 // User Payments API
@@ -391,6 +580,8 @@ export const personalityTestsAPI = {
     params: { include_premium: includePremium },
   }),
   submitTest: (data) => apiClient.post('/personality-tests/submit', data),
+  getCorePremiumQuestions: () => apiClient.get('/personality-tests/core-premium/questions'),
+  submitCorePremium: (data) => apiClient.post('/personality-tests/core-premium/submit', data),
   getDescription: (personalityType) => apiClient.get(`/personality-tests/descriptions/${personalityType}`),
   getMyResults: () => apiClient.get('/personality-tests/my-results'),
   getStats: () => apiClient.get('/personality-tests/stats'),
@@ -419,14 +610,14 @@ export const testResultsAPI = {
   submit: (data) => apiClient.post('/test-results', data),
   getById: (id) => apiClient.get(`/test-results/${id}`),
   checkFreeTest: (userId) => apiClient.get(`/test-results/check-free-test/${userId}`),
-  getAdminPremium: () => apiClient.get('/test-results/admin/premium-results'),
+  getAdminPremium: (params) => apiClient.get('/test-results/admin/premium-results', { params }),
   getAdminPremiumByUser: (userId) => apiClient.get(`/test-results/admin/premium-results/${userId}`),
   getAdminStats: () => apiClient.get('/test-results/admin/stats'),
 };
 
 export const walletAPI = {
   getBalance: (userId) => apiClient.get(`/wallet/balance/${userId}`),
-  getTransactions: (userId) => apiClient.get(`/wallet/transactions/${userId}`),
+  getTransactions: (userId, params) => apiClient.get(`/wallet/transactions/${userId}`, { params }),
   topup: (data) => apiClient.post('/wallet/topup', data),
   checkStatus: (orderId) => apiClient.get(`/wallet/check-status/${orderId}`),
   payTest: (data) => apiClient.post('/wallet/pay-test', data),
@@ -435,18 +626,19 @@ export const walletAPI = {
 export const yayasanAPI = {
   register: (data) => apiClient.post('/yayasan/register', data),
   login: (data) => apiClient.post('/yayasan/login', data),
+  getMitraReferralStatus: (code) => apiClient.get(`/mitra/referral/${encodeURIComponent(code)}/status`),
   getProfile: () => apiClient.get('/yayasan/me'),
   getDashboardStats: () => apiClient.get('/yayasan/dashboard/stats'),
-  getUsers: () => apiClient.get('/yayasan/users'),
+  getUsers: (params) => apiClient.get('/yayasan/users', { params }),
   getUserDetail: (id) => apiClient.get(`/yayasan/users/${id}/detail`),
-  getTestResults: () => apiClient.get('/yayasan/test-results'),
-  getWallet: () => apiClient.get('/yayasan/wallet'),
+  getTestResults: (params) => apiClient.get('/yayasan/test-results', { params }),
+  getWallet: (params) => apiClient.get('/yayasan/wallet', { params }),
   withdraw: (data) => apiClient.post('/yayasan/wallet/withdraw', data),
-  getAdminList: () => apiClient.get('/yayasan/admin/list'),
+  getAdminList: (params) => apiClient.get('/yayasan/admin/list', { params }),
   getAdminDetail: (id) => apiClient.get(`/yayasan/admin/${id}/detail`),
   toggleActive: (id) => apiClient.put(`/yayasan/admin/${id}/toggle-active`, {}),
   verify: (id) => apiClient.put(`/yayasan/admin/${id}/verify`, {}),
-  getWithdrawals: () => apiClient.get('/yayasan/admin/withdrawals'),
+  getWithdrawals: (params) => apiClient.get('/yayasan/admin/withdrawals', { params }),
   approveWithdrawal: (id, data) => apiClient.put(`/yayasan/admin/withdrawals/${id}/approve`, data),
   rejectWithdrawal: (id, data) => apiClient.put(`/yayasan/admin/withdrawals/${id}/reject`, data),
 };
@@ -454,24 +646,31 @@ export const yayasanAPI = {
 export const mitraAPI = {
   register: (data) => apiClient.post('/mitra/register', data),
   login: (data) => apiClient.post('/mitra/login', data),
+  validateInvite: (token) => apiClient.get('/mitra/invite/validate', { params: { token } }),
+  claimInvite: (data) => apiClient.post('/mitra/invite/claim', data),
   getProfile: () => apiClient.get('/mitra/me'),
   getDashboardStats: () => apiClient.get('/mitra/dashboard/stats'),
-  getYayasan: () => apiClient.get('/mitra/yayasan'),
+  getYayasan: (params) => apiClient.get('/mitra/yayasan', { params }),
   getYayasanDetail: (id) => apiClient.get(`/mitra/yayasan/${id}/detail`),
-  getWallet: () => apiClient.get('/mitra/wallet'),
+  getWallet: (params) => apiClient.get('/mitra/wallet', { params }),
   approveYayasan: (id, data) => apiClient.post(`/mitra/yayasan/${id}/approve`, data),
   setYayasanPrice: (id, data) => apiClient.put(`/mitra/yayasan/${id}/price`, data),
   createPriceChangeRequest: (id, data) => apiClient.post(`/mitra/yayasan/${id}/price-change-requests`, data),
-  getPriceChangeRequests: () => apiClient.get('/mitra/price-change-requests'),
+  getPriceChangeRequests: (params) => apiClient.get('/mitra/price-change-requests', { params }),
   withdraw: (data) => apiClient.post('/mitra/withdraw', data),
-  getAdminList: () => apiClient.get('/mitra/admin/list'),
+  createAdminInvite: (data) => apiClient.post('/mitra/admin', data),
+  getAdminList: (params) => apiClient.get('/mitra/admin/list', { params }),
   getAdminDetail: (id) => apiClient.get(`/mitra/admin/${id}/detail`),
-  getAdminPriceChangeRequests: () => apiClient.get('/mitra/admin/price-change-requests'),
+  resendInvite: (id) => apiClient.post(`/mitra/admin/${id}/invite/resend`),
+  revokeInvite: (id) => apiClient.post(`/mitra/admin/${id}/invite/revoke`),
+  updateCapacity: (id, data) => apiClient.put(`/mitra/admin/${id}/capacity`, data),
+  getCapacityHistory: (id) => apiClient.get(`/mitra/admin/${id}/capacity-history`),
+  getAdminPriceChangeRequests: (params) => apiClient.get('/mitra/admin/price-change-requests', { params }),
   reviewAdminPriceChangeRequest: (id, data) => apiClient.put(`/mitra/admin/price-change-requests/${id}/review`, data),
   toggleActive: (id) => apiClient.put(`/mitra/admin/${id}/toggle-active`, {}),
   verify: (id) => apiClient.put(`/mitra/admin/${id}/verify`, {}),
   resetPassword: (id) => apiClient.post(`/mitra/admin/${id}/reset-password`),
-  getWithdrawals: () => apiClient.get('/mitra/admin/withdrawals'),
+  getWithdrawals: (params) => apiClient.get('/mitra/admin/withdrawals', { params }),
   approveWithdrawal: (id, data) => apiClient.put(`/mitra/admin/withdrawals/${id}/approve`, data),
   rejectWithdrawal: (id, data) => apiClient.put(`/mitra/admin/withdrawals/${id}/reject`, data),
 };

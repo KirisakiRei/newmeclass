@@ -11,6 +11,9 @@ import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import CertificatePreview from '../../components/admin/CertificatePreview';
 import CertificateAssetUploader from '../../components/admin/CertificateAssetUploader';
+import Pagination from '../../components/ui/pagination';
+import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const CERT_TYPES = [
   { id: 'individu', label: 'Individu', icon: User, description: 'Sertifikat standar untuk pengguna individual' },
@@ -91,6 +94,7 @@ const normalizeTemplateState = (value, type) => {
 const Certificates = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const adminAccess = useAdminAccess();
   const [template, setTemplate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,21 +103,47 @@ const Certificates = () => {
   const [activeTab, setActiveTab] = useState('template');
   const [certType, setCertType] = useState('individu');
   const [issueForm, setIssueForm] = useState({ userId: '', courseName: '', certType: 'individu' });
+  const [issuedSearch, setIssuedSearch] = useState('');
+  const [issuedPage, setIssuedPage] = useState(1);
+  const [issuedPageSize, setIssuedPageSize] = useState(10);
+  const [issuedPagination, setIssuedPagination] = useState(createEmptyPageState(10));
+  const canViewCertificates = adminAccess.hasPermission('certificates.view');
+  const canCreateCertificates = adminAccess.hasPermission('certificates.create');
+  const canEditCertificates = adminAccess.hasPermission('certificates.edit');
+  const canManageCertificates = adminAccess.hasPermission('certificates.manage');
+  const availableTabs = [
+    canViewCertificates ? 'template' : null,
+    canCreateCertificates ? 'issue' : null,
+    canViewCertificates ? 'issued' : null,
+  ].filter(Boolean);
 
   useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0] || 'template');
+    }
+  }, [activeTab, availableTabs]);
+
   const loadData = async () => {
     try {
       const [templateRes, certsRes, usersRes] = await Promise.all([
-        certificatesAPI.getTemplate(certType),
-        certificatesAPI.getIssued(),
-        usersAPI.getAll()
+        canViewCertificates ? certificatesAPI.getTemplate(certType) : Promise.resolve({ data: null }),
+        canViewCertificates ? certificatesAPI.getIssued({
+          page: issuedPage,
+          pageSize: issuedPageSize,
+          search: issuedSearch || undefined,
+        }) : Promise.resolve({ data: [] }),
+        canCreateCertificates ? usersAPI.getAll({ page: 1, pageSize: 100 }) : Promise.resolve({ data: [] }),
       ]);
       setTemplate(normalizeTemplateState(templateRes.data, certType));
-      setIssuedCerts(Array.isArray(certsRes.data) ? certsRes.data : []);
-      setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+      const issuedPageResult = extractPaginatedResponse(certsRes.data, issuedPageSize);
+      setIssuedCerts(issuedPageResult.items || []);
+      setIssuedPagination(issuedPageResult);
+      const usersPageResult = extractPaginatedResponse(usersRes.data, 100);
+      setUsers(usersPageResult.items || []);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -124,6 +154,7 @@ const Certificates = () => {
   // Reload template when cert type changes
   useEffect(() => {
     const loadTemplate = async () => {
+      if (!canViewCertificates) return;
       try {
         const res = await certificatesAPI.getTemplate(certType);
         setTemplate(normalizeTemplateState(res.data, certType));
@@ -132,9 +163,16 @@ const Certificates = () => {
       }
     };
     if (!loading) loadTemplate();
-  }, [certType]);
+  }, [canViewCertificates, certType]);
+
+  useEffect(() => {
+    if (!loading) {
+      loadData();
+    }
+  }, [issuedPage, issuedPageSize, issuedSearch]);
 
   const handleSaveTemplate = async () => {
+    if (!canEditCertificates) return;
     setSaving(true);
     try {
       await certificatesAPI.updateTemplate({
@@ -158,6 +196,7 @@ const Certificates = () => {
   };
 
   const handleUploadAsset = async (assetType, file) => {
+    if (!canManageCertificates) return null;
     try {
       const response = await certificatesAPI.uploadAsset(assetType, file);
       const uploadedUrl = toAbsoluteUploadedAssetUrl(response.data.url, response);
@@ -192,6 +231,7 @@ const Certificates = () => {
 
   const handleIssueCertificate = async (e) => {
     e.preventDefault();
+    if (!canCreateCertificates) return;
     try {
       const response = await certificatesAPI.issue({
         userId: issueForm.userId,
@@ -216,27 +256,27 @@ const Certificates = () => {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6">
-        <Button
+        {canViewCertificates ? <Button
           variant={activeTab === 'template' ? 'default' : 'outline'}
           onClick={() => setActiveTab('template')}
           className={activeTab === 'template' ? 'bg-yellow-400 text-black' : 'border-yellow-400/50 text-yellow-400'}
         >
           <FileText className="w-4 h-4 mr-2" /> Template
-        </Button>
-        <Button
+        </Button> : null}
+        {canCreateCertificates ? <Button
           variant={activeTab === 'issue' ? 'default' : 'outline'}
           onClick={() => setActiveTab('issue')}
           className={activeTab === 'issue' ? 'bg-yellow-400 text-black' : 'border-yellow-400/50 text-yellow-400'}
         >
           <Award className="w-4 h-4 mr-2" /> Terbitkan
-        </Button>
-        <Button
+        </Button> : null}
+        {canViewCertificates ? <Button
           variant={activeTab === 'issued' ? 'default' : 'outline'}
           onClick={() => setActiveTab('issued')}
           className={activeTab === 'issued' ? 'bg-yellow-400 text-black' : 'border-yellow-400/50 text-yellow-400'}
         >
-          <Users className="w-4 h-4 mr-2" /> Diterbitkan ({issuedCerts.length})
-        </Button>
+          <Users className="w-4 h-4 mr-2" /> Diterbitkan ({issuedPagination.total})
+        </Button> : null}
       </div>
 
       {/* Template Tab */}
@@ -314,13 +354,13 @@ const Certificates = () => {
               <div className="rounded-lg border border-yellow-400/20 bg-[#1a1a1a] p-4 text-sm text-gray-400">
                 Layout resmi sertifikat dikunci. Admin hanya mengatur logo yayasan, tanda tangan, texture background, dan identitas penandatangan.
               </div>
-              <Button onClick={handleSaveTemplate} disabled={saving} className="w-full bg-yellow-400 text-black hover:bg-yellow-500">
+              <Button onClick={handleSaveTemplate} disabled={saving || !canEditCertificates} className="w-full bg-yellow-400 text-black hover:bg-yellow-500">
                 <Save className="w-4 h-4 mr-2" /> {saving ? 'Menyimpan...' : 'Simpan Template'}
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="bg-[#2a2a2a] border-yellow-400/20">
+          {canManageCertificates ? <Card className="bg-[#2a2a2a] border-yellow-400/20">
             <CardHeader>
               <CardTitle className="text-white">Upload Assets</CardTitle>
             </CardHeader>
@@ -362,7 +402,7 @@ const Certificates = () => {
                 onRemove={() => handleRemoveAsset('productionBadge')}
               />
             </CardContent>
-          </Card>
+          </Card> : null}
         </div>
         </div>
       )}
@@ -417,8 +457,20 @@ const Certificates = () => {
 
       {/* Issued Tab */}
       {activeTab === 'issued' && (
-        <Card className="bg-[#2a2a2a] border-yellow-400/20">
-          <CardContent className="p-0">
+        <div className="space-y-4">
+          <div className="max-w-sm">
+            <Input
+              value={issuedSearch}
+              onChange={(event) => {
+                setIssuedSearch(event.target.value);
+                setIssuedPage(1);
+              }}
+              placeholder="Cari nomor sertifikat, nama, atau kursus..."
+              className="bg-[#2a2a2a] border-yellow-400/20 text-white"
+            />
+          </div>
+          <Card className="bg-[#2a2a2a] border-yellow-400/20">
+            <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-[#1a1a1a]">
@@ -465,8 +517,20 @@ const Certificates = () => {
                 </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+          <Pagination
+            currentPage={issuedPagination.page}
+            totalPages={issuedPagination.totalPages}
+            totalItems={issuedPagination.total}
+            pageSize={issuedPagination.pageSize}
+            onPageChange={setIssuedPage}
+            onPageSizeChange={(nextSize) => {
+              setIssuedPageSize(nextSize);
+              setIssuedPage(1);
+            }}
+          />
+        </div>
       )}
     </div>
   );

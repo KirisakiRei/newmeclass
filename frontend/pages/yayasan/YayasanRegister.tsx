@@ -15,6 +15,8 @@ const YayasanRegister = () => {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [referralStatus, setReferralStatus] = useState(null);
+  const [loadingReferral, setLoadingReferral] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -41,12 +43,43 @@ const YayasanRegister = () => {
     }
   }, [mitraReferralCode, navigate]);
 
+  useEffect(() => {
+    if (!mitraReferralCode) {
+      setReferralStatus(null);
+      return;
+    }
+
+    const loadReferralStatus = async () => {
+      setLoadingReferral(true);
+      try {
+        const response = await yayasanAPI.getMitraReferralStatus(mitraReferralCode);
+        setReferralStatus(response.data || null);
+      } catch (error) {
+        setReferralStatus({
+          error: getApiErrorMessage(error, 'Link undangan mitra tidak tersedia.'),
+        });
+      } finally {
+        setLoadingReferral(false);
+      }
+    };
+
+    void loadReferralStatus();
+  }, [mitraReferralCode]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!mitraReferralCode) {
       toast({
         title: 'Link undangan wajib',
         description: 'Pendaftaran yayasan hanya bisa dilakukan melalui link undangan mitra.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (referralStatus?.isCapacityFull) {
+      toast({
+        title: 'Kapasitas penuh',
+        description: 'Mitra pengundang sedang mencapai batas pengelolaan yayasan. Silakan hubungi admin NEWME.',
         variant: 'destructive',
       });
       return;
@@ -101,6 +134,35 @@ const YayasanRegister = () => {
                 <p className="mt-2 text-gray-300">
                   Minta link undangan dari mitra NEWME terlebih dahulu, lalu buka kembali halaman ini melalui link tersebut.
                 </p>
+              </div>
+            )}
+            {mitraReferralCode && loadingReferral && (
+              <div className="mb-6 rounded-lg border border-yellow-400/20 bg-yellow-400/10 p-4 text-sm text-gray-300">
+                Memeriksa status link mitra...
+              </div>
+            )}
+            {mitraReferralCode && referralStatus?.error && (
+              <div className="mb-6 rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-sm">
+                <p className="font-medium text-red-300">Link undangan tidak aktif</p>
+                <p className="mt-2 text-gray-300">{referralStatus.error}</p>
+              </div>
+            )}
+            {mitraReferralCode && referralStatus && !referralStatus.error && (
+              <div className={`mb-6 rounded-lg border p-4 text-sm ${referralStatus.isCapacityFull ? 'border-red-400/30 bg-red-400/10' : 'border-green-400/30 bg-green-400/10'}`}>
+                <p className={`font-medium ${referralStatus.isCapacityFull ? 'text-red-300' : 'text-green-400'}`}>
+                  {referralStatus.isCapacityFull ? 'Kuota mitra sedang penuh' : 'Link mitra aktif'}
+                </p>
+                <p className="mt-2 text-gray-300">
+                  Mitra: <span className="font-semibold text-white">{referralStatus.mitraName}</span>
+                </p>
+                <p className="mt-1 text-gray-300">
+                  Kapasitas yayasan: <span className="font-semibold text-white">{referralStatus.capacityUsed}/{referralStatus.capacityLimit}</span>
+                </p>
+                {referralStatus.isCapacityFull && (
+                  <p className="mt-2 text-gray-300">
+                    Pendaftaran yayasan baru untuk mitra ini sementara ditutup sampai kapasitas ditambahkan oleh admin NEWME.
+                  </p>
+                )}
               </div>
             )}
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -222,7 +284,7 @@ const YayasanRegister = () => {
 
               <Button
                 type="submit"
-                disabled={loading || !mitraReferralCode}
+                disabled={loading || !mitraReferralCode || loadingReferral || referralStatus?.isCapacityFull || !!referralStatus?.error}
                 className="w-full bg-yellow-400 text-black hover:bg-yellow-500"
               >
                 {loading ? (
@@ -231,7 +293,7 @@ const YayasanRegister = () => {
                     Memproses...
                   </span>
                 ) : (
-                  mitraReferralCode ? 'Daftar Yayasan' : 'Butuh Link Undangan Mitra'
+                  referralStatus?.isCapacityFull ? 'Kuota Mitra Penuh' : (mitraReferralCode ? 'Daftar Yayasan' : 'Butuh Link Undangan Mitra')
                 )}
               </Button>
             </form>

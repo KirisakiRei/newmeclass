@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, Activity, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Activity, ArrowUp, ArrowDown, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -10,6 +10,7 @@ import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner, { CardGridSkeleton } from '../../components/ui/loading-spinner';
 import SharedImageUploader from '../../components/admin/SharedImageUploader.jsx';
 import { websiteContentAPI } from '../../services/api';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const EMPTY = {
   title: '', description: '', imageUrl: '', isActive: true,
@@ -72,9 +73,14 @@ const ActivityModal = ({ item, onSave, onClose }) => {
 
 const Activities = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
+  const canCreateActivity = adminAccess.hasPermission('activities.create');
+  const canEditActivity = adminAccess.hasPermission('activities.edit');
+  const canDeleteActivity = adminAccess.hasPermission('activities.delete');
+  const canManageActivity = adminAccess.hasPermission('activities.manage');
 
   const load = async () => {
     setLoading(true);
@@ -91,6 +97,7 @@ const Activities = () => {
   useEffect(() => { load(); }, []);
 
   const handleSave = async (form) => {
+    if (form._id ? !canEditActivity : !canCreateActivity) return;
     try {
       if (form._id) {
         await websiteContentAPI.updateActivity(form._id, form);
@@ -107,6 +114,7 @@ const Activities = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!canDeleteActivity) return;
     if (!window.confirm('Hapus kegiatan ini')) return;
     try {
       await websiteContentAPI.deleteActivity(id);
@@ -118,6 +126,7 @@ const Activities = () => {
   };
 
   const handleMove = async (index, direction) => {
+    if (!canManageActivity) return;
     const arr = [...items];
     const swapIdx = direction === 'up' ? index - 1 : index + 1;
     if (swapIdx < 0 || swapIdx >= arr.length) return;
@@ -137,12 +146,24 @@ const Activities = () => {
     }
   };
 
+  const handleToggleActive = async (item) => {
+    if (!canManageActivity) return;
+    try {
+      const updated = { ...item, isActive: !item.isActive };
+      await websiteContentAPI.updateActivity(item._id, updated);
+      setItems((prev) => prev.map((row) => (row._id === item._id ? updated : row)));
+      toast({ title: `Kegiatan ${updated.isActive ? 'ditampilkan' : 'disembunyikan'}` });
+    } catch {
+      toast({ title: 'Gagal mengubah visibilitas', variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader icon={Activity} title="Kegiatan" description="Kelola galeri foto kegiatan yang ditampilkan di halaman beranda">
-        <Button onClick={() => setModal(EMPTY)} className="bg-yellow-400 text-black hover:bg-yellow-500">
+        {canCreateActivity ? <Button onClick={() => setModal(EMPTY)} className="bg-yellow-400 text-black hover:bg-yellow-500">
           <Plus className="w-4 h-4 mr-2" /> Tambah Kegiatan
-        </Button>
+        </Button> : null}
       </PageHeader>
 
       {loading ? (
@@ -152,9 +173,9 @@ const Activities = () => {
           <CardContent className="p-12 text-center text-gray-400">
             <Activity className="w-12 h-12 mx-auto mb-4 opacity-30" />
             <p className="text-lg mb-4">Belum ada foto kegiatan</p>
-            <Button onClick={() => setModal(EMPTY)} className="bg-yellow-400 text-black hover:bg-yellow-500">
+            {canCreateActivity ? <Button onClick={() => setModal(EMPTY)} className="bg-yellow-400 text-black hover:bg-yellow-500">
               <Plus className="w-4 h-4 mr-2" /> Tambah Kegiatan Pertama
-            </Button>
+            </Button> : null}
           </CardContent>
         </Card>
       ) : (
@@ -170,12 +191,12 @@ const Activities = () => {
                   </div>
                 )}
                 <div className="absolute top-2 left-2 flex gap-1">
-                  <button onClick={() => handleMove(index, 'up')} disabled={index === 0} className="p-1 bg-black/60 hover:bg-black/80 text-white rounded disabled:opacity-30 transition-colors">
+                  {canManageActivity ? <button onClick={() => handleMove(index, 'up')} disabled={index === 0} className="p-1 bg-black/60 hover:bg-black/80 text-white rounded disabled:opacity-30 transition-colors">
                     <ArrowUp className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => handleMove(index, 'down')} disabled={index === items.length - 1} className="p-1 bg-black/60 hover:bg-black/80 text-white rounded disabled:opacity-30 transition-colors">
+                  </button> : null}
+                  {canManageActivity ? <button onClick={() => handleMove(index, 'down')} disabled={index === items.length - 1} className="p-1 bg-black/60 hover:bg-black/80 text-white rounded disabled:opacity-30 transition-colors">
                     <ArrowDown className="w-3.5 h-3.5" />
-                  </button>
+                  </button> : null}
                 </div>
                 <div className="absolute top-2 right-2 w-6 h-6 rounded bg-yellow-400/80 flex items-center justify-center">
                   <span className="text-black text-xs font-bold">{index + 1}</span>
@@ -188,12 +209,15 @@ const Activities = () => {
                 <h3 className="text-white font-semibold text-sm mb-1 truncate">{item.title}</h3>
                 {item.description && <p className="text-gray-400 text-xs mb-3 truncate">{item.description}</p>}
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => setModal(item)} variant="outline" className="border-yellow-400/40 text-yellow-400 flex-1 h-8">
+                  {canEditActivity ? <Button size="sm" onClick={() => setModal(item)} variant="outline" className="border-yellow-400/40 text-yellow-400 flex-1 h-8">
                     <Edit className="w-3.5 h-3.5 mr-1" /> Edit
-                  </Button>
-                  <Button size="sm" onClick={() => handleDelete(item._id)} variant="outline" className="border-red-400/40 text-red-400 h-8 w-8 p-0">
+                  </Button> : null}
+                  {canManageActivity ? <Button size="sm" onClick={() => handleToggleActive(item)} variant="outline" className="border-gray-400/40 text-gray-300 h-8 w-8 p-0">
+                    {item.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </Button> : null}
+                  {canDeleteActivity ? <Button size="sm" onClick={() => handleDelete(item._id)} variant="outline" className="border-red-400/40 text-red-400 h-8 w-8 p-0">
                     <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  </Button> : null}
                 </div>
               </CardContent>
             </Card>
@@ -209,4 +233,3 @@ const Activities = () => {
 };
 
 export default Activities;
-

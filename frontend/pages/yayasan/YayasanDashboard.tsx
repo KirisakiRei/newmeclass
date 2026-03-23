@@ -16,6 +16,8 @@ import { formatCurrency } from '../../lib/utils';
 import { buildFrontendUrl } from '../../lib/public-url';
 import { copyTextToClipboard } from '../../lib/clipboard';
 import ResponsiveTabs from '../../components/ui/responsive-tabs';
+import Pagination from '../../components/ui/pagination';
+import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
 
 const fmt = formatCurrency;
 const TABS = [
@@ -52,10 +54,24 @@ export default function YayasanDashboard() {
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', bankName: '', bankAccount: '', accountName: '' });
   const [withdrawing, setWithdrawing] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: '', email: '', phone: '', address: '', description: '' });
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersPageSize, setUsersPageSize] = useState(10);
+  const [usersPagination, setUsersPagination] = useState(createEmptyPageState(10));
+  const [resultsPage, setResultsPage] = useState(1);
+  const [resultsPageSize, setResultsPageSize] = useState(10);
+  const [resultsPagination, setResultsPagination] = useState(createEmptyPageState(10));
+  const [walletPage, setWalletPage] = useState(1);
+  const [walletPageSize, setWalletPageSize] = useState(10);
+  const [walletPagination, setWalletPagination] = useState(createEmptyPageState(10));
 
   useEffect(() => {
     void bootstrap();
   }, []);
+  useEffect(() => {
+    if (yayasan) {
+      void loadDashboardData(yayasan);
+    }
+  }, [yayasan, usersPage, usersPageSize, resultsPage, resultsPageSize, walletPage, walletPageSize, searchTerm]);
 
   const isApproved = yayasan?.approvalStatus === 'APPROVED' || yayasan?.isMitraApproved;
   const referralLink = useMemo(() => (isApproved && yayasan?.referralCode ? buildFrontendUrl('/register', { ref: yayasan.referralCode }) : ''), [isApproved, yayasan?.referralCode]);
@@ -89,14 +105,27 @@ export default function YayasanDashboard() {
     const approved = profile.approvalStatus === 'APPROVED' || profile.isMitraApproved;
     const requests = await Promise.allSettled([
       yayasanAPI.getDashboardStats(),
-      approved ? yayasanAPI.getUsers() : Promise.resolve({ data: [] }),
-      approved ? yayasanAPI.getTestResults() : Promise.resolve({ data: [] }),
-      approved ? yayasanAPI.getWallet() : Promise.resolve({ data: { balance: 0, transactions: [] } }),
+      approved ? yayasanAPI.getUsers({ page: usersPage, pageSize: usersPageSize, search: searchTerm || undefined }) : Promise.resolve({ data: createEmptyPageState(usersPageSize) }),
+      approved ? yayasanAPI.getTestResults({ page: resultsPage, pageSize: resultsPageSize }) : Promise.resolve({ data: createEmptyPageState(resultsPageSize) }),
+      approved ? yayasanAPI.getWallet({ page: walletPage, pageSize: walletPageSize }) : Promise.resolve({ data: { balance: 0, transactions: createEmptyPageState(walletPageSize) } }),
     ]);
     if (requests[0].status === 'fulfilled') setStats(requests[0].value.data);
-    if (requests[1].status === 'fulfilled') setUsers(requests[1].value.data || []);
-    if (requests[2].status === 'fulfilled') setResults(requests[2].value.data || []);
-    if (requests[3].status === 'fulfilled') setWallet(requests[3].value.data || { balance: 0, transactions: [] });
+    if (requests[1].status === 'fulfilled') {
+      const nextPage = extractPaginatedResponse(requests[1].value.data, usersPageSize);
+      setUsers(nextPage.items || []);
+      setUsersPagination(nextPage);
+    }
+    if (requests[2].status === 'fulfilled') {
+      const nextPage = extractPaginatedResponse(requests[2].value.data, resultsPageSize);
+      setResults(nextPage.items || []);
+      setResultsPagination(nextPage);
+    }
+    if (requests[3].status === 'fulfilled') {
+      const walletData = requests[3].value.data || { balance: 0, transactions: [] };
+      const nextPage = extractPaginatedResponse(walletData.transactions, walletPageSize);
+      setWallet({ ...walletData, transactions: nextPage.items || [] });
+      setWalletPagination(nextPage);
+    }
   };
 
   const handleLogout = () => {
@@ -195,8 +224,6 @@ export default function YayasanDashboard() {
     }
   };
 
-  const filteredUsers = users.filter((item) => `${item.fullName || ''} ${item.email || ''}`.toLowerCase().includes(searchTerm.toLowerCase()));
-
   if (loading) {
     return <div className="min-h-screen bg-gradient-to-b from-[#1a1a1a] to-[#2a2a2a] flex items-center justify-center"><LoadingSpinner size="lg" text="Memuat dashboard yayasan..." /></div>;
   }
@@ -281,17 +308,20 @@ export default function YayasanDashboard() {
               <Card className="border-yellow-400/20 bg-[#2a2a2a]"><CardContent className="py-12 text-center text-gray-400">Data pengguna akan muncul setelah yayasan disetujui oleh mitra.</CardContent></Card>
             ) : (
               <>
-                <Input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Cari nama atau email pengguna..." className="border-yellow-400/30 bg-[#2a2a2a] text-white" />
+                <Input value={searchTerm} onChange={(event) => {
+                  setSearchTerm(event.target.value);
+                  setUsersPage(1);
+                }} placeholder="Cari nama atau email pengguna..." className="border-yellow-400/30 bg-[#2a2a2a] text-white" />
                 <Card className="border-yellow-400/20 bg-[#2a2a2a]">
                   <CardContent className="p-0">
-                    {filteredUsers.length === 0 ? (
+                    {users.length === 0 ? (
                       <p className="py-12 text-center text-gray-400">Belum ada pengguna terhubung.</p>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead><tr className="border-b border-yellow-400/20 text-gray-400"><th className="px-4 py-3 text-left">Pengguna</th><th className="px-4 py-3 text-left">Status Bayar</th><th className="px-4 py-3 text-left">Status Test</th><th className="px-4 py-3 text-left">Aksi</th></tr></thead>
                           <tbody>
-                            {filteredUsers.map((item) => (
+                            {users.map((item) => (
                               <tr key={item._id} className="border-b border-yellow-400/10 hover:bg-[#333]">
                                 <td className="px-4 py-3"><p className="font-medium text-white">{item.fullName}</p><p className="text-xs text-gray-400">{item.email}</p></td>
                                 <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs ${paymentColor(item.paymentStatus)}`}>{paymentLabel(item.paymentStatus)}</span></td>
@@ -305,6 +335,17 @@ export default function YayasanDashboard() {
                     )}
                   </CardContent>
                 </Card>
+                <Pagination
+                  currentPage={usersPagination.page}
+                  totalPages={usersPagination.totalPages}
+                  totalItems={usersPagination.total}
+                  pageSize={usersPagination.pageSize}
+                  onPageChange={setUsersPage}
+                  onPageSizeChange={(nextSize) => {
+                    setUsersPageSize(nextSize);
+                    setUsersPage(1);
+                  }}
+                />
               </>
             )}
           </div>
@@ -316,24 +357,37 @@ export default function YayasanDashboard() {
             ) : results.length === 0 ? (
               <Card className="border-yellow-400/20 bg-[#2a2a2a]"><CardContent className="py-12 text-center text-gray-400">Belum ada hasil test premium dari pengguna yayasan ini.</CardContent></Card>
             ) : (
-              results.map((item) => (
-                <Card key={item._id} className="border-yellow-400/20 bg-[#2a2a2a]">
-                  <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="font-semibold text-white">{item.userName}</p>
-                      <p className="text-xs text-gray-400">{item.userEmail}</p>
-                      <p className="mt-2 text-sm text-yellow-400">{item.dominantLabel || item.analysis?.personalityType || '-'}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" className="border-yellow-400/30 text-yellow-400" onClick={() => { setResultDetail(item); setResultOpen(true); }}><Eye className="mr-2 h-4 w-4" />Lihat Detail</Button>
-                      <Button size="sm" className="bg-yellow-400 text-black hover:bg-yellow-500" disabled={downloadingUserId === item.userId} onClick={() => void handleDownloadCertificate(item.userId)}>
-                        {downloadingUserId === item.userId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDownToLine className="mr-2 h-4 w-4" />}
-                        Download Sertifikat
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+              <div className="space-y-4">
+                {results.map((item) => (
+                  <Card key={item._id} className="border-yellow-400/20 bg-[#2a2a2a]">
+                    <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-semibold text-white">{item.userName}</p>
+                        <p className="text-xs text-gray-400">{item.userEmail}</p>
+                        <p className="mt-2 text-sm text-yellow-400">{item.dominantLabel || item.analysis?.personalityType || '-'}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" className="border-yellow-400/30 text-yellow-400" onClick={() => { setResultDetail(item); setResultOpen(true); }}><Eye className="mr-2 h-4 w-4" />Lihat Detail</Button>
+                        <Button size="sm" className="bg-yellow-400 text-black hover:bg-yellow-500" disabled={downloadingUserId === item.userId} onClick={() => void handleDownloadCertificate(item.userId)}>
+                          {downloadingUserId === item.userId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowDownToLine className="mr-2 h-4 w-4" />}
+                          Download Sertifikat
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                <Pagination
+                  currentPage={resultsPagination.page}
+                  totalPages={resultsPagination.totalPages}
+                  totalItems={resultsPagination.total}
+                  pageSize={resultsPagination.pageSize}
+                  onPageChange={setResultsPage}
+                  onPageSizeChange={(nextSize) => {
+                    setResultsPageSize(nextSize);
+                    setResultsPage(1);
+                  }}
+                />
+              </div>
             )}
           </div>
         )}
@@ -369,6 +423,38 @@ export default function YayasanDashboard() {
                     </Button>
                   </CardContent>
                 </Card>
+                <Card className="border-yellow-400/20 bg-[#2a2a2a]">
+                  <CardHeader><CardTitle className="text-white">Riwayat Penarikan</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    {wallet.transactions.length === 0 ? (
+                      <p className="text-gray-400">Belum ada riwayat penarikan.</p>
+                    ) : wallet.transactions.map((item) => (
+                      <div key={item._id || item.id} className="rounded-lg bg-[#1a1a1a] p-4">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="font-medium text-white">{item.bankName || 'Rekening Yayasan'}</p>
+                            <p className="text-xs text-gray-500">{item.bankAccount || '-'} / {item.accountName || '-'}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-yellow-400">{fmt(item.amount || 0)}</p>
+                            <p className="text-xs text-gray-500">{item.createdAt ? new Date(item.createdAt).toLocaleString('id-ID') : '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+                <Pagination
+                  currentPage={walletPagination.page}
+                  totalPages={walletPagination.totalPages}
+                  totalItems={walletPagination.total}
+                  pageSize={walletPagination.pageSize}
+                  onPageChange={setWalletPage}
+                  onPageSizeChange={(nextSize) => {
+                    setWalletPageSize(nextSize);
+                    setWalletPage(1);
+                  }}
+                />
               </>
             )}
           </div>

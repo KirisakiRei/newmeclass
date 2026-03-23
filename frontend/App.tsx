@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './css/App.css';
-import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import VisitorTracker from './components/VisitorTracker';
@@ -11,7 +11,23 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { useTheme } from './contexts/ThemeContext';
+import { Button } from './components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './components/ui/dialog';
 import { Toaster } from './components/ui/toaster';
+import {
+  clearAuthStorage,
+  getLastSessionActivity,
+  getSessionPolicy,
+  recordSessionActivity,
+  touchSessionForTokenKey,
+} from './services/api';
 
 // Lazy-load all pages to keep the initial bundle focused on the active route.
 // download the code for the page they actually visit.
@@ -50,9 +66,10 @@ const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
 const DashboardHome = lazy(() => import('./pages/admin/DashboardHome'));
 const Users = lazy(() => import('./pages/admin/Users'));
-const Payments = lazy(() => import('./pages/admin/Payments'));
 const LaporanPendapatan = lazy(() => import('./pages/admin/LaporanPendapatan'));
 const Transaksi = lazy(() => import('./pages/admin/Transaksi'));
+const PaymentOps = lazy(() => import('./pages/admin/PaymentOps'));
+const PaymentOpsHelp = lazy(() => import('./pages/admin/PaymentOpsHelp'));
 const Questions = lazy(() => import('./pages/admin/Questions'));
 const PersonalityResults = lazy(() => import('./pages/admin/PersonalityResults'));
 const PersonalityResultEdit = lazy(() => import('./pages/admin/PersonalityResultEdit'));
@@ -85,6 +102,7 @@ const YayasanLogin = lazy(() => import('./pages/yayasan/YayasanLogin'));
 const YayasanRegister = lazy(() => import('./pages/yayasan/YayasanRegister'));
 const MitraLogin = lazy(() => import('./pages/mitra/MitraLogin'));
 const MitraRegister = lazy(() => import('./pages/mitra/MitraRegister'));
+const MitraClaimInvite = lazy(() => import('./pages/mitra/MitraClaimInvite'));
 const MitraDashboard = lazy(() => import('./pages/mitra/MitraDashboard'));
 
 // Export API config for other components
@@ -98,6 +116,142 @@ const PageLoader = () => (
   </div>
 );
 
+const resolveTokenKeyForPath = (pathname) => {
+  if (pathname.startsWith('/admin')) return 'admin_token';
+  if (pathname.startsWith('/yayasan')) return 'yayasan_token';
+  if (pathname.startsWith('/mitra')) return 'mitra_token';
+  if (typeof window !== 'undefined' && localStorage.getItem('user_token')) return 'user_token';
+  return null;
+};
+
+const SessionManager = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [warningOpen, setWarningOpen] = useState(false);
+  const [remainingMs, setRemainingMs] = useState(0);
+  const [extending, setExtending] = useState(false);
+  const heartbeatRef = useRef(0);
+
+  const tokenKey = useMemo(() => resolveTokenKeyForPath(location.pathname), [location.pathname]);
+  const policy = useMemo(() => getSessionPolicy(tokenKey), [tokenKey]);
+
+  const forceLogout = useCallback(() => {
+    if (!tokenKey || !policy) return;
+    clearAuthStorage(tokenKey);
+    setWarningOpen(false);
+    navigate(policy.redirectTo, { replace: true, state: { sessionExpired: true } });
+  }, [navigate, policy, tokenKey]);
+
+  const heartbeatSession = useCallback(async () => {
+    if (!tokenKey || !policy || !localStorage.getItem(tokenKey)) return;
+    const now = Date.now();
+    if ((now - heartbeatRef.current) < 60 * 1000) return;
+    heartbeatRef.current = now;
+    try {
+      await touchSessionForTokenKey(tokenKey);
+    } catch {
+      forceLogout();
+    }
+  }, [forceLogout, policy, tokenKey]);
+
+  const markActivity = useCallback(() => {
+    if (!tokenKey || !policy || !localStorage.getItem(tokenKey)) return;
+    recordSessionActivity(tokenKey);
+    void heartbeatSession();
+  }, [heartbeatSession, policy, tokenKey]);
+
+  useEffect(() => {
+    if (!tokenKey || !policy || !localStorage.getItem(tokenKey)) {
+      setWarningOpen(false);
+      return;
+    }
+    markActivity();
+  }, [location.pathname, markActivity, policy, tokenKey]);
+
+  useEffect(() => {
+    if (!tokenKey || !policy) return undefined;
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        markActivity();
+      }
+    };
+
+    const events = ['click', 'keydown', 'mousedown', 'touchstart'];
+    events.forEach((eventName) => window.addEventListener(eventName, markActivity, { passive: true }));
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      events.forEach((eventName) => window.removeEventListener(eventName, markActivity));
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [markActivity, policy, tokenKey]);
+
+  useEffect(() => {
+    if (!tokenKey || !policy) return undefined;
+
+    const interval = window.setInterval(() => {
+      const token = localStorage.getItem(tokenKey);
+      if (!token) {
+        setWarningOpen(false);
+        return;
+      }
+
+      const lastActivity = getLastSessionActivity(tokenKey);
+      const remaining = policy.idleTimeoutMs - (Date.now() - lastActivity);
+      setRemainingMs(Math.max(remaining, 0));
+
+      if (remaining <= 0) {
+        forceLogout();
+        return;
+      }
+
+      setWarningOpen(remaining <= policy.warningThresholdMs);
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [forceLogout, policy, tokenKey]);
+
+  const handleContinueSession = async () => {
+    if (!tokenKey) return;
+    setExtending(true);
+    try {
+      recordSessionActivity(tokenKey);
+      await touchSessionForTokenKey(tokenKey);
+      setWarningOpen(false);
+    } catch {
+      forceLogout();
+    } finally {
+      setExtending(false);
+    }
+  };
+
+  if (!tokenKey || !policy || !localStorage.getItem(tokenKey)) {
+    return null;
+  }
+
+  return (
+    <Dialog open={warningOpen} onOpenChange={setWarningOpen}>
+      <DialogContent className="border-yellow-400/20 bg-[#171717] text-white sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Sesi akan berakhir</DialogTitle>
+          <DialogDescription className="text-gray-400">
+            Demi keamanan, sesi Anda akan diputus otomatis jika tidak ada aktivitas. Waktu tersisa sekitar {Math.max(Math.ceil(remainingMs / 1000), 0)} detik.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" className="border-gray-600 text-gray-200" onClick={forceLogout}>
+            Logout sekarang
+          </Button>
+          <Button className="bg-yellow-400 text-black hover:bg-yellow-500" onClick={() => void handleContinueSession()} disabled={extending}>
+            {extending ? 'Memperpanjang...' : 'Lanjutkan sesi'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // Component to handle maintenance mode check
 const AppContent = () => {
   const { settings } = useTheme();
@@ -107,6 +261,7 @@ const AppContent = () => {
 
   return (
     <BrowserRouter>
+      <SessionManager />
       <SEOHead />
       <VisitorTracker />
       <Suspense fallback={<PageLoader />}>
@@ -124,9 +279,10 @@ const AppContent = () => {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardHome />} />
           <Route path="users" element={<Users />} />
-          <Route path="payments" element={<Payments />} />
           <Route path="revenue" element={<LaporanPendapatan />} />
           <Route path="transactions" element={<Transaksi />} />
+          <Route path="payment-ops" element={<PaymentOps />} />
+          <Route path="payment-ops/help" element={<PaymentOpsHelp />} />
           <Route path="questions" element={<Questions />} />
           <Route path="certificates" element={<Certificates />} />
           <Route path="certificates/:id" element={<CertificateDetail />} />
@@ -173,6 +329,7 @@ const AppContent = () => {
         <Route path="/mitra" element={<Navigate to="/mitra/login" replace />} />
         <Route path="/mitra/login" element={<MitraLogin />} />
         <Route path="/mitra/register" element={<MitraRegister />} />
+        <Route path="/mitra/claim" element={<MitraClaimInvite />} />
         <Route
           path="/mitra/dashboard"
           element={
@@ -245,7 +402,7 @@ const AppContent = () => {
                   <Route path="/articles" element={<ArticlesPage />} />
                   <Route path="/articles/:id" element={<ArticleDetail />} />
                   <Route path="/personality-tests" element={<PersonalityTestsLanding />} />
-                  <Route path="/test/:testType" element={<PersonalityTest />} />
+                  <Route path="/test/:testType" element={<Navigate to="/user-test" replace />} />
                   <Route path="/test/result/:testType/:result" element={<PersonalityTestResult />} />
                   <Route path="/test-selection" element={<TestSelection />} />
                   <Route path="/certificate-verify" element={<CertificateVerify />} />

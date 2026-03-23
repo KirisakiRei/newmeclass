@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import {
   API_BASE,
+  extractItems,
   pollUntil,
   requestJson,
   saveReport,
@@ -45,7 +46,7 @@ function requireCondition(condition, message) {
 async function ensureQuestions() {
   await requestJson('/questions/seed-questions', { method: 'POST', body: {} });
   const questions = await requestJson('/questions');
-  const all = questions.data || [];
+  const all = extractItems(questions.body);
   return {
     free: all.filter((item) => item.isFree === true),
     paid: all.filter((item) => item.isFree === false),
@@ -280,7 +281,7 @@ async function main() {
   const yayasanUsersAfterRegister = await requestJson('/yayasan/users', { token: yayasanToken });
   requireOk('yayasan users after register', yayasanUsersAfterRegister);
   requireCondition(
-    (yayasanUsersAfterRegister.data || []).some((item) => item._id === referredUser._id && item.paymentStatus === 'unpaid'),
+    extractItems(yayasanUsersAfterRegister.body).some((item) => item._id === referredUser._id && item.paymentStatus === 'unpaid'),
     'User baru belum muncul di dashboard yayasan sebagai registered belum bayar.',
   );
 
@@ -295,7 +296,7 @@ async function main() {
 
   const mitraYayasanListAfterRegister = await requestJson('/mitra/yayasan', { token: mitraToken });
   requireOk('mitra yayasan list after register', mitraYayasanListAfterRegister);
-  const managedYayasan = (mitraYayasanListAfterRegister.data || []).find((item) => item._id === yayasanUser._id);
+  const managedYayasan = extractItems(mitraYayasanListAfterRegister.body).find((item) => item._id === yayasanUser._id);
   requireCondition(!!managedYayasan, 'Yayasan baru belum muncul di dashboard mitra.');
   requireCondition(Number(managedYayasan.usersCount || 0) >= 1, 'Jumlah user pada yayasan di dashboard mitra belum bertambah.');
 
@@ -353,7 +354,7 @@ async function main() {
 
   const yayasanTestResults = await requestJson('/yayasan/test-results', { token: yayasanToken });
   requireOk('yayasan test results', yayasanTestResults);
-  requireCondition((yayasanTestResults.data || []).some((item) => item.userId === referredUser._id), 'Hasil test user belum muncul di dashboard yayasan.');
+  requireCondition(extractItems(yayasanTestResults.body).some((item) => item.userId === referredUser._id), 'Hasil test user belum muncul di dashboard yayasan.');
 
   report.flow = {
     mitra: {

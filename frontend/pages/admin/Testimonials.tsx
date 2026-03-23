@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, MessageSquare, Star } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, MessageSquare, Star, ArrowUp, ArrowDown, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -11,6 +11,7 @@ import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner, { CardGridSkeleton } from '../../components/ui/loading-spinner';
 import SharedImageUploader from '../../components/admin/SharedImageUploader.jsx';
 import { websiteContentAPI } from '../../services/api';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const EMPTY = {
   name: '', organization: '', role: '', imageUrl: '',
@@ -104,9 +105,14 @@ const TestimonialModal = ({ item, onSave, onClose }) => {
 
 const Testimonials = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
+  const canCreateTestimonial = adminAccess.hasPermission('testimonials.create');
+  const canEditTestimonial = adminAccess.hasPermission('testimonials.edit');
+  const canDeleteTestimonial = adminAccess.hasPermission('testimonials.delete');
+  const canManageTestimonial = adminAccess.hasPermission('testimonials.manage');
 
   const load = async () => {
     setLoading(true);
@@ -123,6 +129,7 @@ const Testimonials = () => {
   useEffect(() => { load(); }, []);
 
   const handleSave = async (form) => {
+    if (form._id ? !canEditTestimonial : !canCreateTestimonial) return;
     try {
       if (form._id) {
         await websiteContentAPI.updateTestimonial(form._id, form);
@@ -139,6 +146,7 @@ const Testimonials = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!canDeleteTestimonial) return;
     if (!window.confirm('Hapus testimonial ini')) return;
     try {
       await websiteContentAPI.deleteTestimonial(id);
@@ -146,6 +154,39 @@ const Testimonials = () => {
       load();
     } catch {
       toast({ title: 'Gagal menghapus', variant: 'destructive' });
+    }
+  };
+
+  const handleToggleActive = async (item) => {
+    if (!canManageTestimonial) return;
+    try {
+      const updated = { ...item, isActive: !item.isActive };
+      await websiteContentAPI.updateTestimonial(item._id, updated);
+      setItems((prev) => prev.map((row) => (row._id === item._id ? updated : row)));
+      toast({ title: `Testimonial ${updated.isActive ? 'ditampilkan' : 'disembunyikan'}` });
+    } catch {
+      toast({ title: 'Gagal mengubah visibilitas', variant: 'destructive' });
+    }
+  };
+
+  const handleMove = async (index, direction) => {
+    if (!canManageTestimonial) return;
+    const arr = [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const swapIdx = direction === 'up' ? index - 1 : index + 1;
+    if (swapIdx < 0 || swapIdx >= arr.length) return;
+    const tempOrder = arr[index].order ?? index + 1;
+    arr[index] = { ...arr[index], order: arr[swapIdx].order ?? swapIdx + 1 };
+    arr[swapIdx] = { ...arr[swapIdx], order: tempOrder };
+    const reordered = [...arr].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    setItems(reordered);
+    try {
+      await Promise.all([
+        websiteContentAPI.updateTestimonial(reordered[index]._id, reordered[index]),
+        websiteContentAPI.updateTestimonial(reordered[swapIdx]._id, reordered[swapIdx]),
+      ]);
+    } catch {
+      toast({ title: 'Gagal mengubah urutan', variant: 'destructive' });
+      load();
     }
   };
 
@@ -157,9 +198,9 @@ const Testimonials = () => {
   return (
     <div className="space-y-6">
       <PageHeader icon={MessageSquare} title="Testimonial" description="Kelola testimoni pelanggan yang ditampilkan di halaman beranda">
-        <Button onClick={() => setModal(EMPTY)} className="bg-yellow-400 text-black hover:bg-yellow-500">
+        {canCreateTestimonial ? <Button onClick={() => setModal(EMPTY)} className="bg-yellow-400 text-black hover:bg-yellow-500">
           <Plus className="w-4 h-4 mr-2" /> Tambah Testimonial
-        </Button>
+        </Button> : null}
       </PageHeader>
 
       {loading ? (
@@ -169,14 +210,14 @@ const Testimonials = () => {
           <CardContent className="p-12 text-center text-gray-400">
             <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-30" />
             <p className="text-lg mb-4">Belum ada testimonial</p>
-            <Button onClick={() => setModal(EMPTY)} className="bg-yellow-400 text-black hover:bg-yellow-500">
+            {canCreateTestimonial ? <Button onClick={() => setModal(EMPTY)} className="bg-yellow-400 text-black hover:bg-yellow-500">
               <Plus className="w-4 h-4 mr-2" /> Tambah Testimonial Pertama
-            </Button>
+            </Button> : null}
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {items.map((item) => (
+          {[...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((item, index) => (
             <Card key={item._id} className={`bg-[#2a2a2a] border-yellow-400/20 hover:border-yellow-400/40 transition-all ${!item.isActive ? 'opacity-60' : ''}`}>
               <CardContent className="p-5">
                 {/* Header */}
@@ -201,12 +242,21 @@ const Testimonials = () => {
                 <p className="text-gray-300 text-sm leading-relaxed line-clamp-4 mb-4">"{item.text}"</p>
                 {/* Actions */}
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => setModal(item)} variant="outline" className="border-yellow-400/40 text-yellow-400 flex-1 h-8">
+                  {canManageTestimonial ? <Button size="sm" onClick={() => handleMove(index, 'up')} variant="outline" className="border-gray-500/40 text-gray-300 h-8 w-8 p-0" disabled={index === 0}>
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </Button> : null}
+                  {canManageTestimonial ? <Button size="sm" onClick={() => handleMove(index, 'down')} variant="outline" className="border-gray-500/40 text-gray-300 h-8 w-8 p-0" disabled={index === items.length - 1}>
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </Button> : null}
+                  {canEditTestimonial ? <Button size="sm" onClick={() => setModal(item)} variant="outline" className="border-yellow-400/40 text-yellow-400 flex-1 h-8">
                     <Edit className="w-3.5 h-3.5 mr-1" /> Edit
-                  </Button>
-                  <Button size="sm" onClick={() => handleDelete(item._id)} variant="outline" className="border-red-400/40 text-red-400 h-8 w-8 p-0">
+                  </Button> : null}
+                  {canManageTestimonial ? <Button size="sm" onClick={() => handleToggleActive(item)} variant="outline" className="border-gray-400/40 text-gray-300 h-8 w-8 p-0">
+                    {item.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </Button> : null}
+                  {canDeleteTestimonial ? <Button size="sm" onClick={() => handleDelete(item._id)} variant="outline" className="border-red-400/40 text-red-400 h-8 w-8 p-0">
                     <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  </Button> : null}
                 </div>
               </CardContent>
             </Card>
@@ -222,6 +272,4 @@ const Testimonials = () => {
 };
 
 export default Testimonials;
-
-
 

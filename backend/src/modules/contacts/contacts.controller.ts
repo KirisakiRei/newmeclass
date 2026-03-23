@@ -13,6 +13,11 @@ export class ContactsController {
     return this.prisma.contactMessage.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  @Get(':id')
+  getById(@Param('id') id: string) {
+    return this.prisma.contactMessage.findUnique({ where: { id } });
+  }
+
   @Get('stats/summary') async stats() {
     const total = await this.prisma.contactMessage.count();
     return { total };

@@ -41,6 +41,7 @@ export class AiAnalysisService {
             email: true,
             fullName: true,
             phone: true,
+            myReferralCode: true,
             profile: {
               select: {
                 province: true,

@@ -2,6 +2,11 @@ import { CertificateType, PrismaClient } from '@prisma/client';
 import { existsSync } from 'fs';
 import { pathToFileURL } from 'url';
 import { resolve } from 'path';
+import {
+  CANONICAL_PERSONALITY_TEMPLATE_CODES,
+  MANUAL_CANONICAL_PERSONALITY_TEMPLATES,
+  sortCanonicalPersonalityTemplates,
+} from './personality-template-catalog';
 
 type DemoModule = {
   personalityResults?: any[];
@@ -134,7 +139,7 @@ async function loadDemoModule(): Promise<DemoModule> {
 
 export async function getDemoPersonalityTemplates(): Promise<PersonalityTemplateRecord[]> {
   const module = await loadDemoModule();
-  return safeArray(module.personalityResults)
+  const rawRows = safeArray(module.personalityResults)
     .map((item) => {
       const row = safeObject(item);
       const code = safeString(row.code);
@@ -150,6 +155,37 @@ export async function getDemoPersonalityTemplates(): Promise<PersonalityTemplate
       };
     })
     .filter(Boolean) as PersonalityTemplateRecord[];
+  const rowsByCode = new Map(rawRows.map((row) => [row.code, row]));
+  const manualRowsByCode = new Map(
+    MANUAL_CANONICAL_PERSONALITY_TEMPLATES.map((row) => [
+      row.code,
+      {
+        ...row,
+        element: safeString(row.element, 'kayu').toLowerCase(),
+      } as PersonalityTemplateRecord,
+    ]),
+  );
+
+  const canonicalRows = CANONICAL_PERSONALITY_TEMPLATE_CODES.map((code) => {
+    const direct = rowsByCode.get(code);
+    if (direct) return direct;
+
+    if (code === 'aA') {
+      const legacyAir = rowsByCode.get('aAi');
+      if (legacyAir) {
+        return {
+          ...legacyAir,
+          code: 'aA',
+          socialType: 'ambivert',
+          element: 'air',
+        } as PersonalityTemplateRecord;
+      }
+    }
+
+    return manualRowsByCode.get(code) || null;
+  }).filter(Boolean) as PersonalityTemplateRecord[];
+
+  return sortCanonicalPersonalityTemplates(canonicalRows);
 }
 
 export async function ensureDemoPersonalityTemplates(db: DemoReferenceClient) {

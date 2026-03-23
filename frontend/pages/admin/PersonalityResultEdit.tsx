@@ -6,6 +6,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
 import { personalityResultsAPI } from '../../services/api';
 import LoadingSpinner from '../../components/ui/loading-spinner';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const arrToText = (arr) => (arr || []).join('\n');
 const textToArr = (text) => text.split('\n').map(s => s.trim()).filter(Boolean);
@@ -64,9 +65,11 @@ const PersonalityResultEdit = () => {
   const { code } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [original, setOriginal] = useState(null);
+  const canEditResult = adminAccess.hasPermission('personality_results.edit');
 
   const [form, setForm] = useState({
     label: '',
@@ -138,6 +141,7 @@ const PersonalityResultEdit = () => {
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
   const handleSave = async () => {
+    if (!canEditResult) return;
     setSaving(true);
     try {
       const payload = {
@@ -218,7 +222,7 @@ const PersonalityResultEdit = () => {
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !canEditResult}
           className="flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-300 text-black text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
         >
           <Save className="w-4 h-4" />

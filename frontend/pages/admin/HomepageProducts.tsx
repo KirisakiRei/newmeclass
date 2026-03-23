@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, ShoppingBag } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, ShoppingBag, ArrowUp, ArrowDown, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -10,6 +10,7 @@ import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner, { CardGridSkeleton } from '../../components/ui/loading-spinner';
 import SharedImageUploader from '../../components/admin/SharedImageUploader.jsx';
 import { websiteContentAPI } from '../../services/api';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const EMPTY_PRODUCT = {
   title: '', subtitle: '', imageUrl: '', link: '/', badge: '', isActive: true,
@@ -83,9 +84,14 @@ const ProductModal = ({ product, onSave, onClose }) => {
 
 const HomepageProducts = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
+  const canCreateProduct = adminAccess.hasPermission('homepage_products.create');
+  const canEditProduct = adminAccess.hasPermission('homepage_products.edit');
+  const canDeleteProduct = adminAccess.hasPermission('homepage_products.delete');
+  const canManageProduct = adminAccess.hasPermission('homepage_products.manage');
 
   const load = async () => {
     setLoading(true);
@@ -102,6 +108,7 @@ const HomepageProducts = () => {
   useEffect(() => { load(); }, []);
 
   const handleSave = async (form) => {
+    if (form._id ? !canEditProduct : !canCreateProduct) return;
     try {
       if (form._id) {
         await websiteContentAPI.updateProduct(form._id, form);
@@ -118,6 +125,7 @@ const HomepageProducts = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!canDeleteProduct) return;
     if (!window.confirm('Hapus produk ini dari homepage')) return;
     try {
       await websiteContentAPI.deleteProduct(id);
@@ -128,12 +136,45 @@ const HomepageProducts = () => {
     }
   };
 
+  const handleToggleActive = async (product) => {
+    if (!canManageProduct) return;
+    try {
+      const updated = { ...product, isActive: !product.isActive };
+      await websiteContentAPI.updateProduct(product._id, updated);
+      setProducts((prev) => prev.map((item) => (item._id === product._id ? updated : item)));
+      toast({ title: `Produk ${updated.isActive ? 'ditampilkan' : 'disembunyikan'}` });
+    } catch {
+      toast({ title: 'Gagal mengubah visibilitas', variant: 'destructive' });
+    }
+  };
+
+  const handleMove = async (index, direction) => {
+    if (!canManageProduct) return;
+    const arr = [...products].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const swapIdx = direction === 'up' ? index - 1 : index + 1;
+    if (swapIdx < 0 || swapIdx >= arr.length) return;
+    const tempOrder = arr[index].order ?? index + 1;
+    arr[index] = { ...arr[index], order: arr[swapIdx].order ?? swapIdx + 1 };
+    arr[swapIdx] = { ...arr[swapIdx], order: tempOrder };
+    const reordered = [...arr].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    setProducts(reordered);
+    try {
+      await Promise.all([
+        websiteContentAPI.updateProduct(reordered[index]._id, reordered[index]),
+        websiteContentAPI.updateProduct(reordered[swapIdx]._id, reordered[swapIdx]),
+      ]);
+    } catch {
+      toast({ title: 'Gagal mengubah urutan', variant: 'destructive' });
+      load();
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader icon={ShoppingBag} title="Produk Homepage" description="Produk yang ditampilkan sebagai showcase di halaman beranda">
-        <Button onClick={() => setModal(EMPTY_PRODUCT)} className="bg-yellow-400 text-black hover:bg-yellow-500">
+        {canCreateProduct ? <Button onClick={() => setModal(EMPTY_PRODUCT)} className="bg-yellow-400 text-black hover:bg-yellow-500">
           <Plus className="w-4 h-4 mr-2" /> Tambah Produk
-        </Button>
+        </Button> : null}
       </PageHeader>
 
       {loading ? (
@@ -143,14 +184,14 @@ const HomepageProducts = () => {
           <CardContent className="p-12 text-center text-gray-400">
             <ShoppingBag className="w-12 h-12 mx-auto mb-4 opacity-30" />
             <p className="text-lg mb-4">Belum ada produk homepage</p>
-            <Button onClick={() => setModal(EMPTY_PRODUCT)} className="bg-yellow-400 text-black hover:bg-yellow-500">
+            {canCreateProduct ? <Button onClick={() => setModal(EMPTY_PRODUCT)} className="bg-yellow-400 text-black hover:bg-yellow-500">
               <Plus className="w-4 h-4 mr-2" /> Tambah Produk Pertama
-            </Button>
+            </Button> : null}
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          {products.map((product) => (
+          {[...products].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((product, index) => (
             <Card key={product._id} className={`bg-[#2a2a2a] border-yellow-400/20 group overflow-hidden transition-all hover:border-yellow-400/40 ${!product.isActive ? 'opacity-50' : ''}`}>
               <div className="relative aspect-video bg-[#1a1a1a] overflow-hidden">
                 {product.imageUrl ? (
@@ -163,6 +204,14 @@ const HomepageProducts = () => {
                 {product.badge && (
                   <span className="absolute top-2 left-2 bg-yellow-400 text-black text-xs font-bold px-2 py-0.5 rounded-full">{product.badge}</span>
                 )}
+                <div className="absolute top-2 right-2 flex gap-1">
+                  {canManageProduct ? <button onClick={() => handleMove(index, 'up')} disabled={index === 0} className="p-1 bg-black/60 hover:bg-black/80 text-white rounded disabled:opacity-30 transition-colors">
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button> : null}
+                  {canManageProduct ? <button onClick={() => handleMove(index, 'down')} disabled={index === products.length - 1} className="p-1 bg-black/60 hover:bg-black/80 text-white rounded disabled:opacity-30 transition-colors">
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button> : null}
+                </div>
                 {!product.isActive && (
                   <span className="absolute top-2 right-2 bg-gray-800/80 text-gray-400 text-xs px-2 py-0.5 rounded-full">Tersembunyi</span>
                 )}
@@ -171,12 +220,15 @@ const HomepageProducts = () => {
                 <h3 className="text-white font-semibold text-sm mb-1 truncate">{product.title}</h3>
                 <p className="text-gray-400 text-xs mb-3 truncate">{product.subtitle}</p>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => setModal(product)} variant="outline" className="border-yellow-400/40 text-yellow-400 flex-1 h-8">
+                  {canEditProduct ? <Button size="sm" onClick={() => setModal(product)} variant="outline" className="border-yellow-400/40 text-yellow-400 flex-1 h-8">
                     <Edit className="w-3.5 h-3.5 mr-1" /> Edit
-                  </Button>
-                  <Button size="sm" onClick={() => handleDelete(product._id)} variant="outline" className="border-red-400/40 text-red-400 h-8 w-8 p-0">
+                  </Button> : null}
+                  {canManageProduct ? <Button size="sm" onClick={() => handleToggleActive(product)} variant="outline" className="border-gray-400/40 text-gray-300 h-8 w-8 p-0">
+                    {product.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </Button> : null}
+                  {canDeleteProduct ? <Button size="sm" onClick={() => handleDelete(product._id)} variant="outline" className="border-red-400/40 text-red-400 h-8 w-8 p-0">
                     <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  </Button> : null}
                 </div>
               </CardContent>
             </Card>
@@ -192,6 +244,4 @@ const HomepageProducts = () => {
 };
 
 export default HomepageProducts;
-
-
 

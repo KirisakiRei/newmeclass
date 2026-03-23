@@ -12,6 +12,6 @@ export class PaymentsReconcileService {
   async reconcile() {
     const windowMinutes = Number(process.env.PAYMENT_RECONCILE_WINDOW_MINUTES || 120);
     const result = await this.paymentsService.reconcilePending(windowMinutes);
-    this.logger.log(`Payment reconcile checked=${result.checked} fixed=${result.fixed}`);
+    this.logger.log(`Payment reconcile sweep windowMinutes=${windowMinutes} checked=${result.checked} fixed=${result.fixed}`);
   }
 }

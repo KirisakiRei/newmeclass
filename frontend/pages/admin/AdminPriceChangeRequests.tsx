@@ -13,24 +13,39 @@ import LoadingSpinner from '../../components/ui/loading-spinner';
 import { mitraAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import { formatCurrency } from '../../lib/utils';
+import Pagination from '../../components/ui/pagination';
+import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 export default function AdminPriceChangeRequests() {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [reviewForm, setReviewForm] = useState({ status: 'APPROVED', reviewNote: '' });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [pagination, setPagination] = useState(createEmptyPageState(10));
+  const canReviewPriceChanges = adminAccess.hasPermission('price_change_requests.manage');
 
   useEffect(() => {
     void loadItems();
-  }, []);
+  }, [page, pageSize, searchTerm]);
 
   const loadItems = async () => {
     try {
-      const response = await mitraAPI.getAdminPriceChangeRequests();
-      setItems(response.data || []);
+      const response = await mitraAPI.getAdminPriceChangeRequests({
+        page,
+        pageSize,
+        search: searchTerm || undefined,
+      });
+      const nextPage = extractPaginatedResponse(response.data, pageSize);
+      setItems(nextPage.items || []);
+      setPagination(nextPage);
     } catch (error) {
       toast({ title: 'Gagal memuat data', description: getApiErrorMessage(error, 'Permintaan ubah harga belum bisa dimuat.'), variant: 'destructive' });
     } finally {
@@ -39,13 +54,14 @@ export default function AdminPriceChangeRequests() {
   };
 
   const openReview = (item, status) => {
+    if (!canReviewPriceChanges) return;
     setSelected(item);
     setReviewForm({ status, reviewNote: '' });
     setReviewOpen(true);
   };
 
   const submitReview = async () => {
-    if (!selected) return;
+    if (!canReviewPriceChanges || !selected) return;
     setReviewing(true);
     try {
       await mitraAPI.reviewAdminPriceChangeRequest(selected._id, reviewForm);
@@ -64,6 +80,17 @@ export default function AdminPriceChangeRequests() {
   return (
     <div className="space-y-6">
       <PageHeader icon={Handshake} title="Permintaan Ubah Harga" description="Review permintaan revisi komisi yayasan dari mitra." />
+      <div className="max-w-sm">
+        <Input
+          value={searchTerm}
+          onChange={(event) => {
+            setSearchTerm(event.target.value);
+            setPage(1);
+          }}
+          placeholder="Cari mitra, yayasan, atau alasan..."
+          className="bg-[#2a2a2a] border-yellow-400/30 text-white"
+        />
+      </div>
       <Card className="bg-[#2a2a2a] border-yellow-400/20">
         <CardContent className="p-0">
           {items.length === 0 ? (
@@ -94,7 +121,7 @@ export default function AdminPriceChangeRequests() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {item.status === 'pending' ? (
+                        {item.status === 'pending' && canReviewPriceChanges ? (
                           <div className="flex flex-wrap gap-2">
                             <Button size="sm" className="bg-green-500 text-white hover:bg-green-600" onClick={() => openReview(item, 'APPROVED')}><CheckCircle className="mr-2 h-4 w-4" />Approve</Button>
                             <Button size="sm" variant="outline" className="border-red-400/40 text-red-400" onClick={() => openReview(item, 'REJECTED')}><XCircle className="mr-2 h-4 w-4" />Reject</Button>
@@ -111,6 +138,18 @@ export default function AdminPriceChangeRequests() {
           )}
         </CardContent>
       </Card>
+
+      <Pagination
+        currentPage={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.total}
+        pageSize={pagination.pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(nextSize) => {
+          setPageSize(nextSize);
+          setPage(1);
+        }}
+      />
 
       <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
         <DialogContent className="bg-[#2a2a2a] border-yellow-400/20 max-w-xl">

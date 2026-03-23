@@ -1,25 +1,31 @@
 ﻿// @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   CheckCircle, Clock, Lock, ArrowRight, AlertCircle, Trophy, Star,
-  Sparkles, Brain, ArrowLeft, RefreshCw
+  Sparkles, Brain, ArrowLeft
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
-import { authAPI, questionsAPI, settingsAPI, testResultsAPI, userPaymentsAPI } from '../../services/api';
+import { authAPI, personalityTestsAPI, questionsAPI, settingsAPI, testResultsAPI, userPaymentsAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import { formatCurrency, getJenjang, getQuestionText } from '../../lib/utils';
 
+const TEST_KEEPALIVE_INTERVAL_MS = 90 * 1000;
+const TEST_DRAFT_PREFIX = 'newme_test_draft_';
+
 const UserTest = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
   const [freeQuestions, setFreeQuestions] = useState([]);
   const [paidQuestions, setPaidQuestions] = useState([]);
+  const [premiumQuestionMeta, setPremiumQuestionMeta] = useState(null);
+  const [premiumQuestionError, setPremiumQuestionError] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState({});
   const [testStarted, setTestStarted] = useState(false);
@@ -31,10 +37,180 @@ const UserTest = () => {
   const [testPrice, setTestPrice] = useState(100000);
   const [jenjang, setJenjang] = useState('dewasa');
   const [jenjangConfigData, setJenjangConfigData] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const requestedType = String(searchParams.get('type') || '').trim().toLowerCase();
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (!testStarted || testCompleted) {
+      return undefined;
+    }
+
+    const interval = window.setInterval(() => {
+      void authAPI.refreshSession().catch(() => {
+        // Keep background renewal silent. Submit flow will still show explicit feedback if session fails.
+      });
+    }, TEST_KEEPALIVE_INTERVAL_MS);
+
+    const refreshOnFocus = () => {
+      void authAPI.refreshSession().catch(() => {
+        // Silent keepalive while user stays on the test flow.
+      });
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshOnFocus();
+      }
+    };
+
+    window.addEventListener('focus', refreshOnFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshOnFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [testStarted, testCompleted]);
+
+  const getQuestionId = (question) => question?._id || question?.id || null;
+  const isCorePremiumQuestion = (question) => Boolean(question?.answerPath);
+  const getQuestionOptions = (question) => (
+    Array.isArray(question?.options)
+      ? question.options.map((option) => ({
+          ...option,
+          text: option?.text || option?.label || String(option?.value ?? ''),
+        }))
+      : []
+  );
+  const getRenderedQuestionText = (question) => (
+    isCorePremiumQuestion(question)
+      ? (question?.question || question?.text || '')
+      : getQuestionText(question, jenjang)
+  );
+  const getRenderedQuestionLabel = (question) => (
+    isCorePremiumQuestion(question) ? 'Premium' : (question?.category || 'Umum')
+  );
+  const isQuestionAnswered = (question) => {
+    const questionId = getQuestionId(question);
+    return questionId ? answers[questionId] !== undefined && answers[questionId] !== null : false;
+  };
+
+  const buildCorePremiumPayload = (questionList, answerMap) => {
+    const payload = { tes_a: {}, tes_b: {}, tes_c: {} };
+
+    (questionList || []).forEach((question) => {
+      if (!question?.answerPath) return;
+      const questionId = getQuestionId(question);
+      const answerIndex = questionId ? answerMap[questionId] : undefined;
+      if (answerIndex === undefined || answerIndex === null) return;
+
+      const option = getQuestionOptions(question)[Number(answerIndex)];
+      if (!option) return;
+
+      const [stage, key, slot] = String(question.answerPath).split('.');
+      if (stage === 'tes_a' && key) {
+        payload.tes_a[key] = Boolean(option.value);
+        return;
+      }
+
+      if (stage === 'tes_b' && key) {
+        payload.tes_b[key] = String(option.value);
+        return;
+      }
+
+      if (stage === 'tes_c' && key && slot) {
+        const slotIndex = Math.max(Number(slot) - 1, 0);
+        if (!Array.isArray(payload.tes_c[key])) {
+          payload.tes_c[key] = [];
+        }
+        payload.tes_c[key][slotIndex] = Number(option.value);
+      }
+    });
+
+    return payload;
+  };
+
+  const getDraftKey = (type = testType) => {
+    const userId = user?._id || user?.id;
+    if (!userId || !type) return null;
+    return `${TEST_DRAFT_PREFIX}${userId}_${type}`;
+  };
+
+  const clearDraft = (type = testType) => {
+    const draftKey = getDraftKey(type);
+    if (!draftKey) return;
+    localStorage.removeItem(draftKey);
+  };
+
+  const hydrateDraft = (type, questionList) => {
+    const draftKey = getDraftKey(type);
+    if (!draftKey) return null;
+
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return null;
+      const draft = JSON.parse(raw);
+      const validQuestionIds = new Set((questionList || []).map((item) => getQuestionId(item)).filter(Boolean));
+      const nextAnswers = Object.entries(draft?.answers || {}).reduce((acc, [questionId, answerIndex]) => {
+        if (validQuestionIds.has(questionId)) {
+          acc[questionId] = answerIndex;
+        }
+        return acc;
+      }, {});
+
+      return {
+        answers: nextAnswers,
+        currentQuestion: Math.max(
+          0,
+          Math.min(Number(draft?.currentQuestion || 0), Math.max((questionList?.length || 1) - 1, 0)),
+        ),
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const beginTestSession = (type, questionList) => {
+    const restoredDraft = hydrateDraft(type, questionList);
+    setQuestions(questionList);
+    setTestType(type);
+    setTestStarted(true);
+    setTestCompleted(false);
+
+    if (restoredDraft) {
+      setAnswers(restoredDraft.answers || {});
+      setCurrentQuestion(restoredDraft.currentQuestion || 0);
+      toast({
+        title: 'Melanjutkan sesi tes',
+        description: 'Jawaban terakhir Anda dipulihkan agar bisa dilanjutkan.',
+      });
+      return;
+    }
+
+    setCurrentQuestion(0);
+    setAnswers({});
+  };
+
+  useEffect(() => {
+    if (!testStarted || testCompleted || !testType || !user) {
+      return;
+    }
+
+    const draftKey = getDraftKey(testType);
+    if (!draftKey) return;
+
+    localStorage.setItem(draftKey, JSON.stringify({
+      testType,
+      answers,
+      currentQuestion,
+      savedAt: new Date().toISOString(),
+    }));
+  }, [answers, currentQuestion, testStarted, testCompleted, testType, user]);
 
   const checkAuth = async () => {
     try {
@@ -70,16 +246,31 @@ const UserTest = () => {
         }
       }
       
-      // Load questions
-      const questionsRes = await questionsAPI.getAll();
-      const allQuestions = questionsRes.data || [];
-      
-      // Separate free and paid questions
+      const [legacyQuestionsRes, premiumQuestionsRes] = await Promise.allSettled([
+        questionsAPI.getPublic(),
+        personalityTestsAPI.getCorePremiumQuestions(),
+      ]);
+
+      const allQuestions = legacyQuestionsRes.status === 'fulfilled'
+        ? (legacyQuestionsRes.value.data || [])
+        : [];
       const free = allQuestions.filter(q => q.isFree === true);
-      const paid = allQuestions.filter(q => q.isFree === false);
-      
+      const paidPayload = premiumQuestionsRes.status === 'fulfilled'
+        ? (premiumQuestionsRes.value.data || null)
+        : null;
+      const paid = Array.isArray(paidPayload?.questions) ? paidPayload.questions : [];
+
       setFreeQuestions(free);
       setPaidQuestions(paid);
+      setPremiumQuestionMeta(paidPayload);
+      setPremiumQuestionError(
+        premiumQuestionsRes.status === 'rejected'
+          ? getApiErrorMessage(
+              premiumQuestionsRes.reason,
+              'Pertanyaan premium belum bisa dimuat. Pastikan tanggal lahir profil Anda sudah terisi dengan benar.',
+            )
+          : '',
+      );
 
       // Load jenjang config & compute user's jenjang
       try {
@@ -90,53 +281,47 @@ const UserTest = () => {
         }
       } catch (e) { /* default 'dewasa' */ }
       // Check paid access
+      let paidAccessGranted = false;
       try {
         const paymentRes = await userPaymentsAPI.getStatus(userId);
-        setHasPaidAccess(paymentRes.data.status === 'paid' || paymentRes.data.hasPaidAccess === true);
+        paidAccessGranted = paymentRes.data.status === 'paid' || paymentRes.data.hasPaidAccess === true;
+        setHasPaidAccess(paidAccessGranted);
       } catch (e) {
         setHasPaidAccess(false);
       }
       
       // Check if user already used free test
+      let freeTestAlreadyUsed = false;
       try {
         const freeTestRes = await testResultsAPI.checkFreeTest(userId);
-        setHasUsedFreeTest(freeTestRes.data.hasUsedFreeTest === true);
+        freeTestAlreadyUsed = freeTestRes.data.hasUsedFreeTest === true;
+        setHasUsedFreeTest(freeTestAlreadyUsed);
       } catch (e) {
         setHasUsedFreeTest(false);
       }
+
+      if (requestedType === 'free' && !freeTestAlreadyUsed && free.length > 0) {
+        beginTestSession('free', free);
+      }
+
+      if (requestedType === 'paid') {
+        if (String(userData?.paidTestStatus || '').toLowerCase() === 'completed') {
+          navigate('/dashboard?tab=results', { replace: true });
+          return;
+        }
+        if (paidAccessGranted && paid.length > 0) {
+          beginTestSession('paid', paid);
+        }
+      }
     } catch (error) {
       console.error('Failed to load data:', error);
-      // Try to seed questions if empty
-      try {
-        await questionsAPI.seed();
-        // Retry loading
-        const questionsRes = await questionsAPI.getAll();
-        const allQuestions = questionsRes.data || [];
-        setFreeQuestions(allQuestions.filter(q => q.isFree === true));
-        setPaidQuestions(allQuestions.filter(q => q.isFree === false));
-      } catch (seedError) {
-        console.error('Failed to seed questions:', seedError);
-      }
-    }
-  };
-
-  const seedQuestions = async () => {
-    try {
-      setLoading(true);
-      const response = await questionsAPI.seed();
       toast({
-        title: 'Berhasil',
-        description: response.data.message
+        title: 'Gagal memuat pertanyaan',
+        description: getApiErrorMessage(error, 'Pertanyaan tes belum bisa dimuat. Silakan coba lagi atau hubungi admin.'),
+        variant: 'destructive',
       });
-      await loadAllData(user.id || user._id, user);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: getApiErrorMessage(error, 'Gagal seed questions'),
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
+      setFreeQuestions([]);
+      setPaidQuestions([]);
     }
   };
 
@@ -159,18 +344,23 @@ const UserTest = () => {
       });
       return;
     }
-    setQuestions(freeQuestions);
-    setTestType('free');
-    setTestStarted(true);
-    setCurrentQuestion(0);
-    setAnswers({});
+    beginTestSession('free', freeQuestions);
   };
 
   const startPaidTest = async () => {
+    if (String(user?.paidTestStatus || '').toLowerCase() === 'completed') {
+      toast({
+        title: 'Tes Premium Sudah Selesai',
+        description: 'Tes premium hanya bisa dikerjakan satu kali. Anda akan diarahkan ke hasil tes.',
+      });
+      navigate('/dashboard?tab=results');
+      return;
+    }
+
     if (paidQuestions.length === 0) {
       toast({
         title: 'Tidak Ada Pertanyaan',
-        description: 'Pertanyaan berbayar belum tersedia.',
+        description: premiumQuestionError || 'Pertanyaan berbayar belum tersedia.',
         variant: 'destructive'
       });
       return;
@@ -186,11 +376,7 @@ const UserTest = () => {
       return;
     }
 
-    setQuestions(paidQuestions);
-    setTestType('paid');
-    setTestStarted(true);
-    setCurrentQuestion(0);
-    setAnswers({});
+    beginTestSession('paid', paidQuestions);
   };
 
   const handleAnswer = (questionId, optionIndex) => {
@@ -213,7 +399,17 @@ const UserTest = () => {
   };
 
   const submitTest = async () => {
-    // Build simple result summary on frontend
+    if (Object.keys(answers).length < questions.length) {
+      toast({
+        title: 'Jawaban belum lengkap',
+        description: 'Mohon jawab seluruh pertanyaan sebelum mengakhiri tes.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSubmitting(true);
+
     const result = {
       answeredCount: Object.keys(answers).length,
       totalQuestions: questions.length,
@@ -223,30 +419,65 @@ const UserTest = () => {
       completedAt: new Date().toISOString()
     };
 
-    setResults(result);
-    setTestCompleted(true);
-
-    // Save results to backend (backend does full analysis)
     try {
-      const saveResponse = await testResultsAPI.submit({
-        userId: user._id || user.id,
-        testType,
-        results: result,
-        answers, // {questionId: optionIndex}
-      });
-
-      if (testType === 'free') setHasUsedFreeTest(true);
-
-      if (saveResponse.data.resultId) {
-        navigate(`/test-result/${saveResponse.data.resultId}`);
-        return;
+      let saveResponse;
+      const isCorePremiumSession = testType === 'paid' && questions.some((question) => isCorePremiumQuestion(question));
+      try {
+        saveResponse = isCorePremiumSession
+          ? await personalityTestsAPI.submitCorePremium(buildCorePremiumPayload(questions, answers))
+          : await testResultsAPI.submit({
+              testType,
+              answers,
+            });
+      } catch (error) {
+        if (error?.response?.status === 401) {
+          await authAPI.refreshSession();
+          saveResponse = isCorePremiumSession
+            ? await personalityTestsAPI.submitCorePremium(buildCorePremiumPayload(questions, answers))
+            : await testResultsAPI.submit({
+                testType,
+                answers,
+              });
+        } else {
+          throw error;
+        }
       }
+
+      const createdResultId = saveResponse?.data?.resultId;
+      if (!createdResultId) {
+        throw new Error('Result ID not returned');
+      }
+
+      if (testType === 'free') {
+        setHasUsedFreeTest(true);
+      }
+
+      try {
+        const refreshedProfile = await authAPI.getProfile();
+        setUser(refreshedProfile.data);
+      } catch {
+        // Result page remains the source of truth even if profile refresh is delayed.
+      }
+
+      clearDraft(testType);
+      setResults(result);
+      setTestCompleted(true);
+      navigate(`/test-result/${createdResultId}`, { replace: true });
+      return;
     } catch (error) {
       console.error('Failed to save results:', error);
+      toast({
+        title: 'Hasil tes belum tersimpan',
+        description: getApiErrorMessage(error, 'Terjadi kendala saat menyimpan hasil tes. Jawaban Anda masih ada, silakan coba submit lagi.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const resetTest = () => {
+    clearDraft(testType);
     setTestStarted(false);
     setTestCompleted(false);
     setQuestions([]);
@@ -266,6 +497,7 @@ const UserTest = () => {
 
   // Test Selection Screen
   if (!testStarted) {
+    const hasCompletedPremium = String(user?.paidTestStatus || '').toLowerCase() === 'completed';
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#1a1a1a] to-[#2a2a2a] py-8" data-testid="user-test-page">
         <div className="max-w-4xl mx-auto px-4">
@@ -352,6 +584,11 @@ const UserTest = () => {
                   <li className="flex items-center text-gray-300 text-sm">
                     <CheckCircle className="w-4 h-4 text-yellow-500 mr-2" /> {paidQuestions.length} pertanyaan lengkap
                   </li>
+                  {premiumQuestionMeta?.hiddenTesCElement && (
+                    <li className="flex items-center text-gray-300 text-sm">
+                      <CheckCircle className="w-4 h-4 text-yellow-500 mr-2" /> 1 kelompok Tes C disesuaikan otomatis dari tanggal lahir profil
+                    </li>
+                  )}
                   <li className="flex items-center text-gray-300 text-sm">
                     <CheckCircle className="w-4 h-4 text-yellow-500 mr-2" /> Analisis mendalam
                   </li>
@@ -365,15 +602,25 @@ const UserTest = () => {
                 <Button 
                   onClick={startPaidTest}
                   disabled={paidQuestions.length === 0}
-                  className={`w-full ${hasPaidAccess ? 'bg-green-500 hover:bg-green-600' : 'bg-yellow-400 hover:bg-yellow-500'} text-black`}
+                  className={`w-full ${hasCompletedPremium ? 'bg-purple-500 hover:bg-purple-600 text-white' : hasPaidAccess ? 'bg-green-500 hover:bg-green-600 text-black' : 'bg-yellow-400 hover:bg-yellow-500 text-black'}`}
                 >
-                  {hasPaidAccess ? (
+                  {hasCompletedPremium ? (
+                    <>Lihat Hasil Premium <ArrowRight className="w-4 h-4 ml-2" /></>
+                  ) : hasPaidAccess ? (
                     <>Mulai Test Premium <ArrowRight className="w-4 h-4 ml-2" /></>
                   ) : (
                     <>Selesaikan Pembayaran Dulu <Lock className="w-4 h-4 ml-2" /></>
                   )}
                 </Button>
-                {!hasPaidAccess && (
+                {hasCompletedPremium ? (
+                  <p className="text-purple-300 text-xs mt-2 text-center">
+                    Tes premium sudah selesai dan tidak dapat diulang
+                  </p>
+                ) : premiumQuestionError ? (
+                  <p className="text-red-300 text-xs mt-2 text-center">
+                    {premiumQuestionError}
+                  </p>
+                ) : !hasPaidAccess && (
                   <p className="text-yellow-400 text-xs mt-2 text-center">
                     Lakukan pembayaran dari dashboard untuk membuka test premium
                   </p>
@@ -382,7 +629,6 @@ const UserTest = () => {
             </Card>
           </div>
 
-          {/* Admin: Seed Questions */}
           {(freeQuestions.length === 0 && paidQuestions.length === 0) && (
             <Card className="mt-6 bg-red-500/10 border-red-500/30">
               <CardContent className="p-4 flex items-center justify-between">
@@ -390,12 +636,9 @@ const UserTest = () => {
                   <AlertCircle className="w-6 h-6 text-red-500" />
                   <div>
                     <p className="text-white font-semibold">Pertanyaan Belum Ada</p>
-                    <p className="text-gray-400 text-sm">Klik tombol untuk membuat pertanyaan default</p>
+                    <p className="text-gray-400 text-sm">Pertanyaan tes belum tersedia. Silakan hubungi admin dashboard.</p>
                   </div>
                 </div>
-                <Button onClick={seedQuestions} className="bg-red-600 hover:bg-red-700">
-                  <RefreshCw className="w-4 h-4 mr-2" /> Seed Questions
-                </Button>
               </CardContent>
             </Card>
           )}
@@ -487,7 +730,8 @@ const UserTest = () => {
   const currentQ = questions[currentQuestion];
   const progress = ((currentQuestion + 1) / questions.length) * 100;
   const isLastQuestion = currentQuestion === questions.length - 1;
-  const currentAnswer = currentQ ? answers[currentQ._id] : null;
+  const currentAnswer = currentQ ? answers[getQuestionId(currentQ)] : null;
+  const currentOptions = getQuestionOptions(currentQ);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1a1a1a] to-[#2a2a2a] py-8">
@@ -526,17 +770,17 @@ const UserTest = () => {
               <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
                 <Brain className="w-5 h-5 text-[#1a1a1a]" />
               </div>
-              <span className="text-yellow-400 text-sm capitalize">{currentQ.category || 'Umum'}</span>
+              <span className="text-yellow-400 text-sm capitalize">{getRenderedQuestionLabel(currentQ)}</span>
             </div>
             <CardTitle className="text-white text-xl leading-relaxed">
-              {getQuestionText(currentQ, jenjang)}
+              {getRenderedQuestionText(currentQ)}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {currentQ.options.map((option, index) => (
+            {currentOptions.map((option, index) => (
               <button
                 key={index}
-                onClick={() => handleAnswer(currentQ._id, index)}
+                onClick={() => handleAnswer(getQuestionId(currentQ), index)}
                 className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
                   currentAnswer === index ?
                      'border-yellow-400 bg-yellow-400/10 text-white'
@@ -573,15 +817,19 @@ const UserTest = () => {
               {isLastQuestion ? (
                 <Button
                   onClick={submitTest}
-                  disabled={Object.keys(answers).length < questions.length}
+                  disabled={Object.keys(answers).length < questions.length || submitting}
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                 >
-                  Selesai <CheckCircle className="w-4 h-4 ml-2" />
+                  {submitting ? (
+                    <>Menyimpan Hasil...</>
+                  ) : (
+                    <>Selesai <CheckCircle className="w-4 h-4 ml-2" /></>
+                  )}
                 </Button>
               ) : (
                 <Button
                   onClick={nextQuestion}
-                  disabled={currentAnswer === null || currentAnswer === undefined}
+                  disabled={!isQuestionAnswered(currentQ)}
                   className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-black"
                 >
                   Selanjutnya <ArrowRight className="w-4 h-4 ml-2" />

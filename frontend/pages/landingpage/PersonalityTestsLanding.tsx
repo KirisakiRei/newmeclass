@@ -139,7 +139,7 @@ const PersonalityTestsLanding = () => {
 
                   {/* CTA Button */}
                   <Button
-                    onClick={() => navigate(`/test/${test.id}`)}
+                    onClick={() => navigate('/user-test')}
                     className="w-full bg-yellow-400 text-black hover:bg-yellow-500 group-hover:scale-105 transition-transform"
                   >
                     Mulai Tes Sekarang
@@ -201,13 +201,13 @@ const PersonalityTestsLanding = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
-              onClick={() => navigate('/test/introvert-extrovert')}
+              onClick={() => navigate('/user-test')}
               className="bg-yellow-400 text-black hover:bg-yellow-500"
             >
               Mulai Tes I/E/A
             </Button>
             <Button
-              onClick={() => navigate('/test/element-personality')}
+              onClick={() => navigate('/user-test')}
               variant="outline"
               className="border-yellow-400/30 text-yellow-400 hover:bg-yellow-400/10"
             >

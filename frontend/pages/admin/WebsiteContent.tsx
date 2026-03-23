@@ -1,5 +1,5 @@
 ﻿// @ts-nocheck
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors
@@ -8,9 +8,9 @@ import {
   SortableContext, verticalListSortingStrategy, useSortable, arrayMove
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { 
+import {
   Plus, Save, X,
-  RefreshCw, Layout, Upload, Loader2,
+  RefreshCw, Layout,
   GripVertical, Eye, EyeOff, Pencil, ChevronRight
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -18,115 +18,12 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
-import axios from 'axios';
 import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner, { CardGridSkeleton } from '../../components/ui/loading-spinner';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-
-// Image Upload Component
-const ImageUploader = ({ value, onChange, placeholder = 'Upload gambar', size = 'sm' }) => {
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
-  const previewClass = size === 'lg' ? 'w-full max-w-xs h-48' : 'w-32 h-32';
-  const zoneClass = size === 'lg' ? 'w-full max-w-xs h-48' : 'w-32 h-32';
-
-  const handleFileSelect = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Format file harus JPG, PNG, GIF, atau WEBP');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Ukuran file maksimal 5MB');
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const token = localStorage.getItem('admin_token');
-      const response = await axios.post(`${BACKEND_URL}/api/upload/image`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      if (response.data.url) {
-        onChange(response.data.url);
-      }
-    } catch (err) {
-      alert(err.response.data.detail || 'Gagal upload gambar');
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const getImageSrc = (url) => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    return `${BACKEND_URL}${url}`;
-  };
-
-  return (
-    <div className="space-y-2">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/gif,image/webp"
-        onChange={handleFileSelect}
-        className="hidden"
-      />
-      {value ? (
-        <div className="relative inline-block">
-          <img
-            src={getImageSrc(value)}
-            alt="Preview"
-            className={`${previewClass} object-cover rounded-lg border-2 border-yellow-400/30`}
-          />
-          <button
-            onClick={() => onChange('')}
-            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600"
-            type="button"
-          >
-            <X className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => fileInputRef.current.click()}
-            type="button"
-            className="absolute bottom-1 right-1 bg-black/60 hover:bg-black/80 text-white text-xs px-2 py-0.5 rounded flex items-center gap-1"
-          >
-            <Upload className="w-3 h-3" /> Ganti
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={() => fileInputRef.current.click()}
-          disabled={uploading}
-          type="button"
-          className={`${zoneClass} border-2 border-dashed border-yellow-400/30 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-yellow-400 hover:text-yellow-400 transition bg-[#1a1a1a]`}
-        >
-          {uploading ? (
-            <Loader2 className="w-8 h-8 animate-spin" />
-          ) : (
-            <>
-              <Upload className="w-8 h-8 mb-2" />
-              <span className="text-xs text-center px-2">{placeholder}</span>
-            </>
-          )}
-        </button>
-      )}
-    </div>
-  );
-};
+import { websiteContentAPI } from '../../services/api';
+import { mergeWithDefaultSections } from '../../lib/website-sections';
+import SharedImageUploader from '../../components/admin/SharedImageUploader.tsx';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 // ── BulletListEditor ── visual form editor for string arrays and object arrays
 const BulletListEditor = ({ label, value, onChange, schema }) => {
@@ -190,8 +87,8 @@ const BulletListEditor = ({ label, value, onChange, schema }) => {
 };
 
 // ── SortableSection ── single draggable card in Layout Manager
-const SortableSection = ({ sec, index, total, onEdit, onToggle, onNavigate, editingSection, onSave, onCancelEdit, setEditingSection }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sec._id });
+const SortableSection = ({ sec, index, total, onEdit, onToggle, onNavigate, editingSection, onSave, onCancelEdit, setEditingSection, canEdit, canManage }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sec.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   // Map section key → route
@@ -207,19 +104,25 @@ const SortableSection = ({ sec, index, total, onEdit, onToggle, onNavigate, edit
   return (
     <div ref={setNodeRef} style={style}>
       <div className={`border rounded-lg transition-all ${
-        sec.visible ? 'bg-[#2a2a2a] border-yellow-400/20' : 'bg-[#1e1e1e] border-gray-600/30'
+        sec.isVisible ? 'bg-[#2a2a2a] border-yellow-400/20' : 'bg-[#1e1e1e] border-gray-600/30'
       }`}>
         <div className="p-4">
           <div className="flex items-center gap-3">
             {/* Drag handle */}
-            <button
-              {...attributes}
-              {...listeners}
-              className="p-1 text-gray-500 hover:text-yellow-400 cursor-grab active:cursor-grabbing shrink-0 touch-none"
-              title="Drag untuk atur urutan"
-            >
-              <GripVertical className="w-4 h-4" />
-            </button>
+            {canManage ? (
+              <button
+                {...attributes}
+                {...listeners}
+                className="p-1 text-gray-500 hover:text-yellow-400 cursor-grab active:cursor-grabbing shrink-0 touch-none"
+                title="Drag untuk atur urutan"
+              >
+                <GripVertical className="w-4 h-4" />
+              </button>
+            ) : (
+              <div className="p-1 text-gray-700 shrink-0">
+                <GripVertical className="w-4 h-4" />
+              </div>
+            )}
 
             {/* Order badge */}
             <div className="w-6 h-6 rounded bg-yellow-400/20 flex items-center justify-center shrink-0">
@@ -230,9 +133,9 @@ const SortableSection = ({ sec, index, total, onEdit, onToggle, onNavigate, edit
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className={`font-semibold text-sm ${
-                  sec.visible ? 'text-white' : 'text-gray-500'
-                }`}>{sec.label}</h3>
-                {!sec.visible && (
+                  sec.isVisible ? 'text-white' : 'text-gray-500'
+                }`}>{sec.title}</h3>
+                {!sec.isVisible && (
                   <span className="px-1.5 py-0.5 bg-gray-600/40 text-gray-400 text-xs rounded">Tersembunyi</span>
                 )}
               </div>
@@ -242,6 +145,7 @@ const SortableSection = ({ sec, index, total, onEdit, onToggle, onNavigate, edit
             {/* Actions */}
             <div className="flex items-center gap-2 shrink-0">
               {sec.editable && (
+                canEdit ? (
                 <button
                   onClick={() => onEdit(sec)}
                   className="p-1.5 rounded border border-yellow-400/30 text-yellow-400 hover:bg-yellow-400/10 transition-colors"
@@ -249,6 +153,7 @@ const SortableSection = ({ sec, index, total, onEdit, onToggle, onNavigate, edit
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
+                ) : null
               )}
               {!sec.editable && navInfo && (
                 <button
@@ -259,22 +164,24 @@ const SortableSection = ({ sec, index, total, onEdit, onToggle, onNavigate, edit
                   {navInfo.label} <ChevronRight className="w-3 h-3" />
                 </button>
               )}
-              <button
-                onClick={() => onToggle(sec)}
-                className={`p-1.5 rounded border transition-colors ${
-                  sec.visible ?
-                     'border-green-400/30 text-green-400 hover:bg-green-400/10'
-                    : 'border-gray-500/30 text-gray-500 hover:bg-gray-500/10'
-                }`}
-                title={sec.visible ? 'Sembunyikan' : 'Tampilkan'}
-              >
-                {sec.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-              </button>
+              {canManage ? (
+                <button
+                  onClick={() => onToggle(sec)}
+                  className={`p-1.5 rounded border transition-colors ${
+                    sec.isVisible ?
+                       'border-green-400/30 text-green-400 hover:bg-green-400/10'
+                      : 'border-gray-500/30 text-gray-500 hover:bg-gray-500/10'
+                  }`}
+                  title={sec.isVisible ? 'Sembunyikan' : 'Tampilkan'}
+                >
+                  {sec.isVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                </button>
+              ) : null}
             </div>
           </div>
 
           {/* Inline Content Editor */}
-          {editingSection._id === sec._id && (
+          {editingSection?.id === sec.id && (
             <SectionContentEditor
               editingSection={editingSection}
               setEditingSection={setEditingSection}
@@ -320,9 +227,10 @@ const SectionContentEditor = ({ editingSection, setEditingSection, onSave, onCan
           return (
             <div key={key}>
               <label className="text-gray-400 text-xs block mb-1">Gambar Section</label>
-              <ImageUploader
+              <SharedImageUploader
                 value={val}
                 onChange={url => updateContent(key, url)}
+                category="general"
                 placeholder="Upload gambar section"
                 size="lg"
               />
@@ -373,11 +281,14 @@ const SectionContentEditor = ({ editingSection, setEditingSection, onSave, onCan
 const WebsiteContent = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [loading, setLoading] = useState(false);
 
   // Layout Manager state
   const [pageSections, setPageSections] = useState([]);
   const [editingSection, setEditingSection] = useState(null); // section being content-edited
+  const canEditContent = adminAccess.hasPermission('website_content.edit');
+  const canManageContent = adminAccess.hasPermission('website_content.manage');
 
   useEffect(() => {
     loadSections();
@@ -386,8 +297,8 @@ const WebsiteContent = () => {
   const loadSections = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${BACKEND_URL}/api/website-content/sections`);
-      setPageSections([...(res.data || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+      const res = await websiteContentAPI.getSections();
+      setPageSections(mergeWithDefaultSections(res.data));
     } catch (error) {
       console.error('Failed to load sections:', error);
     } finally {
@@ -401,16 +312,15 @@ const WebsiteContent = () => {
   );
 
   const handleDragEnd = async (event) => {
+    if (!canManageContent) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const oldIndex = pageSections.findIndex(s => s._id === active.id);
-    const newIndex = pageSections.findIndex(s => s._id === over.id);
+    const oldIndex = pageSections.findIndex(s => s.id === active.id);
+    const newIndex = pageSections.findIndex(s => s.id === over.id);
     const reordered = arrayMove(pageSections, oldIndex, newIndex).map((s, i) => ({ ...s, order: i + 1 }));
     setPageSections(reordered);
     try {
-      await axios.put(`${BACKEND_URL}/api/website-content/sections/reorder`, {
-        sections: reordered.map(s => ({ _id: s._id, order: s.order }))
-      });
+      await websiteContentAPI.reorderSections(reordered.map((s) => ({ id: s.id, order: s.order })));
       toast({ title: 'Berhasil', description: 'Urutan section diperbarui' });
     } catch {
       toast({ title: 'Error', description: 'Gagal menyimpan urutan', variant: 'destructive' });
@@ -419,6 +329,7 @@ const WebsiteContent = () => {
 
   // Layout Manager handlers (arrow fallback)
   const moveSectionOrder = async (index, direction) => {
+    if (!canManageContent) return;
     const sorted = [...pageSections];
     const swapIdx = direction === 'up' ? index - 1 : index + 1;
     if (swapIdx < 0 || swapIdx >= sorted.length) return;
@@ -428,9 +339,7 @@ const WebsiteContent = () => {
     const reordered = [...sorted].sort((a, b) => a.order - b.order);
     setPageSections(reordered);
     try {
-      await axios.put(`${BACKEND_URL}/api/website-content/sections/reorder`, {
-        sections: reordered.map(s => ({ _id: s._id, order: s.order }))
-      });
+      await websiteContentAPI.reorderSections(reordered.map((s) => ({ id: s.id, order: s.order })));
       toast({ title: 'Berhasil', description: 'Urutan section diperbarui' });
     } catch {
       toast({ title: 'Error', description: 'Gagal menyimpan urutan', variant: 'destructive' });
@@ -438,30 +347,33 @@ const WebsiteContent = () => {
   };
 
   const toggleSectionVisible = async (sec) => {
-    const updated = { ...sec, visible: !sec.visible };
-    setPageSections(prev => prev.map(s => s._id === sec._id ? updated : s));
+    if (!canManageContent) return;
+    const updated = { ...sec, isVisible: !sec.isVisible, visible: !sec.isVisible };
+    setPageSections(prev => prev.map(s => s.id === sec.id ? updated : s));
     try {
-      await axios.put(`${BACKEND_URL}/api/website-content/sections/${sec._id}`, updated);
-      toast({ title: 'Berhasil', description: `Section ${updated.visible ? 'diaktifkan' : 'disembunyikan'}` });
+      await websiteContentAPI.updateSection(sec.id, updated);
+      toast({ title: 'Berhasil', description: `Section ${updated.isVisible ? 'diaktifkan' : 'disembunyikan'}` });
     } catch {
       toast({ title: 'Error', description: 'Gagal update visibility', variant: 'destructive' });
     }
   };
 
   const saveSectionContent = async (sec) => {
+    if (!canEditContent) return;
     try {
-      await axios.put(`${BACKEND_URL}/api/website-content/sections/${sec._id}`, sec);
-      setPageSections(prev => prev.map(s => s._id === sec._id ? sec : s));
+      await websiteContentAPI.updateSection(sec.id, sec);
+      setPageSections(prev => prev.map(s => s.id === sec.id ? sec : s));
       setEditingSection(null);
-      toast({ title: 'Berhasil', description: `Konten "${sec.label}" berhasil disimpan` });
+      toast({ title: 'Berhasil', description: `Konten "${sec.title}" berhasil disimpan` });
     } catch {
       toast({ title: 'Error', description: 'Gagal menyimpan konten', variant: 'destructive' });
     }
   };
 
   const seedDefaults = async () => {
+    if (!canManageContent) return;
     try {
-      const response = await axios.post(`${BACKEND_URL}/api/website-content/seed-defaults`);
+      const response = await websiteContentAPI.seedDefaults();
       toast({ title: 'Berhasil', description: response.data.message });
       loadSections();
     } catch (error) {
@@ -476,9 +388,9 @@ const WebsiteContent = () => {
           <Button onClick={loadSections} variant="outline" className="border-yellow-400 text-yellow-400">
             <RefreshCw className="w-4 h-4 mr-2" /> Refresh
           </Button>
-          <Button onClick={seedDefaults} className="bg-yellow-400 text-black hover:bg-yellow-500">
-            Seed Default Data
-          </Button>
+          {canManageContent ? <Button onClick={seedDefaults} className="bg-yellow-400 text-black hover:bg-yellow-500">
+            Sinkronkan 12 Section
+          </Button> : null}
         </div>
       </PageHeader>
 
@@ -486,25 +398,27 @@ const WebsiteContent = () => {
 
       <div className="space-y-4">
         <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-4 text-sm text-yellow-400">
-          <strong>Layout Manager</strong> — Drag kartu untuk mengubah urutan section di halaman beranda. Section yang disembunyikan tidak akan tampil di website.
+          <strong>Layout Manager</strong> — Halaman ini mengatur seluruh 12 section landing page. Drag kartu untuk mengubah urutan tampil, gunakan ikon mata untuk menampilkan/menyembunyikan section, dan tombol edit untuk section teks yang dikelola langsung dari sini.
         </div>
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={pageSections.map(s => s._id)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={pageSections.map(s => s.id).filter(Boolean)} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">
               {pageSections.map((sec, index) => (
                 <SortableSection
-                  key={sec._id}
+                  key={sec.id}
                   sec={sec}
                   index={index}
                   total={pageSections.length}
                   editingSection={editingSection}
                   setEditingSection={setEditingSection}
-                  onEdit={s => setEditingSection(editingSection._id === s._id ? null : { ...s, content: { ...s.content } })}
+                  onEdit={s => setEditingSection(editingSection?.id === s.id ? null : { ...s, content: { ...(s.content || {}) } })}
                   onToggle={toggleSectionVisible}
                   onNavigate={nav => navigate(nav.route)}
                   onSave={saveSectionContent}
                   onCancelEdit={() => setEditingSection(null)}
+                  canEdit={canEditContent}
+                  canManage={canManageContent}
                 />
               ))}
             </div>

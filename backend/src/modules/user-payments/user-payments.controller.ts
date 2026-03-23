@@ -29,7 +29,13 @@ export class UserPaymentsController {
       this.paymentsService.getUserManualProofs(user.sub),
       this.paymentsService.getUserPaymentOrders(user.sub),
     ]);
-    return { payments: proofs, orders };
+    return {
+      payments: proofs,
+      orders: orders.map((order) => ({
+        ...order,
+        ...this.paymentsService.getSnapSession(order),
+      })),
+    };
   }
 
   @Get('test-price')

@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { AccountStatus, PaymentStatus, Prisma, Role, TestStatus } from '@prisma/client';
 import { createHash } from 'crypto';
 import { mapUserForClient, toClientPaymentStatus } from 'src/common/mappers/client-shapes';
+import { buildPaginatedResult, resolvePagination } from 'src/common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersQueryDto } from './dto/users-query.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -15,9 +16,28 @@ export class UsersService {
     return createHash('sha256').update(value).digest('hex');
   }
 
+  private readonly endUserWhere: Prisma.UserWhereInput = {
+    role: Role.USER,
+  };
+
+  private async getEndUserOrThrow(id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id,
+        role: Role.USER,
+      },
+      include: { profile: true, wallet: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User tidak ditemukan');
+    }
+
+    return user;
+  }
+
   async getAll(query: UsersQueryDto) {
-    const where: Prisma.UserWhereInput = {};
-    if (query?.role && Object.values(Role).includes(query.role as Role)) where.role = query.role as Role;
+    const where: Prisma.UserWhereInput = { ...this.endUserWhere };
     if (query?.status) where.status = query.status;
     if (query?.isBanned === 'true') where.status = AccountStatus.BANNED;
     if (query?.paymentStatus === 'approved') {
@@ -35,40 +55,45 @@ export class UsersService {
       ];
     }
 
-    const page = Math.max(Number(query.page || 1), 1);
-    const limit = Math.min(Math.max(Number(query.limit || 100), 1), 500);
+    const { page, pageSize, skip, take } = resolvePagination(query, { pageSize: 10, maxPageSize: 100 });
 
-    const users = await this.prisma.user.findMany({
-      where,
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-      include: { profile: true, wallet: true },
-    });
+    const [total, users] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: { profile: true, wallet: true },
+      }),
+    ]);
 
-    return users.map((user) => mapUserForClient(user, {
+    const items = users.map((user) => mapUserForClient(user, {
       address: user.profile?.extra && typeof user.profile.extra === 'object' ? (user.profile.extra as Record<string, any>).address || null : null,
       userType: user.profile?.extra && typeof user.profile.extra === 'object' ? (user.profile.extra as Record<string, any>).userType || null : null,
     }));
+
+    return buildPaginatedResult(items, total, page, pageSize);
   }
 
   async getStats() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const baseWhere = this.endUserWhere;
 
     const [total, active, banned, paid, newToday] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { status: AccountStatus.ACTIVE } }),
-      this.prisma.user.count({ where: { status: AccountStatus.BANNED } }),
-      this.prisma.user.count({ where: { paymentStatus: { in: [PaymentStatus.SUCCESS, PaymentStatus.SETTLEMENT, PaymentStatus.CAPTURE] } } }),
-      this.prisma.user.count({ where: { createdAt: { gte: today } } }),
+      this.prisma.user.count({ where: baseWhere }),
+      this.prisma.user.count({ where: { ...baseWhere, status: AccountStatus.ACTIVE } }),
+      this.prisma.user.count({ where: { ...baseWhere, status: AccountStatus.BANNED } }),
+      this.prisma.user.count({ where: { ...baseWhere, paymentStatus: { in: [PaymentStatus.SUCCESS, PaymentStatus.SETTLEMENT, PaymentStatus.CAPTURE] } } }),
+      this.prisma.user.count({ where: { ...baseWhere, createdAt: { gte: today } } }),
     ]);
 
     return { total, active, banned, paid, newToday };
   }
 
   async getById(id: string) {
-    const user = await this.prisma.user.findUnique({ where: { id }, include: { profile: true, wallet: true } });
+    const user = await this.getEndUserOrThrow(id);
     return mapUserForClient(user, {
       address: user?.profile?.extra && typeof user.profile.extra === 'object' ? (user.profile.extra as Record<string, any>).address || null : null,
       institutionName: user?.profile?.extra && typeof user.profile.extra === 'object' ? (user.profile.extra as Record<string, any>).institutionName || null : null,
@@ -79,10 +104,7 @@ export class UsersService {
   }
 
   async update(id: string, body: UpdateUserDto) {
-    const existing = await this.prisma.user.findUnique({
-      where: { id },
-      include: { profile: true },
-    });
+    const existing = await this.getEndUserOrThrow(id);
     const existingExtra =
       existing?.profile?.extra && typeof existing.profile.extra === 'object'
         ? (existing.profile.extra as Record<string, any>)
@@ -149,28 +171,61 @@ export class UsersService {
   }
 
   updateStatus(id: string, status: string) {
-    return this.prisma.user.update({ where: { id }, data: { status: status as AccountStatus } });
+    return this.prisma.user.updateMany({
+      where: { id, role: Role.USER },
+      data: { status: status as AccountStatus },
+    }).then((result) => {
+      if (!result.count) {
+        throw new NotFoundException('User tidak ditemukan');
+      }
+      return this.getEndUserOrThrow(id);
+    });
   }
 
   ban(id: string, _reason: string) {
-    return this.prisma.user.update({ where: { id }, data: { status: AccountStatus.BANNED } });
+    return this.prisma.user.updateMany({
+      where: { id, role: Role.USER },
+      data: { status: AccountStatus.BANNED },
+    }).then((result) => {
+      if (!result.count) {
+        throw new NotFoundException('User tidak ditemukan');
+      }
+      return this.getEndUserOrThrow(id);
+    });
   }
 
   unban(id: string) {
-    return this.prisma.user.update({ where: { id }, data: { status: AccountStatus.ACTIVE } });
+    return this.prisma.user.updateMany({
+      where: { id, role: Role.USER },
+      data: { status: AccountStatus.ACTIVE },
+    }).then((result) => {
+      if (!result.count) {
+        throw new NotFoundException('User tidak ditemukan');
+      }
+      return this.getEndUserOrThrow(id);
+    });
   }
 
   async resetPassword(id: string, body: ResetUserPasswordDto) {
-    await this.prisma.user.update({
-      where: { id },
+    const result = await this.prisma.user.updateMany({
+      where: { id, role: Role.USER },
       data: { passwordHash: this.hash(body?.newPassword || 'Reset123!') },
     });
+
+    if (!result.count) {
+      throw new NotFoundException('User tidak ditemukan');
+    }
 
     return { message: 'Password reset success. Temporary password has been applied.' };
   }
 
   async remove(id: string) {
-    await this.prisma.user.delete({ where: { id } });
+    const result = await this.prisma.user.deleteMany({
+      where: { id, role: Role.USER },
+    });
+    if (!result.count) {
+      throw new NotFoundException('User tidak ditemukan');
+    }
     return { message: 'User deleted' };
   }
 }

@@ -9,6 +9,7 @@ import PageHeader from '../../components/ui/page-header';
 import StatsGrid from '../../components/ui/stats-grid';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import EmptyState from '../../components/ui/empty-state';
+import { useAdminAccess } from '../../lib/admin-rbac';
 
 const EMPTY_ANALYTICS_STATS = {
   totalViews: 0,
@@ -42,9 +43,11 @@ const normalizeOnlineUsers = (value) => ({
 
 const Analytics = () => {
   const { toast } = useToast();
+  const adminAccess = useAdminAccess();
   const [stats, setStats] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState(null);
   const [loading, setLoading] = useState(true);
+  const canManageAnalytics = adminAccess.hasPermission('analytics.manage');
 
   useEffect(() => {
     loadData();
@@ -69,6 +72,7 @@ const Analytics = () => {
   };
 
   const handleCleanup = async () => {
+    if (!canManageAnalytics) return;
     try {
       await analyticsAPI.cleanup();
       toast({ title: 'Sukses', description: 'Data lama berhasil dibersihkan' });
@@ -93,9 +97,9 @@ const Analytics = () => {
             <Button onClick={loadData} variant="outline" className="border-yellow-400/50 text-yellow-400">
               <RefreshCw className="w-4 h-4 mr-2" /> Refresh
             </Button>
-            <Button onClick={handleCleanup} variant="outline" className="border-red-400/50 text-red-400">
+            {canManageAnalytics ? <Button onClick={handleCleanup} variant="outline" className="border-red-400/50 text-red-400">
               Cleanup Data Lama
-            </Button>
+            </Button> : null}
           </div>
         }
       />

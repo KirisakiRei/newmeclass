@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-15T07:47:27.982Z",
+  "generatedAt": "2026-03-17T18:15:31.061Z",
   "template": {
     "id": "cmmq7idzq0004qdxz7wouzx1u",
     "code": "aL",
@@ -12,8 +12,8 @@
       "ok": true,
       "status": 200,
       "data": {
-        "id": "cmmrgc4t50006m8yfbkleosog",
-        "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+        "id": "cmmuxnikn0006hl667w3pzwm7",
+        "userId": "cmmuxnijv001ymgaxdt4kixlv",
         "submissionId": null,
         "testType": "paid",
         "category": "general",
@@ -41,23 +41,23 @@
         },
         "paidInsights": null,
         "aiInsights": null,
-        "createdAt": "2026-03-15T07:47:28.217Z",
+        "createdAt": "2026-03-17T18:15:31.271Z",
         "user": {
-          "id": "cmmrgc4rw001qkjqi4cxzxof0",
-          "email": "sync-user.1773560847950.1@example.com",
+          "id": "cmmuxnijv001ymgaxdt4kixlv",
+          "email": "sync-user.1773771331043.1@example.com",
           "fullName": "vvaa",
-          "phone": "084784795001",
+          "phone": "084733104301",
           "role": "USER",
           "profile": {
             "province": "DKI Jakarta",
             "city": "Jakarta Selatan",
             "extra": {
-              "whatsapp": "084784795001"
+              "whatsapp": "084733104301"
             }
           }
         },
-        "resultId": "cmmrgc4t50006m8yfbkleosog",
-        "completedAt": "2026-03-15T07:47:28.217Z",
+        "resultId": "cmmuxnikn0006hl667w3pzwm7",
+        "completedAt": "2026-03-17T18:15:31.271Z",
         "personalityType": "Si Ahli Terstruktur",
         "dominantLabel": "Si Ahli Terstruktur",
         "displayAnalysis": {
@@ -175,6 +175,113 @@
             "dibutuhkanPadaProfesi": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
             "code": "aL"
           },
+          "personalInsights": {
+            "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
+            "kekuatanUtama": [
+              "Standar kualitas tertinggi — tidak puas sebelum semuanya sempurna",
+              "Kemampuan analisis mendalam yang mengidentifikasi masalah sebelum terjadi",
+              "Terorganisir dan sistematis — membuat kekacauan menjadi kejelasan",
+              "Keputusan berbasis data dan logika yang jarang membuat kesalahan besar",
+              "Profesionalisme tinggi yang membangun kepercayaan jangka panjang"
+            ],
+            "areasPengembanganDiri": [
+              "Perfeksionisme yang berlebihan bisa menghambat progress dan produktivitas",
+              "Fleksibilitas — dunia tidak selalu berjalan sesuai rencana",
+              "Empati dan kehangatan dalam berinteraksi dengan tim",
+              "Delegasi — sulit mempercayakan pekerjaan orang lain karena standar tinggi"
+            ],
+            "rekomendasiKarirSpesifik": [
+              {
+                "bidang": "Auditor",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Auditor"
+                ]
+              },
+              {
+                "bidang": "Engineer",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Engineer"
+                ]
+              },
+              {
+                "bidang": "Data Analyst",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Data Analyst"
+                ]
+              },
+              {
+                "bidang": "Quality Manager",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Quality Manager"
+                ]
+              },
+              {
+                "bidang": "Lawyer",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Lawyer"
+                ]
+              },
+              {
+                "bidang": "Financial Planner",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Financial Planner"
+                ]
+              },
+              {
+                "bidang": "System Architect",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "System Architect"
+                ]
+              }
+            ],
+            "strategiPengembanganDiri": [
+              {
+                "area": "Gaya Kerja",
+                "langkahKonkret": [
+                  "Sistematis, Perfeksionis & High-Quality"
+                ]
+              },
+              {
+                "area": "Gaya Belajar",
+                "langkahKonkret": [
+                  "Sistematis, Terstruktur & Berbasis Teori"
+                ]
+              },
+              {
+                "area": "Gaya Konflik",
+                "langkahKonkret": [
+                  "Analisis Fakta & Solusi Logis"
+                ]
+              },
+              {
+                "area": "Gaya Komunikasi",
+                "langkahKonkret": [
+                  "Tepat, Jelas & Data-Driven"
+                ]
+              },
+              {
+                "area": "Gaya Kepemimpinan",
+                "langkahKonkret": [
+                  "Expert Authority & Standard-Setting"
+                ]
+              }
+            ],
+            "tipsPraktis": [
+              "Perfeksionis dalam arti positif — standar tinggi menghasilkan kualitas terbaik",
+              "Sangat terorganisir dan sistematis dalam setiap aspek pekerjaan",
+              "Analitis dan logis — keputusan selalu berbasis data dan fakta",
+              "Profesional dan terpercaya dalam lingkup kerja apapun",
+              "Ambivert yang fleksibel — bisa tampil saat perlu, tenang saat intens bekerja"
+            ],
+            "motivationalMessage": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi."
+          },
           "aiInsights": {
             "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
             "kekuatanUtama": [
@@ -284,8 +391,8 @@
           }
         },
         "userName": "vvaa",
-        "userEmail": "sync-user.1773560847950.1@example.com",
-        "userWhatsapp": "084784795001",
+        "userEmail": "sync-user.1773771331043.1@example.com",
+        "userWhatsapp": "084733104301",
         "userProvince": "DKI Jakarta",
         "userCity": "Jakarta Selatan"
       },
@@ -293,8 +400,8 @@
         "success": true,
         "message": "OK",
         "data": {
-          "id": "cmmrgc4t50006m8yfbkleosog",
-          "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+          "id": "cmmuxnikn0006hl667w3pzwm7",
+          "userId": "cmmuxnijv001ymgaxdt4kixlv",
           "submissionId": null,
           "testType": "paid",
           "category": "general",
@@ -322,23 +429,23 @@
           },
           "paidInsights": null,
           "aiInsights": null,
-          "createdAt": "2026-03-15T07:47:28.217Z",
+          "createdAt": "2026-03-17T18:15:31.271Z",
           "user": {
-            "id": "cmmrgc4rw001qkjqi4cxzxof0",
-            "email": "sync-user.1773560847950.1@example.com",
+            "id": "cmmuxnijv001ymgaxdt4kixlv",
+            "email": "sync-user.1773771331043.1@example.com",
             "fullName": "vvaa",
-            "phone": "084784795001",
+            "phone": "084733104301",
             "role": "USER",
             "profile": {
               "province": "DKI Jakarta",
               "city": "Jakarta Selatan",
               "extra": {
-                "whatsapp": "084784795001"
+                "whatsapp": "084733104301"
               }
             }
           },
-          "resultId": "cmmrgc4t50006m8yfbkleosog",
-          "completedAt": "2026-03-15T07:47:28.217Z",
+          "resultId": "cmmuxnikn0006hl667w3pzwm7",
+          "completedAt": "2026-03-17T18:15:31.271Z",
           "personalityType": "Si Ahli Terstruktur",
           "dominantLabel": "Si Ahli Terstruktur",
           "displayAnalysis": {
@@ -456,6 +563,113 @@
               "dibutuhkanPadaProfesi": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
               "code": "aL"
             },
+            "personalInsights": {
+              "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
+              "kekuatanUtama": [
+                "Standar kualitas tertinggi — tidak puas sebelum semuanya sempurna",
+                "Kemampuan analisis mendalam yang mengidentifikasi masalah sebelum terjadi",
+                "Terorganisir dan sistematis — membuat kekacauan menjadi kejelasan",
+                "Keputusan berbasis data dan logika yang jarang membuat kesalahan besar",
+                "Profesionalisme tinggi yang membangun kepercayaan jangka panjang"
+              ],
+              "areasPengembanganDiri": [
+                "Perfeksionisme yang berlebihan bisa menghambat progress dan produktivitas",
+                "Fleksibilitas — dunia tidak selalu berjalan sesuai rencana",
+                "Empati dan kehangatan dalam berinteraksi dengan tim",
+                "Delegasi — sulit mempercayakan pekerjaan orang lain karena standar tinggi"
+              ],
+              "rekomendasiKarirSpesifik": [
+                {
+                  "bidang": "Auditor",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Auditor"
+                  ]
+                },
+                {
+                  "bidang": "Engineer",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Engineer"
+                  ]
+                },
+                {
+                  "bidang": "Data Analyst",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Data Analyst"
+                  ]
+                },
+                {
+                  "bidang": "Quality Manager",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Quality Manager"
+                  ]
+                },
+                {
+                  "bidang": "Lawyer",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Lawyer"
+                  ]
+                },
+                {
+                  "bidang": "Financial Planner",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Financial Planner"
+                  ]
+                },
+                {
+                  "bidang": "System Architect",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "System Architect"
+                  ]
+                }
+              ],
+              "strategiPengembanganDiri": [
+                {
+                  "area": "Gaya Kerja",
+                  "langkahKonkret": [
+                    "Sistematis, Perfeksionis & High-Quality"
+                  ]
+                },
+                {
+                  "area": "Gaya Belajar",
+                  "langkahKonkret": [
+                    "Sistematis, Terstruktur & Berbasis Teori"
+                  ]
+                },
+                {
+                  "area": "Gaya Konflik",
+                  "langkahKonkret": [
+                    "Analisis Fakta & Solusi Logis"
+                  ]
+                },
+                {
+                  "area": "Gaya Komunikasi",
+                  "langkahKonkret": [
+                    "Tepat, Jelas & Data-Driven"
+                  ]
+                },
+                {
+                  "area": "Gaya Kepemimpinan",
+                  "langkahKonkret": [
+                    "Expert Authority & Standard-Setting"
+                  ]
+                }
+              ],
+              "tipsPraktis": [
+                "Perfeksionis dalam arti positif — standar tinggi menghasilkan kualitas terbaik",
+                "Sangat terorganisir dan sistematis dalam setiap aspek pekerjaan",
+                "Analitis dan logis — keputusan selalu berbasis data dan fakta",
+                "Profesional dan terpercaya dalam lingkup kerja apapun",
+                "Ambivert yang fleksibel — bisa tampil saat perlu, tenang saat intens bekerja"
+              ],
+              "motivationalMessage": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi."
+            },
             "aiInsights": {
               "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
               "kekuatanUtama": [
@@ -565,8 +779,8 @@
             }
           },
           "userName": "vvaa",
-          "userEmail": "sync-user.1773560847950.1@example.com",
-          "userWhatsapp": "084784795001",
+          "userEmail": "sync-user.1773771331043.1@example.com",
+          "userWhatsapp": "084733104301",
           "userProvince": "DKI Jakarta",
           "userCity": "Jakarta Selatan"
         }
@@ -578,8 +792,8 @@
       "data": {
         "success": true,
         "analysis": {
-          "id": "cmmrgc4t50006m8yfbkleosog",
-          "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+          "id": "cmmuxnikn0006hl667w3pzwm7",
+          "userId": "cmmuxnijv001ymgaxdt4kixlv",
           "submissionId": null,
           "testType": "paid",
           "category": "general",
@@ -607,22 +821,22 @@
           },
           "paidInsights": null,
           "aiInsights": null,
-          "createdAt": "2026-03-15T07:47:28.217Z",
+          "createdAt": "2026-03-17T18:15:31.271Z",
           "user": {
-            "id": "cmmrgc4rw001qkjqi4cxzxof0",
-            "email": "sync-user.1773560847950.1@example.com",
+            "id": "cmmuxnijv001ymgaxdt4kixlv",
+            "email": "sync-user.1773771331043.1@example.com",
             "fullName": "vvaa",
-            "phone": "084784795001",
+            "phone": "084733104301",
             "profile": {
               "province": "DKI Jakarta",
               "city": "Jakarta Selatan",
               "extra": {
-                "whatsapp": "084784795001"
+                "whatsapp": "084733104301"
               }
             }
           },
-          "resultId": "cmmrgc4t50006m8yfbkleosog",
-          "completedAt": "2026-03-15T07:47:28.217Z",
+          "resultId": "cmmuxnikn0006hl667w3pzwm7",
+          "completedAt": "2026-03-17T18:15:31.271Z",
           "personalityType": "Si Ahli Terstruktur",
           "dominantLabel": "Si Ahli Terstruktur",
           "displayAnalysis": {
@@ -740,6 +954,113 @@
               "dibutuhkanPadaProfesi": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
               "code": "aL"
             },
+            "personalInsights": {
+              "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
+              "kekuatanUtama": [
+                "Standar kualitas tertinggi — tidak puas sebelum semuanya sempurna",
+                "Kemampuan analisis mendalam yang mengidentifikasi masalah sebelum terjadi",
+                "Terorganisir dan sistematis — membuat kekacauan menjadi kejelasan",
+                "Keputusan berbasis data dan logika yang jarang membuat kesalahan besar",
+                "Profesionalisme tinggi yang membangun kepercayaan jangka panjang"
+              ],
+              "areasPengembanganDiri": [
+                "Perfeksionisme yang berlebihan bisa menghambat progress dan produktivitas",
+                "Fleksibilitas — dunia tidak selalu berjalan sesuai rencana",
+                "Empati dan kehangatan dalam berinteraksi dengan tim",
+                "Delegasi — sulit mempercayakan pekerjaan orang lain karena standar tinggi"
+              ],
+              "rekomendasiKarirSpesifik": [
+                {
+                  "bidang": "Auditor",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Auditor"
+                  ]
+                },
+                {
+                  "bidang": "Engineer",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Engineer"
+                  ]
+                },
+                {
+                  "bidang": "Data Analyst",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Data Analyst"
+                  ]
+                },
+                {
+                  "bidang": "Quality Manager",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Quality Manager"
+                  ]
+                },
+                {
+                  "bidang": "Lawyer",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Lawyer"
+                  ]
+                },
+                {
+                  "bidang": "Financial Planner",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Financial Planner"
+                  ]
+                },
+                {
+                  "bidang": "System Architect",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "System Architect"
+                  ]
+                }
+              ],
+              "strategiPengembanganDiri": [
+                {
+                  "area": "Gaya Kerja",
+                  "langkahKonkret": [
+                    "Sistematis, Perfeksionis & High-Quality"
+                  ]
+                },
+                {
+                  "area": "Gaya Belajar",
+                  "langkahKonkret": [
+                    "Sistematis, Terstruktur & Berbasis Teori"
+                  ]
+                },
+                {
+                  "area": "Gaya Konflik",
+                  "langkahKonkret": [
+                    "Analisis Fakta & Solusi Logis"
+                  ]
+                },
+                {
+                  "area": "Gaya Komunikasi",
+                  "langkahKonkret": [
+                    "Tepat, Jelas & Data-Driven"
+                  ]
+                },
+                {
+                  "area": "Gaya Kepemimpinan",
+                  "langkahKonkret": [
+                    "Expert Authority & Standard-Setting"
+                  ]
+                }
+              ],
+              "tipsPraktis": [
+                "Perfeksionis dalam arti positif — standar tinggi menghasilkan kualitas terbaik",
+                "Sangat terorganisir dan sistematis dalam setiap aspek pekerjaan",
+                "Analitis dan logis — keputusan selalu berbasis data dan fakta",
+                "Profesional dan terpercaya dalam lingkup kerja apapun",
+                "Ambivert yang fleksibel — bisa tampil saat perlu, tenang saat intens bekerja"
+              ],
+              "motivationalMessage": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi."
+            },
             "aiInsights": {
               "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
               "kekuatanUtama": [
@@ -849,8 +1170,8 @@
             }
           },
           "userName": "vvaa",
-          "userEmail": "sync-user.1773560847950.1@example.com",
-          "userWhatsapp": "084784795001",
+          "userEmail": "sync-user.1773771331043.1@example.com",
+          "userWhatsapp": "084733104301",
           "userProvince": "DKI Jakarta",
           "userCity": "Jakarta Selatan"
         }
@@ -858,8 +1179,8 @@
       "body": {
         "success": true,
         "analysis": {
-          "id": "cmmrgc4t50006m8yfbkleosog",
-          "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+          "id": "cmmuxnikn0006hl667w3pzwm7",
+          "userId": "cmmuxnijv001ymgaxdt4kixlv",
           "submissionId": null,
           "testType": "paid",
           "category": "general",
@@ -887,22 +1208,22 @@
           },
           "paidInsights": null,
           "aiInsights": null,
-          "createdAt": "2026-03-15T07:47:28.217Z",
+          "createdAt": "2026-03-17T18:15:31.271Z",
           "user": {
-            "id": "cmmrgc4rw001qkjqi4cxzxof0",
-            "email": "sync-user.1773560847950.1@example.com",
+            "id": "cmmuxnijv001ymgaxdt4kixlv",
+            "email": "sync-user.1773771331043.1@example.com",
             "fullName": "vvaa",
-            "phone": "084784795001",
+            "phone": "084733104301",
             "profile": {
               "province": "DKI Jakarta",
               "city": "Jakarta Selatan",
               "extra": {
-                "whatsapp": "084784795001"
+                "whatsapp": "084733104301"
               }
             }
           },
-          "resultId": "cmmrgc4t50006m8yfbkleosog",
-          "completedAt": "2026-03-15T07:47:28.217Z",
+          "resultId": "cmmuxnikn0006hl667w3pzwm7",
+          "completedAt": "2026-03-17T18:15:31.271Z",
           "personalityType": "Si Ahli Terstruktur",
           "dominantLabel": "Si Ahli Terstruktur",
           "displayAnalysis": {
@@ -1020,6 +1341,113 @@
               "dibutuhkanPadaProfesi": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
               "code": "aL"
             },
+            "personalInsights": {
+              "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
+              "kekuatanUtama": [
+                "Standar kualitas tertinggi — tidak puas sebelum semuanya sempurna",
+                "Kemampuan analisis mendalam yang mengidentifikasi masalah sebelum terjadi",
+                "Terorganisir dan sistematis — membuat kekacauan menjadi kejelasan",
+                "Keputusan berbasis data dan logika yang jarang membuat kesalahan besar",
+                "Profesionalisme tinggi yang membangun kepercayaan jangka panjang"
+              ],
+              "areasPengembanganDiri": [
+                "Perfeksionisme yang berlebihan bisa menghambat progress dan produktivitas",
+                "Fleksibilitas — dunia tidak selalu berjalan sesuai rencana",
+                "Empati dan kehangatan dalam berinteraksi dengan tim",
+                "Delegasi — sulit mempercayakan pekerjaan orang lain karena standar tinggi"
+              ],
+              "rekomendasiKarirSpesifik": [
+                {
+                  "bidang": "Auditor",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Auditor"
+                  ]
+                },
+                {
+                  "bidang": "Engineer",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Engineer"
+                  ]
+                },
+                {
+                  "bidang": "Data Analyst",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Data Analyst"
+                  ]
+                },
+                {
+                  "bidang": "Quality Manager",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Quality Manager"
+                  ]
+                },
+                {
+                  "bidang": "Lawyer",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Lawyer"
+                  ]
+                },
+                {
+                  "bidang": "Financial Planner",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Financial Planner"
+                  ]
+                },
+                {
+                  "bidang": "System Architect",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "System Architect"
+                  ]
+                }
+              ],
+              "strategiPengembanganDiri": [
+                {
+                  "area": "Gaya Kerja",
+                  "langkahKonkret": [
+                    "Sistematis, Perfeksionis & High-Quality"
+                  ]
+                },
+                {
+                  "area": "Gaya Belajar",
+                  "langkahKonkret": [
+                    "Sistematis, Terstruktur & Berbasis Teori"
+                  ]
+                },
+                {
+                  "area": "Gaya Konflik",
+                  "langkahKonkret": [
+                    "Analisis Fakta & Solusi Logis"
+                  ]
+                },
+                {
+                  "area": "Gaya Komunikasi",
+                  "langkahKonkret": [
+                    "Tepat, Jelas & Data-Driven"
+                  ]
+                },
+                {
+                  "area": "Gaya Kepemimpinan",
+                  "langkahKonkret": [
+                    "Expert Authority & Standard-Setting"
+                  ]
+                }
+              ],
+              "tipsPraktis": [
+                "Perfeksionis dalam arti positif — standar tinggi menghasilkan kualitas terbaik",
+                "Sangat terorganisir dan sistematis dalam setiap aspek pekerjaan",
+                "Analitis dan logis — keputusan selalu berbasis data dan fakta",
+                "Profesional dan terpercaya dalam lingkup kerja apapun",
+                "Ambivert yang fleksibel — bisa tampil saat perlu, tenang saat intens bekerja"
+              ],
+              "motivationalMessage": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi."
+            },
             "aiInsights": {
               "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
               "kekuatanUtama": [
@@ -1129,16 +1557,16 @@
             }
           },
           "userName": "vvaa",
-          "userEmail": "sync-user.1773560847950.1@example.com",
-          "userWhatsapp": "084784795001",
+          "userEmail": "sync-user.1773771331043.1@example.com",
+          "userWhatsapp": "084733104301",
           "userProvince": "DKI Jakarta",
           "userCity": "Jakarta Selatan"
         }
       }
     },
     "adminPremiumListItem": {
-      "id": "cmmrgc4t50006m8yfbkleosog",
-      "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+      "id": "cmmuxnikn0006hl667w3pzwm7",
+      "userId": "cmmuxnijv001ymgaxdt4kixlv",
       "submissionId": null,
       "testType": "paid",
       "category": "general",
@@ -1166,23 +1594,23 @@
       },
       "paidInsights": null,
       "aiInsights": null,
-      "createdAt": "2026-03-15T07:47:28.217Z",
+      "createdAt": "2026-03-17T18:15:31.271Z",
       "user": {
-        "id": "cmmrgc4rw001qkjqi4cxzxof0",
-        "email": "sync-user.1773560847950.1@example.com",
+        "id": "cmmuxnijv001ymgaxdt4kixlv",
+        "email": "sync-user.1773771331043.1@example.com",
         "fullName": "vvaa",
-        "phone": "084784795001",
+        "phone": "084733104301",
         "role": "USER",
         "profile": {
           "province": "DKI Jakarta",
           "city": "Jakarta Selatan",
           "extra": {
-            "whatsapp": "084784795001"
+            "whatsapp": "084733104301"
           }
         }
       },
-      "resultId": "cmmrgc4t50006m8yfbkleosog",
-      "completedAt": "2026-03-15T07:47:28.217Z",
+      "resultId": "cmmuxnikn0006hl667w3pzwm7",
+      "completedAt": "2026-03-17T18:15:31.271Z",
       "personalityType": "Si Ahli Terstruktur",
       "dominantLabel": "Si Ahli Terstruktur",
       "displayAnalysis": {
@@ -1300,6 +1728,113 @@
           "dibutuhkanPadaProfesi": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
           "code": "aL"
         },
+        "personalInsights": {
+          "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
+          "kekuatanUtama": [
+            "Standar kualitas tertinggi — tidak puas sebelum semuanya sempurna",
+            "Kemampuan analisis mendalam yang mengidentifikasi masalah sebelum terjadi",
+            "Terorganisir dan sistematis — membuat kekacauan menjadi kejelasan",
+            "Keputusan berbasis data dan logika yang jarang membuat kesalahan besar",
+            "Profesionalisme tinggi yang membangun kepercayaan jangka panjang"
+          ],
+          "areasPengembanganDiri": [
+            "Perfeksionisme yang berlebihan bisa menghambat progress dan produktivitas",
+            "Fleksibilitas — dunia tidak selalu berjalan sesuai rencana",
+            "Empati dan kehangatan dalam berinteraksi dengan tim",
+            "Delegasi — sulit mempercayakan pekerjaan orang lain karena standar tinggi"
+          ],
+          "rekomendasiKarirSpesifik": [
+            {
+              "bidang": "Auditor",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Auditor"
+              ]
+            },
+            {
+              "bidang": "Engineer",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Engineer"
+              ]
+            },
+            {
+              "bidang": "Data Analyst",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Data Analyst"
+              ]
+            },
+            {
+              "bidang": "Quality Manager",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Quality Manager"
+              ]
+            },
+            {
+              "bidang": "Lawyer",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Lawyer"
+              ]
+            },
+            {
+              "bidang": "Financial Planner",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Financial Planner"
+              ]
+            },
+            {
+              "bidang": "System Architect",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "System Architect"
+              ]
+            }
+          ],
+          "strategiPengembanganDiri": [
+            {
+              "area": "Gaya Kerja",
+              "langkahKonkret": [
+                "Sistematis, Perfeksionis & High-Quality"
+              ]
+            },
+            {
+              "area": "Gaya Belajar",
+              "langkahKonkret": [
+                "Sistematis, Terstruktur & Berbasis Teori"
+              ]
+            },
+            {
+              "area": "Gaya Konflik",
+              "langkahKonkret": [
+                "Analisis Fakta & Solusi Logis"
+              ]
+            },
+            {
+              "area": "Gaya Komunikasi",
+              "langkahKonkret": [
+                "Tepat, Jelas & Data-Driven"
+              ]
+            },
+            {
+              "area": "Gaya Kepemimpinan",
+              "langkahKonkret": [
+                "Expert Authority & Standard-Setting"
+              ]
+            }
+          ],
+          "tipsPraktis": [
+            "Perfeksionis dalam arti positif — standar tinggi menghasilkan kualitas terbaik",
+            "Sangat terorganisir dan sistematis dalam setiap aspek pekerjaan",
+            "Analitis dan logis — keputusan selalu berbasis data dan fakta",
+            "Profesional dan terpercaya dalam lingkup kerja apapun",
+            "Ambivert yang fleksibel — bisa tampil saat perlu, tenang saat intens bekerja"
+          ],
+          "motivationalMessage": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi."
+        },
         "aiInsights": {
           "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
           "kekuatanUtama": [
@@ -1409,8 +1944,8 @@
         }
       },
       "userName": "vvaa",
-      "userEmail": "sync-user.1773560847950.1@example.com",
-      "userWhatsapp": "084784795001",
+      "userEmail": "sync-user.1773771331043.1@example.com",
+      "userWhatsapp": "084733104301",
       "userProvince": "DKI Jakarta",
       "userCity": "Jakarta Selatan"
     },
@@ -1418,8 +1953,8 @@
       "ok": true,
       "status": 200,
       "data": {
-        "id": "cmmrgc4t50006m8yfbkleosog",
-        "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+        "id": "cmmuxnikn0006hl667w3pzwm7",
+        "userId": "cmmuxnijv001ymgaxdt4kixlv",
         "submissionId": null,
         "testType": "paid",
         "category": "general",
@@ -1447,23 +1982,23 @@
         },
         "paidInsights": null,
         "aiInsights": null,
-        "createdAt": "2026-03-15T07:47:28.217Z",
+        "createdAt": "2026-03-17T18:15:31.271Z",
         "user": {
-          "id": "cmmrgc4rw001qkjqi4cxzxof0",
-          "email": "sync-user.1773560847950.1@example.com",
+          "id": "cmmuxnijv001ymgaxdt4kixlv",
+          "email": "sync-user.1773771331043.1@example.com",
           "fullName": "vvaa",
-          "phone": "084784795001",
+          "phone": "084733104301",
           "role": "USER",
           "profile": {
             "province": "DKI Jakarta",
             "city": "Jakarta Selatan",
             "extra": {
-              "whatsapp": "084784795001"
+              "whatsapp": "084733104301"
             }
           }
         },
-        "resultId": "cmmrgc4t50006m8yfbkleosog",
-        "completedAt": "2026-03-15T07:47:28.217Z",
+        "resultId": "cmmuxnikn0006hl667w3pzwm7",
+        "completedAt": "2026-03-17T18:15:31.271Z",
         "personalityType": "Si Ahli Terstruktur",
         "dominantLabel": "Si Ahli Terstruktur",
         "displayAnalysis": {
@@ -1581,6 +2116,113 @@
             "dibutuhkanPadaProfesi": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
             "code": "aL"
           },
+          "personalInsights": {
+            "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
+            "kekuatanUtama": [
+              "Standar kualitas tertinggi — tidak puas sebelum semuanya sempurna",
+              "Kemampuan analisis mendalam yang mengidentifikasi masalah sebelum terjadi",
+              "Terorganisir dan sistematis — membuat kekacauan menjadi kejelasan",
+              "Keputusan berbasis data dan logika yang jarang membuat kesalahan besar",
+              "Profesionalisme tinggi yang membangun kepercayaan jangka panjang"
+            ],
+            "areasPengembanganDiri": [
+              "Perfeksionisme yang berlebihan bisa menghambat progress dan produktivitas",
+              "Fleksibilitas — dunia tidak selalu berjalan sesuai rencana",
+              "Empati dan kehangatan dalam berinteraksi dengan tim",
+              "Delegasi — sulit mempercayakan pekerjaan orang lain karena standar tinggi"
+            ],
+            "rekomendasiKarirSpesifik": [
+              {
+                "bidang": "Auditor",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Auditor"
+                ]
+              },
+              {
+                "bidang": "Engineer",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Engineer"
+                ]
+              },
+              {
+                "bidang": "Data Analyst",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Data Analyst"
+                ]
+              },
+              {
+                "bidang": "Quality Manager",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Quality Manager"
+                ]
+              },
+              {
+                "bidang": "Lawyer",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Lawyer"
+                ]
+              },
+              {
+                "bidang": "Financial Planner",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "Financial Planner"
+                ]
+              },
+              {
+                "bidang": "System Architect",
+                "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                "roleContoh": [
+                  "System Architect"
+                ]
+              }
+            ],
+            "strategiPengembanganDiri": [
+              {
+                "area": "Gaya Kerja",
+                "langkahKonkret": [
+                  "Sistematis, Perfeksionis & High-Quality"
+                ]
+              },
+              {
+                "area": "Gaya Belajar",
+                "langkahKonkret": [
+                  "Sistematis, Terstruktur & Berbasis Teori"
+                ]
+              },
+              {
+                "area": "Gaya Konflik",
+                "langkahKonkret": [
+                  "Analisis Fakta & Solusi Logis"
+                ]
+              },
+              {
+                "area": "Gaya Komunikasi",
+                "langkahKonkret": [
+                  "Tepat, Jelas & Data-Driven"
+                ]
+              },
+              {
+                "area": "Gaya Kepemimpinan",
+                "langkahKonkret": [
+                  "Expert Authority & Standard-Setting"
+                ]
+              }
+            ],
+            "tipsPraktis": [
+              "Perfeksionis dalam arti positif — standar tinggi menghasilkan kualitas terbaik",
+              "Sangat terorganisir dan sistematis dalam setiap aspek pekerjaan",
+              "Analitis dan logis — keputusan selalu berbasis data dan fakta",
+              "Profesional dan terpercaya dalam lingkup kerja apapun",
+              "Ambivert yang fleksibel — bisa tampil saat perlu, tenang saat intens bekerja"
+            ],
+            "motivationalMessage": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi."
+          },
           "aiInsights": {
             "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
             "kekuatanUtama": [
@@ -1690,8 +2332,8 @@
           }
         },
         "userName": "vvaa",
-        "userEmail": "sync-user.1773560847950.1@example.com",
-        "userWhatsapp": "084784795001",
+        "userEmail": "sync-user.1773771331043.1@example.com",
+        "userWhatsapp": "084733104301",
         "userProvince": "DKI Jakarta",
         "userCity": "Jakarta Selatan"
       },
@@ -1699,8 +2341,8 @@
         "success": true,
         "message": "OK",
         "data": {
-          "id": "cmmrgc4t50006m8yfbkleosog",
-          "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+          "id": "cmmuxnikn0006hl667w3pzwm7",
+          "userId": "cmmuxnijv001ymgaxdt4kixlv",
           "submissionId": null,
           "testType": "paid",
           "category": "general",
@@ -1728,23 +2370,23 @@
           },
           "paidInsights": null,
           "aiInsights": null,
-          "createdAt": "2026-03-15T07:47:28.217Z",
+          "createdAt": "2026-03-17T18:15:31.271Z",
           "user": {
-            "id": "cmmrgc4rw001qkjqi4cxzxof0",
-            "email": "sync-user.1773560847950.1@example.com",
+            "id": "cmmuxnijv001ymgaxdt4kixlv",
+            "email": "sync-user.1773771331043.1@example.com",
             "fullName": "vvaa",
-            "phone": "084784795001",
+            "phone": "084733104301",
             "role": "USER",
             "profile": {
               "province": "DKI Jakarta",
               "city": "Jakarta Selatan",
               "extra": {
-                "whatsapp": "084784795001"
+                "whatsapp": "084733104301"
               }
             }
           },
-          "resultId": "cmmrgc4t50006m8yfbkleosog",
-          "completedAt": "2026-03-15T07:47:28.217Z",
+          "resultId": "cmmuxnikn0006hl667w3pzwm7",
+          "completedAt": "2026-03-17T18:15:31.271Z",
           "personalityType": "Si Ahli Terstruktur",
           "dominantLabel": "Si Ahli Terstruktur",
           "displayAnalysis": {
@@ -1862,6 +2504,113 @@
               "dibutuhkanPadaProfesi": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
               "code": "aL"
             },
+            "personalInsights": {
+              "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
+              "kekuatanUtama": [
+                "Standar kualitas tertinggi — tidak puas sebelum semuanya sempurna",
+                "Kemampuan analisis mendalam yang mengidentifikasi masalah sebelum terjadi",
+                "Terorganisir dan sistematis — membuat kekacauan menjadi kejelasan",
+                "Keputusan berbasis data dan logika yang jarang membuat kesalahan besar",
+                "Profesionalisme tinggi yang membangun kepercayaan jangka panjang"
+              ],
+              "areasPengembanganDiri": [
+                "Perfeksionisme yang berlebihan bisa menghambat progress dan produktivitas",
+                "Fleksibilitas — dunia tidak selalu berjalan sesuai rencana",
+                "Empati dan kehangatan dalam berinteraksi dengan tim",
+                "Delegasi — sulit mempercayakan pekerjaan orang lain karena standar tinggi"
+              ],
+              "rekomendasiKarirSpesifik": [
+                {
+                  "bidang": "Auditor",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Auditor"
+                  ]
+                },
+                {
+                  "bidang": "Engineer",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Engineer"
+                  ]
+                },
+                {
+                  "bidang": "Data Analyst",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Data Analyst"
+                  ]
+                },
+                {
+                  "bidang": "Quality Manager",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Quality Manager"
+                  ]
+                },
+                {
+                  "bidang": "Lawyer",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Lawyer"
+                  ]
+                },
+                {
+                  "bidang": "Financial Planner",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Financial Planner"
+                  ]
+                },
+                {
+                  "bidang": "System Architect",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "System Architect"
+                  ]
+                }
+              ],
+              "strategiPengembanganDiri": [
+                {
+                  "area": "Gaya Kerja",
+                  "langkahKonkret": [
+                    "Sistematis, Perfeksionis & High-Quality"
+                  ]
+                },
+                {
+                  "area": "Gaya Belajar",
+                  "langkahKonkret": [
+                    "Sistematis, Terstruktur & Berbasis Teori"
+                  ]
+                },
+                {
+                  "area": "Gaya Konflik",
+                  "langkahKonkret": [
+                    "Analisis Fakta & Solusi Logis"
+                  ]
+                },
+                {
+                  "area": "Gaya Komunikasi",
+                  "langkahKonkret": [
+                    "Tepat, Jelas & Data-Driven"
+                  ]
+                },
+                {
+                  "area": "Gaya Kepemimpinan",
+                  "langkahKonkret": [
+                    "Expert Authority & Standard-Setting"
+                  ]
+                }
+              ],
+              "tipsPraktis": [
+                "Perfeksionis dalam arti positif — standar tinggi menghasilkan kualitas terbaik",
+                "Sangat terorganisir dan sistematis dalam setiap aspek pekerjaan",
+                "Analitis dan logis — keputusan selalu berbasis data dan fakta",
+                "Profesional dan terpercaya dalam lingkup kerja apapun",
+                "Ambivert yang fleksibel — bisa tampil saat perlu, tenang saat intens bekerja"
+              ],
+              "motivationalMessage": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi."
+            },
             "aiInsights": {
               "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
               "kekuatanUtama": [
@@ -1971,8 +2720,8 @@
             }
           },
           "userName": "vvaa",
-          "userEmail": "sync-user.1773560847950.1@example.com",
-          "userWhatsapp": "084784795001",
+          "userEmail": "sync-user.1773771331043.1@example.com",
+          "userWhatsapp": "084733104301",
           "userProvince": "DKI Jakarta",
           "userCity": "Jakarta Selatan"
         }
@@ -1982,25 +2731,25 @@
       "ok": true,
       "status": 200,
       "data": {
-        "total": 223,
-        "totalPaid": 9,
-        "totalFree": 214,
-        "premiumResultsThisMonth": 9
+        "total": 262,
+        "totalPaid": 36,
+        "totalFree": 226,
+        "premiumResultsThisMonth": 36
       },
       "body": {
         "success": true,
         "message": "OK",
         "data": {
-          "total": 223,
-          "totalPaid": 9,
-          "totalFree": 214,
-          "premiumResultsThisMonth": 9
+          "total": 262,
+          "totalPaid": 36,
+          "totalFree": 226,
+          "premiumResultsThisMonth": 36
         }
       }
     },
     "yayasanListItem": {
-      "id": "cmmrgc4t50006m8yfbkleosog",
-      "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+      "id": "cmmuxnikn0006hl667w3pzwm7",
+      "userId": "cmmuxnijv001ymgaxdt4kixlv",
       "submissionId": null,
       "testType": "paid",
       "category": "general",
@@ -2028,22 +2777,22 @@
       },
       "paidInsights": null,
       "aiInsights": null,
-      "createdAt": "2026-03-15T07:47:28.217Z",
+      "createdAt": "2026-03-17T18:15:31.271Z",
       "user": {
-        "id": "cmmrgc4rw001qkjqi4cxzxof0",
-        "email": "sync-user.1773560847950.1@example.com",
+        "id": "cmmuxnijv001ymgaxdt4kixlv",
+        "email": "sync-user.1773771331043.1@example.com",
         "fullName": "vvaa",
-        "phone": "084784795001",
+        "phone": "084733104301",
         "profile": {
           "province": "DKI Jakarta",
           "city": "Jakarta Selatan",
           "extra": {
-            "whatsapp": "084784795001"
+            "whatsapp": "084733104301"
           }
         }
       },
-      "resultId": "cmmrgc4t50006m8yfbkleosog",
-      "completedAt": "2026-03-15T07:47:28.217Z",
+      "resultId": "cmmuxnikn0006hl667w3pzwm7",
+      "completedAt": "2026-03-17T18:15:31.271Z",
       "personalityType": "Si Ahli Terstruktur",
       "dominantLabel": "Si Ahli Terstruktur",
       "displayAnalysis": {
@@ -2161,6 +2910,113 @@
           "dibutuhkanPadaProfesi": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
           "code": "aL"
         },
+        "personalInsights": {
+          "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
+          "kekuatanUtama": [
+            "Standar kualitas tertinggi — tidak puas sebelum semuanya sempurna",
+            "Kemampuan analisis mendalam yang mengidentifikasi masalah sebelum terjadi",
+            "Terorganisir dan sistematis — membuat kekacauan menjadi kejelasan",
+            "Keputusan berbasis data dan logika yang jarang membuat kesalahan besar",
+            "Profesionalisme tinggi yang membangun kepercayaan jangka panjang"
+          ],
+          "areasPengembanganDiri": [
+            "Perfeksionisme yang berlebihan bisa menghambat progress dan produktivitas",
+            "Fleksibilitas — dunia tidak selalu berjalan sesuai rencana",
+            "Empati dan kehangatan dalam berinteraksi dengan tim",
+            "Delegasi — sulit mempercayakan pekerjaan orang lain karena standar tinggi"
+          ],
+          "rekomendasiKarirSpesifik": [
+            {
+              "bidang": "Auditor",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Auditor"
+              ]
+            },
+            {
+              "bidang": "Engineer",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Engineer"
+              ]
+            },
+            {
+              "bidang": "Data Analyst",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Data Analyst"
+              ]
+            },
+            {
+              "bidang": "Quality Manager",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Quality Manager"
+              ]
+            },
+            {
+              "bidang": "Lawyer",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Lawyer"
+              ]
+            },
+            {
+              "bidang": "Financial Planner",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "Financial Planner"
+              ]
+            },
+            {
+              "bidang": "System Architect",
+              "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+              "roleContoh": [
+                "System Architect"
+              ]
+            }
+          ],
+          "strategiPengembanganDiri": [
+            {
+              "area": "Gaya Kerja",
+              "langkahKonkret": [
+                "Sistematis, Perfeksionis & High-Quality"
+              ]
+            },
+            {
+              "area": "Gaya Belajar",
+              "langkahKonkret": [
+                "Sistematis, Terstruktur & Berbasis Teori"
+              ]
+            },
+            {
+              "area": "Gaya Konflik",
+              "langkahKonkret": [
+                "Analisis Fakta & Solusi Logis"
+              ]
+            },
+            {
+              "area": "Gaya Komunikasi",
+              "langkahKonkret": [
+                "Tepat, Jelas & Data-Driven"
+              ]
+            },
+            {
+              "area": "Gaya Kepemimpinan",
+              "langkahKonkret": [
+                "Expert Authority & Standard-Setting"
+              ]
+            }
+          ],
+          "tipsPraktis": [
+            "Perfeksionis dalam arti positif — standar tinggi menghasilkan kualitas terbaik",
+            "Sangat terorganisir dan sistematis dalam setiap aspek pekerjaan",
+            "Analitis dan logis — keputusan selalu berbasis data dan fakta",
+            "Profesional dan terpercaya dalam lingkup kerja apapun",
+            "Ambivert yang fleksibel — bisa tampil saat perlu, tenang saat intens bekerja"
+          ],
+          "motivationalMessage": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi."
+        },
         "aiInsights": {
           "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
           "kekuatanUtama": [
@@ -2270,8 +3126,8 @@
         }
       },
       "userName": "vvaa",
-      "userEmail": "sync-user.1773560847950.1@example.com",
-      "userWhatsapp": "084784795001",
+      "userEmail": "sync-user.1773771331043.1@example.com",
+      "userWhatsapp": "084733104301",
       "userProvince": "DKI Jakarta",
       "userCity": "Jakarta Selatan"
     },
@@ -2279,9 +3135,9 @@
       "ok": true,
       "status": 200,
       "data": {
-        "id": "cmmrgc4rw001qkjqi4cxzxof0",
-        "email": "sync-user.1773560847950.1@example.com",
-        "phone": "084784795001",
+        "id": "cmmuxnijv001ymgaxdt4kixlv",
+        "email": "sync-user.1773771331043.1@example.com",
+        "phone": "084733104301",
         "passwordHash": "a109e36947ad56de1dca1cc49f0ef8ac9ad9a7b1aa0df41fb3c4cb73c1ff01ea",
         "fullName": "vvaa",
         "role": "USER",
@@ -2289,14 +3145,14 @@
         "paymentStatus": "approved",
         "freeTestStatus": "not_started",
         "paidTestStatus": "completed",
-        "myReferralCode": "U80743",
-        "referredByCode": "Y59809",
+        "myReferralCode": "U01513",
+        "referredByCode": "Y88388",
         "emailVerifiedAt": null,
-        "createdAt": "2026-03-15T07:47:28.172Z",
-        "updatedAt": "2026-03-15T07:47:28.198Z",
+        "createdAt": "2026-03-17T18:15:31.243Z",
+        "updatedAt": "2026-03-17T18:15:31.263Z",
         "profile": {
-          "id": "cmmrgc4rw001skjqi9s0kc9ci",
-          "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+          "id": "cmmuxnijv0020mgax2pth4ajz",
+          "userId": "cmmuxnijv001ymgaxdt4kixlv",
           "birthDate": null,
           "province": "DKI Jakarta",
           "city": "Jakarta Selatan",
@@ -2304,22 +3160,22 @@
           "village": null,
           "schoolLevel": null,
           "extra": {
-            "whatsapp": "084784795001"
+            "whatsapp": "084733104301"
           },
-          "createdAt": "2026-03-15T07:47:28.172Z",
-          "updatedAt": "2026-03-15T07:47:28.191Z"
+          "createdAt": "2026-03-17T18:15:31.243Z",
+          "updatedAt": "2026-03-17T18:15:31.259Z"
         },
         "wallet": {
-          "id": "cmmrgc4rw001rkjqimfc11tq4",
-          "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+          "id": "cmmuxnijv001zmgax59qzr0es",
+          "userId": "cmmuxnijv001ymgaxdt4kixlv",
           "availableBalance": 0,
           "reserveBalance": 0,
-          "updatedAt": "2026-03-15T07:47:28.172Z"
+          "updatedAt": "2026-03-17T18:15:31.243Z"
         },
         "testResults": [
           {
-            "id": "cmmrgc4t50006m8yfbkleosog",
-            "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+            "id": "cmmuxnikn0006hl667w3pzwm7",
+            "userId": "cmmuxnijv001ymgaxdt4kixlv",
             "submissionId": null,
             "testType": "paid",
             "category": "general",
@@ -2347,29 +3203,29 @@
             },
             "paidInsights": null,
             "aiInsights": null,
-            "createdAt": "2026-03-15T07:47:28.217Z",
+            "createdAt": "2026-03-17T18:15:31.271Z",
             "user": {
-              "id": "cmmrgc4rw001qkjqi4cxzxof0",
-              "email": "sync-user.1773560847950.1@example.com",
+              "id": "cmmuxnijv001ymgaxdt4kixlv",
+              "email": "sync-user.1773771331043.1@example.com",
               "fullName": "vvaa",
-              "phone": "084784795001",
+              "phone": "084733104301",
               "profile": {
                 "province": "DKI Jakarta",
                 "city": "Jakarta Selatan",
                 "extra": {
-                  "whatsapp": "084784795001"
+                  "whatsapp": "084733104301"
                 }
               }
             }
           }
         ],
-        "_id": "cmmrgc4rw001qkjqi4cxzxof0",
-        "publicId": "U80743",
-        "businessId": "U80743",
-        "memberCode": "U80743",
+        "_id": "cmmuxnijv001ymgaxdt4kixlv",
+        "publicId": "U01513",
+        "businessId": "U01513",
+        "memberCode": "U01513",
         "name": "vvaa",
         "username": "vvaa",
-        "whatsapp": "084784795001",
+        "whatsapp": "084733104301",
         "birthDate": null,
         "province": "DKI Jakarta",
         "city": "Jakarta Selatan",
@@ -2382,8 +3238,8 @@
         "description": null,
         "referralSource": null,
         "referralOther": null,
-        "referralCode": "U80743",
-        "usedReferralCode": "Y59809",
+        "referralCode": "U01513",
+        "usedReferralCode": "Y88388",
         "isBanned": false,
         "isActive": true,
         "isVerified": true,
@@ -2417,8 +3273,8 @@
         "walletBalance": 0,
         "reserveBalance": 0,
         "latestResult": {
-          "id": "cmmrgc4t50006m8yfbkleosog",
-          "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+          "id": "cmmuxnikn0006hl667w3pzwm7",
+          "userId": "cmmuxnijv001ymgaxdt4kixlv",
           "submissionId": null,
           "testType": "paid",
           "category": "general",
@@ -2446,22 +3302,22 @@
           },
           "paidInsights": null,
           "aiInsights": null,
-          "createdAt": "2026-03-15T07:47:28.217Z",
+          "createdAt": "2026-03-17T18:15:31.271Z",
           "user": {
-            "id": "cmmrgc4rw001qkjqi4cxzxof0",
-            "email": "sync-user.1773560847950.1@example.com",
+            "id": "cmmuxnijv001ymgaxdt4kixlv",
+            "email": "sync-user.1773771331043.1@example.com",
             "fullName": "vvaa",
-            "phone": "084784795001",
+            "phone": "084733104301",
             "profile": {
               "province": "DKI Jakarta",
               "city": "Jakarta Selatan",
               "extra": {
-                "whatsapp": "084784795001"
+                "whatsapp": "084733104301"
               }
             }
           },
-          "resultId": "cmmrgc4t50006m8yfbkleosog",
-          "completedAt": "2026-03-15T07:47:28.217Z",
+          "resultId": "cmmuxnikn0006hl667w3pzwm7",
+          "completedAt": "2026-03-17T18:15:31.271Z",
           "personalityType": "Si Ahli Terstruktur",
           "dominantLabel": "Si Ahli Terstruktur",
           "displayAnalysis": {
@@ -2579,6 +3435,113 @@
               "dibutuhkanPadaProfesi": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
               "code": "aL"
             },
+            "personalInsights": {
+              "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
+              "kekuatanUtama": [
+                "Standar kualitas tertinggi — tidak puas sebelum semuanya sempurna",
+                "Kemampuan analisis mendalam yang mengidentifikasi masalah sebelum terjadi",
+                "Terorganisir dan sistematis — membuat kekacauan menjadi kejelasan",
+                "Keputusan berbasis data dan logika yang jarang membuat kesalahan besar",
+                "Profesionalisme tinggi yang membangun kepercayaan jangka panjang"
+              ],
+              "areasPengembanganDiri": [
+                "Perfeksionisme yang berlebihan bisa menghambat progress dan produktivitas",
+                "Fleksibilitas — dunia tidak selalu berjalan sesuai rencana",
+                "Empati dan kehangatan dalam berinteraksi dengan tim",
+                "Delegasi — sulit mempercayakan pekerjaan orang lain karena standar tinggi"
+              ],
+              "rekomendasiKarirSpesifik": [
+                {
+                  "bidang": "Auditor",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Auditor"
+                  ]
+                },
+                {
+                  "bidang": "Engineer",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Engineer"
+                  ]
+                },
+                {
+                  "bidang": "Data Analyst",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Data Analyst"
+                  ]
+                },
+                {
+                  "bidang": "Quality Manager",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Quality Manager"
+                  ]
+                },
+                {
+                  "bidang": "Lawyer",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Lawyer"
+                  ]
+                },
+                {
+                  "bidang": "Financial Planner",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "Financial Planner"
+                  ]
+                },
+                {
+                  "bidang": "System Architect",
+                  "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                  "roleContoh": [
+                    "System Architect"
+                  ]
+                }
+              ],
+              "strategiPengembanganDiri": [
+                {
+                  "area": "Gaya Kerja",
+                  "langkahKonkret": [
+                    "Sistematis, Perfeksionis & High-Quality"
+                  ]
+                },
+                {
+                  "area": "Gaya Belajar",
+                  "langkahKonkret": [
+                    "Sistematis, Terstruktur & Berbasis Teori"
+                  ]
+                },
+                {
+                  "area": "Gaya Konflik",
+                  "langkahKonkret": [
+                    "Analisis Fakta & Solusi Logis"
+                  ]
+                },
+                {
+                  "area": "Gaya Komunikasi",
+                  "langkahKonkret": [
+                    "Tepat, Jelas & Data-Driven"
+                  ]
+                },
+                {
+                  "area": "Gaya Kepemimpinan",
+                  "langkahKonkret": [
+                    "Expert Authority & Standard-Setting"
+                  ]
+                }
+              ],
+              "tipsPraktis": [
+                "Perfeksionis dalam arti positif — standar tinggi menghasilkan kualitas terbaik",
+                "Sangat terorganisir dan sistematis dalam setiap aspek pekerjaan",
+                "Analitis dan logis — keputusan selalu berbasis data dan fakta",
+                "Profesional dan terpercaya dalam lingkup kerja apapun",
+                "Ambivert yang fleksibel — bisa tampil saat perlu, tenang saat intens bekerja"
+              ],
+              "motivationalMessage": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi."
+            },
             "aiInsights": {
               "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
               "kekuatanUtama": [
@@ -2688,8 +3651,8 @@
             }
           },
           "userName": "vvaa",
-          "userEmail": "sync-user.1773560847950.1@example.com",
-          "userWhatsapp": "084784795001",
+          "userEmail": "sync-user.1773771331043.1@example.com",
+          "userWhatsapp": "084733104301",
           "userProvince": "DKI Jakarta",
           "userCity": "Jakarta Selatan"
         }
@@ -2698,9 +3661,9 @@
         "success": true,
         "message": "OK",
         "data": {
-          "id": "cmmrgc4rw001qkjqi4cxzxof0",
-          "email": "sync-user.1773560847950.1@example.com",
-          "phone": "084784795001",
+          "id": "cmmuxnijv001ymgaxdt4kixlv",
+          "email": "sync-user.1773771331043.1@example.com",
+          "phone": "084733104301",
           "passwordHash": "a109e36947ad56de1dca1cc49f0ef8ac9ad9a7b1aa0df41fb3c4cb73c1ff01ea",
           "fullName": "vvaa",
           "role": "USER",
@@ -2708,14 +3671,14 @@
           "paymentStatus": "approved",
           "freeTestStatus": "not_started",
           "paidTestStatus": "completed",
-          "myReferralCode": "U80743",
-          "referredByCode": "Y59809",
+          "myReferralCode": "U01513",
+          "referredByCode": "Y88388",
           "emailVerifiedAt": null,
-          "createdAt": "2026-03-15T07:47:28.172Z",
-          "updatedAt": "2026-03-15T07:47:28.198Z",
+          "createdAt": "2026-03-17T18:15:31.243Z",
+          "updatedAt": "2026-03-17T18:15:31.263Z",
           "profile": {
-            "id": "cmmrgc4rw001skjqi9s0kc9ci",
-            "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+            "id": "cmmuxnijv0020mgax2pth4ajz",
+            "userId": "cmmuxnijv001ymgaxdt4kixlv",
             "birthDate": null,
             "province": "DKI Jakarta",
             "city": "Jakarta Selatan",
@@ -2723,22 +3686,22 @@
             "village": null,
             "schoolLevel": null,
             "extra": {
-              "whatsapp": "084784795001"
+              "whatsapp": "084733104301"
             },
-            "createdAt": "2026-03-15T07:47:28.172Z",
-            "updatedAt": "2026-03-15T07:47:28.191Z"
+            "createdAt": "2026-03-17T18:15:31.243Z",
+            "updatedAt": "2026-03-17T18:15:31.259Z"
           },
           "wallet": {
-            "id": "cmmrgc4rw001rkjqimfc11tq4",
-            "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+            "id": "cmmuxnijv001zmgax59qzr0es",
+            "userId": "cmmuxnijv001ymgaxdt4kixlv",
             "availableBalance": 0,
             "reserveBalance": 0,
-            "updatedAt": "2026-03-15T07:47:28.172Z"
+            "updatedAt": "2026-03-17T18:15:31.243Z"
           },
           "testResults": [
             {
-              "id": "cmmrgc4t50006m8yfbkleosog",
-              "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+              "id": "cmmuxnikn0006hl667w3pzwm7",
+              "userId": "cmmuxnijv001ymgaxdt4kixlv",
               "submissionId": null,
               "testType": "paid",
               "category": "general",
@@ -2766,29 +3729,29 @@
               },
               "paidInsights": null,
               "aiInsights": null,
-              "createdAt": "2026-03-15T07:47:28.217Z",
+              "createdAt": "2026-03-17T18:15:31.271Z",
               "user": {
-                "id": "cmmrgc4rw001qkjqi4cxzxof0",
-                "email": "sync-user.1773560847950.1@example.com",
+                "id": "cmmuxnijv001ymgaxdt4kixlv",
+                "email": "sync-user.1773771331043.1@example.com",
                 "fullName": "vvaa",
-                "phone": "084784795001",
+                "phone": "084733104301",
                 "profile": {
                   "province": "DKI Jakarta",
                   "city": "Jakarta Selatan",
                   "extra": {
-                    "whatsapp": "084784795001"
+                    "whatsapp": "084733104301"
                   }
                 }
               }
             }
           ],
-          "_id": "cmmrgc4rw001qkjqi4cxzxof0",
-          "publicId": "U80743",
-          "businessId": "U80743",
-          "memberCode": "U80743",
+          "_id": "cmmuxnijv001ymgaxdt4kixlv",
+          "publicId": "U01513",
+          "businessId": "U01513",
+          "memberCode": "U01513",
           "name": "vvaa",
           "username": "vvaa",
-          "whatsapp": "084784795001",
+          "whatsapp": "084733104301",
           "birthDate": null,
           "province": "DKI Jakarta",
           "city": "Jakarta Selatan",
@@ -2801,8 +3764,8 @@
           "description": null,
           "referralSource": null,
           "referralOther": null,
-          "referralCode": "U80743",
-          "usedReferralCode": "Y59809",
+          "referralCode": "U01513",
+          "usedReferralCode": "Y88388",
           "isBanned": false,
           "isActive": true,
           "isVerified": true,
@@ -2836,8 +3799,8 @@
           "walletBalance": 0,
           "reserveBalance": 0,
           "latestResult": {
-            "id": "cmmrgc4t50006m8yfbkleosog",
-            "userId": "cmmrgc4rw001qkjqi4cxzxof0",
+            "id": "cmmuxnikn0006hl667w3pzwm7",
+            "userId": "cmmuxnijv001ymgaxdt4kixlv",
             "submissionId": null,
             "testType": "paid",
             "category": "general",
@@ -2865,22 +3828,22 @@
             },
             "paidInsights": null,
             "aiInsights": null,
-            "createdAt": "2026-03-15T07:47:28.217Z",
+            "createdAt": "2026-03-17T18:15:31.271Z",
             "user": {
-              "id": "cmmrgc4rw001qkjqi4cxzxof0",
-              "email": "sync-user.1773560847950.1@example.com",
+              "id": "cmmuxnijv001ymgaxdt4kixlv",
+              "email": "sync-user.1773771331043.1@example.com",
               "fullName": "vvaa",
-              "phone": "084784795001",
+              "phone": "084733104301",
               "profile": {
                 "province": "DKI Jakarta",
                 "city": "Jakarta Selatan",
                 "extra": {
-                  "whatsapp": "084784795001"
+                  "whatsapp": "084733104301"
                 }
               }
             },
-            "resultId": "cmmrgc4t50006m8yfbkleosog",
-            "completedAt": "2026-03-15T07:47:28.217Z",
+            "resultId": "cmmuxnikn0006hl667w3pzwm7",
+            "completedAt": "2026-03-17T18:15:31.271Z",
             "personalityType": "Si Ahli Terstruktur",
             "dominantLabel": "Si Ahli Terstruktur",
             "displayAnalysis": {
@@ -2998,6 +3961,113 @@
                 "dibutuhkanPadaProfesi": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
                 "code": "aL"
               },
+              "personalInsights": {
+                "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
+                "kekuatanUtama": [
+                  "Standar kualitas tertinggi — tidak puas sebelum semuanya sempurna",
+                  "Kemampuan analisis mendalam yang mengidentifikasi masalah sebelum terjadi",
+                  "Terorganisir dan sistematis — membuat kekacauan menjadi kejelasan",
+                  "Keputusan berbasis data dan logika yang jarang membuat kesalahan besar",
+                  "Profesionalisme tinggi yang membangun kepercayaan jangka panjang"
+                ],
+                "areasPengembanganDiri": [
+                  "Perfeksionisme yang berlebihan bisa menghambat progress dan produktivitas",
+                  "Fleksibilitas — dunia tidak selalu berjalan sesuai rencana",
+                  "Empati dan kehangatan dalam berinteraksi dengan tim",
+                  "Delegasi — sulit mempercayakan pekerjaan orang lain karena standar tinggi"
+                ],
+                "rekomendasiKarirSpesifik": [
+                  {
+                    "bidang": "Auditor",
+                    "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                    "roleContoh": [
+                      "Auditor"
+                    ]
+                  },
+                  {
+                    "bidang": "Engineer",
+                    "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                    "roleContoh": [
+                      "Engineer"
+                    ]
+                  },
+                  {
+                    "bidang": "Data Analyst",
+                    "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                    "roleContoh": [
+                      "Data Analyst"
+                    ]
+                  },
+                  {
+                    "bidang": "Quality Manager",
+                    "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                    "roleContoh": [
+                      "Quality Manager"
+                    ]
+                  },
+                  {
+                    "bidang": "Lawyer",
+                    "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                    "roleContoh": [
+                      "Lawyer"
+                    ]
+                  },
+                  {
+                    "bidang": "Financial Planner",
+                    "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                    "roleContoh": [
+                      "Financial Planner"
+                    ]
+                  },
+                  {
+                    "bidang": "System Architect",
+                    "alasan": "Keuangan, Rekayasa, Hukum, Teknologi, Manajemen Kualitas",
+                    "roleContoh": [
+                      "System Architect"
+                    ]
+                  }
+                ],
+                "strategiPengembanganDiri": [
+                  {
+                    "area": "Gaya Kerja",
+                    "langkahKonkret": [
+                      "Sistematis, Perfeksionis & High-Quality"
+                    ]
+                  },
+                  {
+                    "area": "Gaya Belajar",
+                    "langkahKonkret": [
+                      "Sistematis, Terstruktur & Berbasis Teori"
+                    ]
+                  },
+                  {
+                    "area": "Gaya Konflik",
+                    "langkahKonkret": [
+                      "Analisis Fakta & Solusi Logis"
+                    ]
+                  },
+                  {
+                    "area": "Gaya Komunikasi",
+                    "langkahKonkret": [
+                      "Tepat, Jelas & Data-Driven"
+                    ]
+                  },
+                  {
+                    "area": "Gaya Kepemimpinan",
+                    "langkahKonkret": [
+                      "Expert Authority & Standard-Setting"
+                    ]
+                  }
+                ],
+                "tipsPraktis": [
+                  "Perfeksionis dalam arti positif — standar tinggi menghasilkan kualitas terbaik",
+                  "Sangat terorganisir dan sistematis dalam setiap aspek pekerjaan",
+                  "Analitis dan logis — keputusan selalu berbasis data dan fakta",
+                  "Profesional dan terpercaya dalam lingkup kerja apapun",
+                  "Ambivert yang fleksibel — bisa tampil saat perlu, tenang saat intens bekerja"
+                ],
+                "motivationalMessage": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi."
+              },
               "aiInsights": {
                 "ringkasanKepribadian": "Anda adalah pribadi dengan dominasi elemen LOGAM yang presisi — seorang Ahli Terstruktur yang menggabungkan standar tinggi dengan kemampuan beradaptasi pada berbagai situasi sosial. Ambivert-Logam adalah kombinasi yang melahirkan profesional sejati: tahu kapan tampil di depan dan kapan bekerja di belakang layar, selalu dengan standar kualitas tertinggi.",
                 "kekuatanUtama": [
@@ -3107,8 +4177,8 @@
               }
             },
             "userName": "vvaa",
-            "userEmail": "sync-user.1773560847950.1@example.com",
-            "userWhatsapp": "084784795001",
+            "userEmail": "sync-user.1773771331043.1@example.com",
+            "userWhatsapp": "084733104301",
             "userProvince": "DKI Jakarta",
             "userCity": "Jakarta Selatan"
           }
