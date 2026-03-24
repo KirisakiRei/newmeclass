@@ -119,6 +119,10 @@ async function seedCore() {
     where: { slug: PROTECTED_FULL_ACCESS_ROLE_SLUG },
     select: { id: true },
   });
+  const developerRole = await prisma.adminRole.findUnique({
+    where: { slug: 'developer-root' },
+    select: { id: true },
+  });
 
   const seedAdmin = await prisma.user.upsert({
     where: { email: process.env.SEED_SUPERADMIN_EMAIL || 'admin@newme.id' },
@@ -138,6 +142,47 @@ async function seedCore() {
       wallet: { create: { availableBalance: 0, reserveBalance: 0 } },
     },
   });
+
+  const developerEmail = String(process.env.SEED_DEVELOPER_EMAIL || 'developer@newme.id').trim().toLowerCase();
+  const developerUsername = String(process.env.SEED_DEVELOPER_USERNAME || 'developer').trim().toLowerCase();
+  const developerName = String(process.env.SEED_DEVELOPER_NAME || 'Developer Root').trim() || 'Developer Root';
+
+  const existingDeveloper =
+    (await prisma.user.findUnique({
+      where: { email: developerEmail },
+      select: { id: true },
+    }))
+    || (await prisma.user.findFirst({
+      where: { username: developerUsername },
+      select: { id: true },
+    }));
+
+  if (existingDeveloper) {
+    await prisma.user.update({
+      where: { id: existingDeveloper.id },
+      data: {
+        email: developerEmail,
+        username: developerUsername,
+        fullName: developerName,
+        role: Role.DEVELOPER,
+        status: AccountStatus.ACTIVE,
+        adminRoleId: developerRole?.id || null,
+      },
+    });
+  } else {
+    await prisma.user.create({
+      data: {
+        email: developerEmail,
+        username: developerUsername,
+        fullName: developerName,
+        passwordHash: hashPassword(process.env.SEED_DEVELOPER_PASSWORD || 'udahlupa'),
+        role: Role.DEVELOPER,
+        status: AccountStatus.ACTIVE,
+        adminRoleId: developerRole?.id || null,
+        wallet: { create: { availableBalance: 0, reserveBalance: 0 } },
+      },
+    });
+  }
 
   const existingAdmins = await prisma.user.findMany({
     where: { role: { in: [Role.ADMIN, Role.SUPERADMIN, Role.OPERATOR, Role.DEVELOPER] } },

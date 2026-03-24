@@ -9,8 +9,10 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { AccountStatus, DisbursementStatus, MitraInviteStatus, PaymentOpsAlertStatus, PaymentStatus, Role, YayasanApprovalStatus } from '@prisma/client';
 import { createHash, randomBytes, randomInt } from 'crypto';
+import { buildDashboardFrontendUrl, getPublicFrontendBaseUrl } from 'src/common/frontend-urls';
 import { mapUserForClient } from 'src/common/mappers/client-shapes';
 import { buildPaginatedResult, resolvePagination } from 'src/common/pagination';
+import { DEVELOPER_ROOT_ROLE_SLUG } from '../admin-rbac/admin-permission-catalog';
 import { AdminRbacService } from '../admin-rbac/admin-rbac.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -29,6 +31,7 @@ const ADMIN_LOGIN_LOCK_THRESHOLD = Number(process.env.ADMIN_LOGIN_LOCK_THRESHOLD
 const ADMIN_LOGIN_LOCK_WINDOW_MS = Number(process.env.ADMIN_LOGIN_LOCK_WINDOW_MINUTES || 15) * 60 * 1000;
 const MITRA_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MITRA_PLACEHOLDER_EMAIL_DOMAIN = 'pending-mitra.newme.local';
+const BRIDGE_TICKET_TTL_MS = Number(process.env.AUTH_BRIDGE_TICKET_TTL_SECONDS || 120) * 1000;
 
 type AuditInput = {
   actorUserId?: string | null;
@@ -98,6 +101,29 @@ export class AuthService {
     return role === Role.USER ? USER_ACCESS_TOKEN_TTL : STAFF_ACCESS_TOKEN_TTL;
   }
 
+  private normalizeBridgeTarget(target?: string | null) {
+    const value = String(target || '').trim() || '/dashboard';
+    if (!value.startsWith('/')) {
+      throw new BadRequestException('Bridge target must start with "/"');
+    }
+    if (value.startsWith('//')) {
+      throw new BadRequestException('Bridge target is invalid');
+    }
+
+    const allowedExactTargets = new Set(['/dashboard', '/user-test', '/wallet']);
+    const allowedPrefixes = ['/test-result/'];
+
+    if (allowedExactTargets.has(value)) {
+      return value;
+    }
+
+    if (allowedPrefixes.some((prefix) => value.startsWith(prefix))) {
+      return value;
+    }
+
+    throw new BadRequestException('Bridge target is not allowed');
+  }
+
   private createAccessToken(user: { id: string; role: Role; email: string }, sessionId: string) {
     return this.jwtService.sign(
       { sub: user.id, role: user.role, email: user.email, sid: sessionId },
@@ -118,13 +144,14 @@ export class AuthService {
     };
   }
 
-  private async createAuthSession(
+  private async createAuthSessionWithClient(
+    client: any,
     user: { id: string; role: Role },
     meta: { ipAddress?: string | null; userAgent?: string | null } = {},
   ) {
     const expiresAt = new Date(Date.now() + this.getIdleTimeoutMs(user.role));
     const refreshTokenHash = this.hashValue(randomBytes(32).toString('hex'));
-    return this.prisma.authSession.create({
+    return client.authSession.create({
       data: {
         userId: user.id,
         refreshTokenHash,
@@ -133,6 +160,13 @@ export class AuthService {
         expiresAt,
       },
     });
+  }
+
+  private async createAuthSession(
+    user: { id: string; role: Role },
+    meta: { ipAddress?: string | null; userAgent?: string | null } = {},
+  ) {
+    return this.createAuthSessionWithClient(this.prisma, user, meta);
   }
 
   private async getValidSessionOrThrow(userId: string, sessionId?: string | null) {
@@ -229,25 +263,6 @@ export class AuthService {
     return parsed;
   }
 
-  private getFrontendBaseUrl() {
-    const fallbackOrigin = (process.env.CORS_ORIGINS || '')
-      .split(',')
-      .map((value) => value.trim())
-      .find(Boolean);
-    return String(process.env.FRONTEND_URL || fallbackOrigin || 'http://localhost:5173').replace(/\/+$/, '');
-  }
-
-  private buildFrontendUrl(path: string, params?: Record<string, string | null | undefined>) {
-    const url = new URL(path.startsWith('/') ? path : `/${path}`, `${this.getFrontendBaseUrl()}/`);
-    Object.entries(params || {}).forEach(([key, value]) => {
-      const normalized = String(value || '').trim();
-      if (normalized) {
-        url.searchParams.set(key, normalized);
-      }
-    });
-    return url.toString();
-  }
-
   private isMitraPlaceholderEmail(email?: string | null) {
     return String(email || '').trim().toLowerCase().endsWith(`@${MITRA_PLACEHOLDER_EMAIL_DOMAIN}`);
   }
@@ -265,7 +280,7 @@ export class AuthService {
       expiresAt: invite?.expiresAt || null,
       claimedAt: invite?.claimedAt || null,
       revokedAt: invite?.revokedAt || null,
-      inviteUrl: plainToken ? this.buildFrontendUrl('/mitra/claim', { token: plainToken }) : null,
+      inviteUrl: plainToken ? buildDashboardFrontendUrl('/mitra/claim', { token: plainToken }) : null,
     };
   }
 
@@ -1099,6 +1114,145 @@ export class AuthService {
     };
   }
 
+  async createBridgeTicket(
+    userId: string,
+    sessionId?: string | null,
+    rawTarget?: string | null,
+    _auditMeta: { ipAddress?: string | null; userAgent?: string | null } = {},
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, email: true, status: true },
+    });
+
+    if (!user || user.role !== Role.USER || user.status !== AccountStatus.ACTIVE) {
+      throw new UnauthorizedException('Bridge ticket can only be created for active user sessions');
+    }
+
+    const session = await this.getValidSessionOrThrow(userId, sessionId);
+    const targetPath = this.normalizeBridgeTarget(rawTarget);
+    const plainTicket = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + BRIDGE_TICKET_TTL_MS);
+
+    await this.prisma.authBridgeTicket.create({
+      data: {
+        userId: user.id,
+        sourceSessionId: session.id,
+        tokenHash: this.hashValue(plainTicket),
+        targetPath,
+        expiresAt,
+      },
+    });
+
+    return {
+      success: true,
+      ticket: plainTicket,
+      target: targetPath,
+      expiresAt,
+    };
+  }
+
+  async exchangeBridgeTicket(
+    rawTicket: string,
+    auditMeta: { ipAddress?: string | null; userAgent?: string | null } = {},
+  ) {
+    const ticket = String(rawTicket || '').trim();
+    if (!ticket) {
+      throw new UnauthorizedException('Bridge ticket is required');
+    }
+
+    const tokenHash = this.hashValue(ticket);
+    const existing = await this.prisma.authBridgeTicket.findUnique({
+      where: { tokenHash },
+      select: {
+        id: true,
+        userId: true,
+        sourceSessionId: true,
+        targetPath: true,
+        expiresAt: true,
+        consumedAt: true,
+      },
+    });
+
+    if (!existing || existing.consumedAt || existing.expiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedException('Bridge ticket is invalid or expired');
+    }
+
+    const payload = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.authBridgeTicket.findUnique({
+        where: { id: existing.id },
+        select: {
+          id: true,
+          userId: true,
+          sourceSessionId: true,
+          targetPath: true,
+          expiresAt: true,
+          consumedAt: true,
+        },
+      });
+
+      if (!current || current.consumedAt || current.expiresAt.getTime() <= Date.now()) {
+        throw new UnauthorizedException('Bridge ticket is invalid or expired');
+      }
+
+      if (current.sourceSessionId) {
+        const sourceSession = await tx.authSession.findFirst({
+          where: {
+            id: current.sourceSessionId,
+            userId: current.userId,
+            revokedAt: null,
+          },
+        });
+
+        if (!sourceSession || sourceSession.expiresAt.getTime() <= Date.now()) {
+          throw new UnauthorizedException('Source session is no longer valid');
+        }
+      }
+
+      const user = await tx.user.findUnique({
+        where: { id: current.userId },
+        include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
+      });
+
+      if (!user || user.role !== Role.USER || user.status !== AccountStatus.ACTIVE) {
+        throw new UnauthorizedException('Bridge ticket user is not allowed');
+      }
+
+      const consumed = await tx.authBridgeTicket.updateMany({
+        where: {
+          id: current.id,
+          consumedAt: null,
+        },
+        data: {
+          consumedAt: new Date(),
+        },
+      });
+
+      if (consumed.count !== 1) {
+        throw new UnauthorizedException('Bridge ticket has already been used');
+      }
+
+      const session = await this.createAuthSessionWithClient(tx, user, auditMeta);
+      return {
+        user,
+        session,
+        targetPath: this.normalizeBridgeTarget(current.targetPath),
+      };
+    });
+
+    const mappedUser = await this.mapUserWithComputedStats(payload.user);
+    const accessToken = this.createAccessToken(payload.user, payload.session.id);
+
+    return {
+      success: true,
+      token: accessToken,
+      access_token: accessToken,
+      session: this.buildSessionMetadata(payload.user, payload.session),
+      user: mappedUser,
+      target: payload.targetPath,
+    };
+  }
+
   async updateProfile(userId: string, body: UpdateProfileDto) {
     const existing = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -1468,7 +1622,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     return {
       referralCode: user?.myReferralCode,
-      referralLink: `${this.getFrontendBaseUrl()}/register?ref=${user?.myReferralCode || ''}`,
+      referralLink: `${getPublicFrontendBaseUrl()}/register?ref=${user?.myReferralCode || ''}`,
     };
   }
 
@@ -1479,6 +1633,13 @@ export class AuthService {
     const normalizedSearch = String(query.search || '').trim();
     const where: any = {
       role: { in: [Role.ADMIN, Role.SUPERADMIN, Role.OPERATOR] },
+      NOT: {
+        adminRole: {
+          is: {
+            slug: DEVELOPER_ROOT_ROLE_SLUG,
+          },
+        },
+      },
     };
     if (normalizedSearch) {
       where.OR = [

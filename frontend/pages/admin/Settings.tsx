@@ -1,13 +1,12 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useState } from 'react';
-import { CreditCard, Globe, GraduationCap, Landmark, Save, Settings as SettingsIcon, ShieldCheck, Upload } from 'lucide-react';
+import { CreditCard, GraduationCap, Landmark, Save, Settings as SettingsIcon, ShieldCheck } from 'lucide-react';
 import { settingsAPI } from '../../services/api';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
 import { Switch } from '../../components/ui/switch';
 import { useToast } from '../../hooks/use-toast';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -36,20 +35,12 @@ function SummaryCard({ icon: Icon, label, value, note, color = 'text-white' }) {
   );
 }
 
-function assetUrl(value) {
-  if (!value) return '';
-  if (/^https?:\/\//i.test(value)) return value;
-  const backend = String(process.env.REACT_APP_BACKEND_URL || '').replace(/\/+$/, '');
-  return value.startsWith('/uploads/') && backend ? `${backend}${value}` : value;
-}
-
 export default function Settings() {
   const { toast } = useToast();
   const adminAccess = useAdminAccess();
   const { reloadSettings, applyTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState('');
   const [savingJenjang, setSavingJenjang] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmationText, setConfirmationText] = useState('');
@@ -151,26 +142,6 @@ export default function Settings() {
     }));
   };
 
-  const handleFileUpload = async (assetType, file) => {
-    if (!canManageSettings) return;
-    setUploading(assetType);
-    try {
-      const response = await settingsAPI.uploadAsset(assetType, file);
-      const uploadedUrl = response.data?.url || '';
-      if (assetType === 'logo') {
-        handleChange('logoUrl', uploadedUrl);
-      }
-      if (assetType === 'favicon') {
-        handleChange('faviconUrl', uploadedUrl);
-      }
-      toast({ title: 'Upload berhasil', description: `Asset ${assetType} berhasil diunggah.` });
-    } catch (error) {
-      toast({ title: 'Upload gagal', description: 'Asset belum berhasil diunggah ke backend.', variant: 'destructive' });
-    } finally {
-      setUploading('');
-    }
-  };
-
   const referralSummary = useMemo(() => ({
     totalPrice: systemSummary?.pricing?.referralTotalPrice || 250000,
     shareBudget: systemSummary?.pricing?.referralShareBudget || 150000,
@@ -183,7 +154,7 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <PageHeader icon={SettingsIcon} title="Pengaturan Website" />
+        <PageHeader icon={SettingsIcon} title="Pengaturan Operasional" />
         <Button onClick={() => void handleSave()} disabled={saving || !canEditSettings} className="bg-yellow-400 text-black hover:bg-yellow-500">
           <Save className="mr-2 h-4 w-4" />
           {saving ? 'Menyimpan...' : canEditSettings ? 'Simpan Pengaturan' : 'Read Only'}
@@ -197,176 +168,113 @@ export default function Settings() {
         <SummaryCard icon={GraduationCap} label="Skema Referral Yayasan" value={fmt(referralSummary.totalPrice)} note={`Budget share ${fmt(referralSummary.shareBudget)}`} color="text-purple-400" />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="space-y-6">
-          <Card className="border-yellow-400/20 bg-[#2a2a2a]">
-            <CardHeader>
-              <CardTitle className="text-white">Pricing & Revenue</CardTitle>
-              <CardDescription className="text-gray-400">Atur harga test premium individu dan persentase pembagian pendapatan.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label className="text-gray-300">Harga Test Premium</Label>
-                <Input type="number" value={settings.paymentAmount || 100000} onChange={(event) => handleChange('paymentAmount', Number(event.target.value || 0))} className="bg-[#1a1a1a] text-white" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Developer Fee Percent</Label>
-                <Input type="number" value={settings.devFeePercent || 5} onChange={(event) => handleChange('devFeePercent', Number(event.target.value || 0))} className="bg-[#1a1a1a] text-white" />
-              </div>
-              <div className="md:col-span-2 rounded-lg border border-yellow-400/10 bg-[#1a1a1a] p-4 text-sm text-gray-400">
-                Harga jalur yayasan tidak diatur manual di sini. Jalur yayasan tetap mengikuti skema referral yang sudah berjalan, yaitu total {fmt(referralSummary.totalPrice)} dengan budget share {fmt(referralSummary.shareBudget)}.
-              </div>
-            </CardContent>
-          </Card>
+      <div className="space-y-6">
+        <Card className="border-yellow-400/20 bg-[#2a2a2a]">
+          <CardHeader>
+            <CardTitle className="text-white">Pricing & Revenue</CardTitle>
+            <CardDescription className="text-gray-400">Atur harga test premium individu dan persentase pembagian pendapatan.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label className="text-gray-300">Harga Test Premium</Label>
+              <Input type="number" value={settings.paymentAmount || 100000} onChange={(event) => handleChange('paymentAmount', Number(event.target.value || 0))} className="bg-[#1a1a1a] text-white" />
+            </div>
+            <div>
+              <Label className="text-gray-300">Developer Fee Percent</Label>
+              <Input type="number" value={settings.devFeePercent || 5} onChange={(event) => handleChange('devFeePercent', Number(event.target.value || 0))} className="bg-[#1a1a1a] text-white" />
+            </div>
+            <div className="md:col-span-2 rounded-lg border border-yellow-400/10 bg-[#1a1a1a] p-4 text-sm text-gray-400">
+              Harga jalur yayasan tidak diatur manual di sini. Jalur yayasan tetap mengikuti skema referral yang sudah berjalan, yaitu total {fmt(referralSummary.totalPrice)} dengan budget share {fmt(referralSummary.shareBudget)}.
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card className="border-yellow-400/20 bg-[#2a2a2a]">
-            <CardHeader>
-              <CardTitle className="text-white">Pencairan Fee Pengembang</CardTitle>
-              <CardDescription className="text-gray-400">Atur rekening tujuan untuk pencairan fee pengembang.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-3">
-              <div>
-                <Label className="text-gray-300">Bank Developer</Label>
-                <Input value={settings.devBankName || ''} onChange={(event) => handleChange('devBankName', event.target.value)} className="bg-[#1a1a1a] text-white" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Rekening Developer</Label>
-                <Input value={settings.devBankAccount || ''} onChange={(event) => handleChange('devBankAccount', event.target.value)} className="bg-[#1a1a1a] text-white" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Atas Nama</Label>
-                <Input value={settings.devAccountName || ''} onChange={(event) => handleChange('devAccountName', event.target.value)} className="bg-[#1a1a1a] text-white" />
-              </div>
-            </CardContent>
-          </Card>
+        <Card className="border-yellow-400/20 bg-[#2a2a2a]">
+          <CardHeader>
+            <CardTitle className="text-white">Pencairan Fee Pengembang</CardTitle>
+            <CardDescription className="text-gray-400">Atur rekening tujuan untuk pencairan fee pengembang.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-3">
+            <div>
+              <Label className="text-gray-300">Bank Developer</Label>
+              <Input value={settings.devBankName || ''} onChange={(event) => handleChange('devBankName', event.target.value)} className="bg-[#1a1a1a] text-white" />
+            </div>
+            <div>
+              <Label className="text-gray-300">Rekening Developer</Label>
+              <Input value={settings.devBankAccount || ''} onChange={(event) => handleChange('devBankAccount', event.target.value)} className="bg-[#1a1a1a] text-white" />
+            </div>
+            <div>
+              <Label className="text-gray-300">Atas Nama</Label>
+              <Input value={settings.devAccountName || ''} onChange={(event) => handleChange('devAccountName', event.target.value)} className="bg-[#1a1a1a] text-white" />
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card className="border-yellow-400/20 bg-[#2a2a2a]">
-            <CardHeader>
-              <CardTitle className="text-white">Konfigurasi Jenjang Tes</CardTitle>
-              <CardDescription className="text-gray-400">Atur pembagian jenjang usia untuk test yang tersedia di sistem.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Object.entries(jenjangConfig || {}).map(([key, value]) => (
-                <div key={key} className="grid gap-3 rounded-xl border border-yellow-400/10 bg-[#1a1a1a] p-4 md:grid-cols-3">
-                  <div>
-                    <Label className="text-gray-300">Label</Label>
-                    <Input value={value.label} onChange={(event) => handleJenjangChange(key, 'label', event.target.value)} className="bg-[#121212] text-white" />
-                  </div>
-                  <div>
-                    <Label className="text-gray-300">Usia Minimum</Label>
-                    <Input type="number" value={value.min} onChange={(event) => handleJenjangChange(key, 'min', event.target.value)} className="bg-[#121212] text-white" />
-                  </div>
-                  <div>
-                    <Label className="text-gray-300">Usia Maksimum</Label>
-                    <Input type="number" value={value.max} onChange={(event) => handleJenjangChange(key, 'max', event.target.value)} className="bg-[#121212] text-white" />
-                  </div>
-                </div>
-              ))}
-              <Button onClick={() => void handleSaveJenjang()} disabled={savingJenjang || !canManageSettings} variant="outline" className="border-yellow-400/30 text-yellow-400">
-                {savingJenjang ? 'Menyimpan...' : 'Simpan Jenjang'}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card className="border-yellow-400/20 bg-[#2a2a2a]">
-            <CardHeader>
-              <CardTitle className="text-white">Identitas Website</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label className="text-gray-300">Nama Situs</Label>
-                <Input value={settings.siteName || ''} onChange={(event) => handleChange('siteName', event.target.value)} className="bg-[#1a1a1a] text-white" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Email Kontak</Label>
-                <Input value={settings.email || ''} onChange={(event) => handleChange('email', event.target.value)} className="bg-[#1a1a1a] text-white" />
-              </div>
-              <div>
-                <Label className="text-gray-300">WhatsApp</Label>
-                <Input value={settings.whatsapp || ''} onChange={(event) => handleChange('whatsapp', event.target.value)} className="bg-[#1a1a1a] text-white" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Alamat</Label>
-                <Textarea value={settings.address || ''} onChange={(event) => handleChange('address', event.target.value)} className="min-h-[100px] bg-[#1a1a1a] text-white" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-yellow-400/20 bg-[#2a2a2a]">
-            <CardHeader>
-              <CardTitle className="text-white">Logo & Favicon</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-xl border border-yellow-400/10 bg-[#1a1a1a] p-4">
-                <Label className="text-gray-300">Upload Logo</Label>
-                <Input type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && handleFileUpload('logo', event.target.files[0])} className="mt-2 bg-[#121212] text-white" disabled={!canManageSettings} />
-                {assetUrl(settings.logoUrl) ? <img src={assetUrl(settings.logoUrl)} alt="Logo" className="mt-4 h-16 rounded bg-white/5 p-2" /> : null}
-              </div>
-              <div className="rounded-xl border border-yellow-400/10 bg-[#1a1a1a] p-4">
-                <Label className="text-gray-300">Upload Favicon</Label>
-                <Input type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && handleFileUpload('favicon', event.target.files[0])} className="mt-2 bg-[#121212] text-white" disabled={!canManageSettings} />
-                {assetUrl(settings.faviconUrl) ? <img src={assetUrl(settings.faviconUrl)} alt="Favicon" className="mt-4 h-10 rounded bg-white/5 p-2" /> : null}
-              </div>
-              {uploading ? (
-                <div className="rounded-lg bg-yellow-400/10 p-3 text-xs text-yellow-200">
-                  <Upload className="mr-2 inline h-4 w-4" />
-                  Uploading {uploading}...
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card className="border-yellow-400/20 bg-[#2a2a2a]">
-            <CardHeader>
-              <CardTitle className="text-white">Feature Flags</CardTitle>
-              <CardDescription className="text-gray-400">Kontrol fitur utama yang memengaruhi tampilan dan akses website.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-xl bg-[#1a1a1a] p-4">
+        <Card className="border-yellow-400/20 bg-[#2a2a2a]">
+          <CardHeader>
+            <CardTitle className="text-white">Konfigurasi Jenjang Tes</CardTitle>
+            <CardDescription className="text-gray-400">Atur pembagian jenjang usia untuk test yang tersedia di sistem.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {Object.entries(jenjangConfig || {}).map(([key, value]) => (
+              <div key={key} className="grid gap-3 rounded-xl border border-yellow-400/10 bg-[#1a1a1a] p-4 md:grid-cols-3">
                 <div>
-                  <p className="text-sm font-medium text-white">Izinkan Registrasi Umum</p>
-                  <p className="text-xs text-gray-500">Registrasi umum dapat dibuka atau ditutup sesuai kebutuhan.</p>
+                  <Label className="text-gray-300">Label</Label>
+                  <Input value={value.label} onChange={(event) => handleJenjangChange(key, 'label', event.target.value)} className="bg-[#121212] text-white" />
                 </div>
-                <Switch checked={!!settings.allowRegistration} onCheckedChange={(checked) => handleChange('allowRegistration', checked)} />
-              </div>
-              <div className="flex items-center justify-between rounded-xl bg-[#1a1a1a] p-4">
                 <div>
-                  <p className="text-sm font-medium text-white">Wajib Pembayaran</p>
-                  <p className="text-xs text-gray-500">Gunakan jika akses ke layanan premium harus melalui pembayaran.</p>
+                  <Label className="text-gray-300">Usia Minimum</Label>
+                  <Input type="number" value={value.min} onChange={(event) => handleJenjangChange(key, 'min', event.target.value)} className="bg-[#121212] text-white" />
                 </div>
-                <Switch checked={!!settings.requirePayment} onCheckedChange={(checked) => handleChange('requirePayment', checked)} />
-              </div>
-              <div className="flex items-center justify-between rounded-xl bg-[#1a1a1a] p-4">
                 <div>
-                  <p className="text-sm font-medium text-white">Maintenance Mode</p>
-                  <p className="text-xs text-gray-500">Dipakai untuk menampilkan mode pemeliharaan bila diperlukan.</p>
+                  <Label className="text-gray-300">Usia Maksimum</Label>
+                  <Input type="number" value={value.max} onChange={(event) => handleJenjangChange(key, 'max', event.target.value)} className="bg-[#121212] text-white" />
                 </div>
-                <Switch checked={!!settings.maintenanceMode} onCheckedChange={(checked) => handleChange('maintenanceMode', checked)} />
               </div>
-            </CardContent>
-          </Card>
+            ))}
+            <Button onClick={() => void handleSaveJenjang()} disabled={savingJenjang || !canManageSettings} variant="outline" className="border-yellow-400/30 text-yellow-400">
+              {savingJenjang ? 'Menyimpan...' : 'Simpan Jenjang'}
+            </Button>
+          </CardContent>
+        </Card>
 
-          <Card className="border-yellow-400/20 bg-[#2a2a2a]">
-            <CardHeader>
-              <CardTitle className="text-white">SEO Ringkas</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <Card className="border-yellow-400/20 bg-[#2a2a2a]">
+          <CardHeader>
+            <CardTitle className="text-white">Feature Flags</CardTitle>
+            <CardDescription className="text-gray-400">Kontrol perilaku sistem yang tetap berada di dashboard admin.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-[#1a1a1a] p-4">
               <div>
-                <Label className="text-gray-300">Meta Description</Label>
-                <Textarea value={settings.seoMetaDescription || ''} onChange={(event) => handleChange('seoMetaDescription', event.target.value)} className="min-h-[120px] bg-[#1a1a1a] text-white" />
+                <p className="text-sm font-medium text-white">Izinkan Registrasi Umum</p>
+                <p className="text-xs text-gray-500">Registrasi umum dapat dibuka atau ditutup sesuai kebutuhan.</p>
               </div>
+              <Switch checked={!!settings.allowRegistration} onCheckedChange={(checked) => handleChange('allowRegistration', checked)} />
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-[#1a1a1a] p-4">
               <div>
-                <Label className="text-gray-300">SEO Keywords</Label>
-                <Input value={settings.seoKeywords || ''} onChange={(event) => handleChange('seoKeywords', event.target.value)} className="bg-[#1a1a1a] text-white" />
+                <p className="text-sm font-medium text-white">Wajib Pembayaran</p>
+                <p className="text-xs text-gray-500">Gunakan jika akses ke layanan premium harus melalui pembayaran.</p>
               </div>
-              <div className="rounded-xl border border-yellow-400/10 bg-[#1a1a1a] p-4 text-xs text-gray-500">
-                Lengkapi informasi ini agar identitas website dan tampilan publik tetap konsisten.
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              <Switch checked={!!settings.requirePayment} onCheckedChange={(checked) => handleChange('requirePayment', checked)} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-yellow-400/20 bg-[#2a2a2a]">
+          <CardHeader>
+            <CardTitle className="text-white">Boundary Pengelolaan</CardTitle>
+            <CardDescription className="text-gray-400">Pisahkan pengaturan operasional dashboard dengan pengaturan konten publik.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-gray-300">
+            <div className="rounded-xl border border-yellow-400/10 bg-[#1a1a1a] p-4">
+              Branding publik, logo, favicon, SEO, navigation website, dan profil company sekarang dikelola dari Landing CMS agar sumber datanya tunggal.
+            </div>
+            <div className="rounded-xl border border-yellow-400/10 bg-[#1a1a1a] p-4">
+              Dashboard admin ini difokuskan untuk pricing, pembagian fee, pencairan, jenjang tes, dan flag operasional aplikasi.
+            </div>
+          </CardContent>
+        </Card>
       </div>
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="max-w-lg border-yellow-400/20 bg-[#2a2a2a]">

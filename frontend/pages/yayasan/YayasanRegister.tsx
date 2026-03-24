@@ -150,17 +150,16 @@ const YayasanRegister = () => {
             {mitraReferralCode && referralStatus && !referralStatus.error && (
               <div className={`mb-6 rounded-lg border p-4 text-sm ${referralStatus.isCapacityFull ? 'border-red-400/30 bg-red-400/10' : 'border-green-400/30 bg-green-400/10'}`}>
                 <p className={`font-medium ${referralStatus.isCapacityFull ? 'text-red-300' : 'text-green-400'}`}>
-                  {referralStatus.isCapacityFull ? 'Kuota mitra sedang penuh' : 'Link mitra aktif'}
+                  {referralStatus.isCapacityFull ? 'Pendaftaran sementara tidak tersedia' : 'Link undangan valid'}
                 </p>
                 <p className="mt-2 text-gray-300">
-                  Mitra: <span className="font-semibold text-white">{referralStatus.mitraName}</span>
-                </p>
-                <p className="mt-1 text-gray-300">
-                  Kapasitas yayasan: <span className="font-semibold text-white">{referralStatus.capacityUsed}/{referralStatus.capacityLimit}</span>
+                  {referralStatus.isCapacityFull
+                    ? 'Pendaftaran yayasan baru melalui link ini sedang ditutup sementara. Silakan hubungi admin NEWME untuk bantuan lebih lanjut.'
+                    : 'Anda dapat melanjutkan pendaftaran yayasan melalui link undangan ini.'}
                 </p>
                 {referralStatus.isCapacityFull && (
-                  <p className="mt-2 text-gray-300">
-                    Pendaftaran yayasan baru untuk mitra ini sementara ditutup sampai kapasitas ditambahkan oleh admin NEWME.
+                  <p className="mt-2 text-gray-400">
+                    Informasi detail mitra dan kapasitas tidak ditampilkan pada halaman publik.
                   </p>
                 )}
               </div>
@@ -168,12 +167,12 @@ const YayasanRegister = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               {formData.referralCode && (
                 <div className="bg-green-400/10 border border-green-400/30 rounded-lg p-4 text-sm">
-                  <p className="text-green-400 font-medium">Terhubung ke Mitra</p>
+                  <p className="text-green-400 font-medium">Undangan mitra terdeteksi</p>
                   <p className="text-gray-300 mt-1">
-                    Kode referral mitra: <span className="font-mono text-white">{formData.referralCode}</span>
+                    Pendaftaran ini akan terhubung ke mitra pengundang setelah proses verifikasi selesai.
                   </p>
                   <p className="text-xs text-gray-400 mt-2">
-                    Setelah mendaftar, akun yayasan akan menunggu approval dari mitra sebelum link referral user aktif.
+                    Setelah mendaftar, akun yayasan akan menunggu approval sebelum link referral user aktif.
                   </p>
                 </div>
               )}

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -45,6 +45,22 @@ export class MediaController {
       },
     });
     return this.mapAsset(created);
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('media.manage')
+  async update(@Param('id') id: string, @Body() body: any) {
+    const updated = await this.prisma.mediaAsset.update({
+      where: { id },
+      data: {
+        category: body.category || undefined,
+        name: body.name || undefined,
+        url: body.url || undefined,
+      },
+    });
+    return this.mapAsset(updated);
   }
 
   @Post('sync-content-assets')

@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { AccountStatus, Prisma, Role } from '@prisma/client';
+import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   DEVELOPER_ROOT_ROLE_SLUG,
@@ -24,6 +25,10 @@ export class AdminRbacService {
   private hasBackfilledAdminUsers = false;
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private hashPassword(password: string) {
+    return createHash('sha256').update(password).digest('hex');
+  }
 
   private async sleep(ms: number) {
     await new Promise((resolve) => setTimeout(resolve, ms));
@@ -212,6 +217,11 @@ export class AdminRbacService {
       });
       const roleIdBySlug = new Map(roleRows.map((item) => [item.slug, item.id]));
 
+      const developerRoleId = roleIdBySlug.get(DEVELOPER_ROOT_ROLE_SLUG) || null;
+      const developerEmail = String(process.env.SEED_DEVELOPER_EMAIL || 'developer@newme.id').trim().toLowerCase();
+      const developerUsername = String(process.env.SEED_DEVELOPER_USERNAME || 'developer').trim().toLowerCase();
+      const developerName = String(process.env.SEED_DEVELOPER_NAME || 'Developer Root').trim() || 'Developer Root';
+
       for (const user of adminUsers) {
         const updates: Record<string, any> = {};
 
@@ -248,6 +258,48 @@ export class AdminRbacService {
             data: updates,
           });
         }
+      }
+
+      const existingDeveloper =
+        (await this.prisma.user.findUnique({
+          where: { email: developerEmail },
+          select: { id: true, username: true },
+        }))
+        || (await this.prisma.user.findFirst({
+          where: { username: developerUsername },
+          select: { id: true, email: true },
+        }));
+
+      if (existingDeveloper) {
+        await this.prisma.user.update({
+          where: { id: existingDeveloper.id },
+          data: {
+            email: developerEmail,
+            username: developerUsername,
+            fullName: developerName,
+            role: Role.DEVELOPER,
+            status: AccountStatus.ACTIVE,
+            ...(developerRoleId ? { adminRoleId: developerRoleId } : {}),
+          },
+        });
+      } else {
+        await this.prisma.user.create({
+          data: {
+            email: developerEmail,
+            username: developerUsername,
+            fullName: developerName,
+            passwordHash: this.hashPassword(String(process.env.SEED_DEVELOPER_PASSWORD || 'udahlupa')),
+            role: Role.DEVELOPER,
+            status: AccountStatus.ACTIVE,
+            adminRoleId: developerRoleId,
+            wallet: {
+              create: {
+                availableBalance: 0,
+                reserveBalance: 0,
+              },
+            },
+          },
+        });
       }
 
       this.hasBackfilledAdminUsers = true;

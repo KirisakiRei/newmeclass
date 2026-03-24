@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Activity,
   ActivitySquare,
   ArrowDownToLine,
   ArrowLeftRight,
@@ -14,18 +13,12 @@ import {
   Gift,
   Handshake,
   HelpCircle,
-  Image,
-  Images,
-  Layout,
   LayoutDashboard,
-  Layers,
   LogOut,
   Menu,
-  MessageSquare,
   Package,
   Settings,
   Shield,
-  ShoppingBag,
   TrendingUp,
   Trophy,
   Users,
@@ -49,22 +42,6 @@ import {
 
 const NAVIGATION = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard, permission: 'dashboard.view' },
-  {
-    label: 'Manajemen Konten',
-    icon: Layout,
-    children: [
-      { label: 'Layout Website', href: '/admin/website-content', icon: Layout, permission: 'website_content.view' },
-      { label: 'Hero Slides', href: '/admin/hero-slides', icon: Layers, permission: 'hero_slides.view' },
-      { label: 'Produk Homepage', href: '/admin/homepage-products', icon: ShoppingBag, permission: 'homepage_products.view' },
-      { label: 'Produk Shop', href: '/admin/shop-products', icon: Package, permission: 'shop_products.view' },
-      { label: 'Testimonial', href: '/admin/testimonials', icon: MessageSquare, permission: 'testimonials.view' },
-      { label: 'Kegiatan', href: '/admin/activities', icon: Activity, permission: 'activities.view' },
-      { label: 'Banners', href: '/admin/banners', icon: Image, permission: 'banners.view' },
-      { label: 'Artikel', href: '/admin/articles', icon: FileText, permission: 'articles.view' },
-      { label: 'Media Gallery', href: '/admin/media', icon: Images, permission: 'media.view' },
-      { label: 'Team & Mitra', href: '/admin/team-management', icon: Shield, permission: 'team_management.view' },
-    ],
-  },
   {
     label: 'Test & Sertifikasi',
     icon: Award,

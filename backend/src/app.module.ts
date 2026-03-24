@@ -35,6 +35,7 @@ import { TestAccessModule } from './modules/test-access/test-access.module';
 import { ArticlesModule } from './modules/articles/articles.module';
 import { MediaModule } from './modules/media/media.module';
 import { BannersModule } from './modules/banners/banners.module';
+import { LandingCmsModule } from './modules/landing-cms/landing-cms.module';
 import { RunningInfoModule } from './modules/running-info/running-info.module';
 import { QueueModule } from './modules/queue/queue.module';
 import { ScoringModule } from './modules/scoring/scoring.module';
@@ -75,6 +76,7 @@ import { validateEnv } from './config/env.validation';
     ArticlesModule,
     MediaModule,
     BannersModule,
+    LandingCmsModule,
     RunningInfoModule,
     QuestionsModule,
     ScoringModule,

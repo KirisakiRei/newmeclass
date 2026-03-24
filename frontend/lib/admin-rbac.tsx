@@ -8,6 +8,7 @@ const PAGE_ACTIONS = {
   analytics: ['view', 'manage'],
   settings: ['view', 'edit', 'manage'],
   admin_management: ['view', 'create', 'edit', 'delete', 'manage'],
+  cms_access: ['manage'],
   website_content: ['view', 'edit', 'manage'],
   hero_slides: ['view', 'create', 'edit', 'delete', 'manage'],
   homepage_products: ['view', 'create', 'edit', 'delete', 'manage'],
@@ -48,16 +49,7 @@ const VIEW_PERMISSION_BY_PAGE = Object.keys(PAGE_ACTIONS).reduce((acc, pageKey) 
 }, {});
 
 const CONTENT_VIEW_PERMISSIONS = [
-  'website_content.view',
-  'hero_slides.view',
-  'homepage_products.view',
-  'shop_products.view',
-  'testimonials.view',
-  'activities.view',
-  'banners.view',
-  'articles.view',
-  'media.view',
-  'team_management.view',
+  'cms_access.manage',
 ];
 
 const TESTING_VIEW_PERMISSIONS = [
@@ -124,16 +116,6 @@ const ADMIN_REDIRECT_ORDER = [
   '/admin/mitra',
   '/admin/price-change-requests',
   '/admin/referrals',
-  '/admin/website-content',
-  '/admin/hero-slides',
-  '/admin/homepage-products',
-  '/admin/shop-products',
-  '/admin/testimonials',
-  '/admin/activities',
-  '/admin/banners',
-  '/admin/articles',
-  '/admin/media',
-  '/admin/team-management',
   '/admin/questions',
   '/admin/personality-results',
   '/admin/premium-results',

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BadRequestException } from '@nestjs/common';
 import { DEFAULT_DEV_FEE_PERCENT, MIN_PREMIUM_PRICE, resolveCanonicalDevFeePercent, resolveCanonicalPaymentAmount } from 'src/common/settings/finance-settings';
+import { LANDING_DOMAIN_SETTING_KEYS } from '../landing-cms/landing-cms.defaults';
 import { PrismaService } from '../prisma/prisma.service';
 
 const DEFAULT_SETTINGS: Record<string, any> = {
@@ -150,6 +151,10 @@ const DEFAULT_SETTINGS: Record<string, any> = {
 const REMOVED_SETTING_KEYS = new Set(['paydisiniApiId', 'paydisiniApiKey']);
 const TEAM_MANAGEMENT_KEYS = new Set(['boardOfDirectors', 'teamSupport', 'partners']);
 
+const isPlainObject = (value: unknown): value is Record<string, any> => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
 @Injectable()
 export class SettingsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -166,10 +171,68 @@ export class SettingsService {
   async getAll() {
     const rows = await this.prisma.setting.findMany();
     const obj: Record<string, any> = { ...DEFAULT_SETTINGS };
+    let landingGlobal: Record<string, any> | null = null;
     for (const row of rows) {
       if (REMOVED_SETTING_KEYS.has(row.key)) continue;
+      if (row.key === LANDING_DOMAIN_SETTING_KEYS.global && isPlainObject(row.value)) {
+        landingGlobal = row.value as Record<string, any>;
+      }
       obj[row.key] = row.value;
     }
+
+    if (landingGlobal) {
+      const nextSiteName = String(landingGlobal.siteName || '').trim();
+      const nextTagline = String(landingGlobal.tagline || '').trim();
+      const nextMetaTitle = String(landingGlobal.metaTitle || '').trim();
+      const nextMetaDescription = String(landingGlobal.metaDescription || '').trim();
+      const nextMetaKeywords = String(landingGlobal.metaKeywords || '').trim();
+      const nextLogoUrl = String(landingGlobal.logoUrl || '').trim();
+      const nextFaviconUrl = String(landingGlobal.faviconUrl || '').trim();
+      const general = isPlainObject(obj.general) ? { ...obj.general } : {};
+
+      obj.siteName = nextSiteName;
+      obj.companyName = nextSiteName;
+      obj.siteTitle = nextMetaTitle || nextSiteName;
+      obj.siteDescription = nextTagline;
+      obj.tagline = nextTagline;
+      obj.phone = String(landingGlobal.phone || '').trim();
+      obj.email = String(landingGlobal.email || '').trim();
+      obj.whatsapp = String(landingGlobal.whatsapp || '').trim();
+      obj.address = String(landingGlobal.address || '').trim();
+      obj.logoUrl = nextLogoUrl;
+      obj.logo = nextLogoUrl;
+      obj.faviconUrl = nextFaviconUrl;
+      obj.metaTitle = nextMetaTitle;
+      obj.metaDescription = nextMetaDescription;
+      obj.metaKeywords = nextMetaKeywords;
+      obj.seoMetaDescription = nextMetaDescription;
+      obj.seoKeywords = nextMetaKeywords;
+      obj.socialLinks = Array.isArray(landingGlobal.socialLinks) ? landingGlobal.socialLinks : [];
+      obj.maintenanceMode = Boolean(landingGlobal.maintenanceMode);
+      obj.general = {
+        ...general,
+        siteName: obj.siteName,
+        companyName: obj.companyName,
+        siteTitle: obj.siteTitle,
+        siteDescription: obj.siteDescription,
+        tagline: obj.tagline,
+        phone: obj.phone,
+        email: obj.email,
+        whatsapp: obj.whatsapp,
+        address: obj.address,
+        logoUrl: obj.logoUrl,
+        logo: obj.logo,
+        faviconUrl: obj.faviconUrl,
+        metaTitle: obj.metaTitle,
+        metaDescription: obj.metaDescription,
+        metaKeywords: obj.metaKeywords,
+        seoMetaDescription: obj.seoMetaDescription,
+        seoKeywords: obj.seoKeywords,
+        socialLinks: obj.socialLinks,
+        maintenanceMode: obj.maintenanceMode,
+      };
+    }
+
     delete obj.paydisiniApiId;
     delete obj.paydisiniApiKey;
     obj.paymentAmount = resolveCanonicalPaymentAmount(obj);

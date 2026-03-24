@@ -50,8 +50,14 @@ export default defineConfig(({ mode }) => {
     define: {
       // Bridge CRA-style process.env to Vite
       'process.env.REACT_APP_BACKEND_URL': JSON.stringify(env.REACT_APP_BACKEND_URL || ''),
+      'process.env.REACT_APP_PUBLIC_WEB_URL': JSON.stringify(env.REACT_APP_PUBLIC_WEB_URL || ''),
+      'process.env.REACT_APP_DASHBOARD_URL': JSON.stringify(env.REACT_APP_DASHBOARD_URL || ''),
       'process.env.REACT_APP_MIDTRANS_CLIENT_KEY': JSON.stringify(env.REACT_APP_MIDTRANS_CLIENT_KEY || ''),
       'process.env.REACT_APP_MIDTRANS_IS_PRODUCTION': JSON.stringify(env.REACT_APP_MIDTRANS_IS_PRODUCTION || ''),
+    },
+    server: {
+      port: 5173,
+      strictPort: true,
     },
     build: {
       minify: 'esbuild',

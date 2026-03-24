@@ -142,6 +142,7 @@ model User {
   updatedAt        DateTime         @updatedAt
   profile          UserProfile?
   sessions         AuthSession[]
+  bridgeTickets    AuthBridgeTicket[]
   resetTokens      PasswordResetToken[]
   wallet           Wallet?
   referralCode     ReferralCode?
@@ -309,6 +310,21 @@ model AuthSession {
   createdAt        DateTime  @default(now())
 
   @@index([userId, expiresAt])
+}
+
+model AuthBridgeTicket {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceSessionId String?
+  tokenHash       String    @unique
+  targetPath      String
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([sourceSessionId, expiresAt])
 }
 
 model PasswordResetToken {

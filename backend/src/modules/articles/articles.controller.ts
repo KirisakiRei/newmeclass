@@ -114,6 +114,47 @@ export class ArticlesController {
     const created = await this.prisma.article.create({ data: this.sanitizeArticleInput(body) });
     return this.mapArticle(created);
   }
+  @Put('bulk')
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission(['articles.create', 'articles.edit', 'articles.delete'])
+  async bulkSync(@Body() body: any) {
+    const items = Array.isArray(body?.items) ? body.items : [];
+    const replaceMissing = body?.replaceMissing !== false;
+    const existing = await this.prisma.article.findMany({ orderBy: { createdAt: 'asc' } });
+    const existingIds = new Set(existing.map((item) => item.id));
+    const keepIds = new Set<string>();
+
+    for (const item of items) {
+      const next = this.sanitizeArticleInput(item);
+      if (item?.id && existingIds.has(item.id)) {
+        const updated = await this.prisma.article.update({
+          where: { id: item.id },
+          data: next,
+        });
+        keepIds.add(updated.id);
+        continue;
+      }
+
+      const created = await this.prisma.article.create({
+        data: next,
+      });
+      keepIds.add(created.id);
+    }
+
+    if (replaceMissing) {
+      const deleteIds = existing
+        .map((item) => item.id)
+        .filter((id) => !keepIds.has(id));
+      if (deleteIds.length) {
+        await this.prisma.article.deleteMany({
+          where: { id: { in: deleteIds } },
+        });
+      }
+    }
+
+    return this.getAll();
+  }
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)

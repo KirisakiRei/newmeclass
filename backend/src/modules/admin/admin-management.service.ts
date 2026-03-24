@@ -77,6 +77,35 @@ export class AdminManagementService {
     return role;
   }
 
+  private async assertVisibleAdminUserTarget(adminId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: adminId },
+      select: {
+        id: true,
+        role: true,
+        adminRoleId: true,
+        email: true,
+        username: true,
+        adminRole: {
+          select: {
+            slug: true,
+          },
+        },
+      },
+    });
+
+    if (
+      !user
+      || !isAdminActorRole(user.role)
+      || user.role === Role.DEVELOPER
+      || isHiddenSystemAdminRoleSlug(user.adminRole?.slug)
+    ) {
+      throw new NotFoundException('Admin user not found');
+    }
+
+    return user;
+  }
+
   private async assertCanMutateProtectedAdmin(targetUserId: string, nextRoleId?: string | null) {
     const protectedRoleId = await this.adminRbacService.getProtectedRoleId();
     if (!protectedRoleId) return;
@@ -320,13 +349,7 @@ export class AdminManagementService {
 
   async updateAdminUser(adminId: string, body: UpdateAdminUserDto, actorUserId?: string | null) {
     await this.adminRbacService.syncAdminRbacSeed();
-    const existing = await this.prisma.user.findUnique({
-      where: { id: adminId },
-      select: { id: true, adminRoleId: true, email: true, username: true, role: true },
-    });
-    if (!existing || !isAdminActorRole(existing.role)) {
-      throw new NotFoundException('Admin user not found');
-    }
+    const existing = await this.assertVisibleAdminUserTarget(adminId);
 
     const data: Record<string, any> = {};
     if (body.username !== undefined) {
@@ -376,13 +399,7 @@ export class AdminManagementService {
   }
 
   async changeAdminPassword(adminId: string, body: UpdateAdminPasswordDto) {
-    const existing = await this.prisma.user.findUnique({
-      where: { id: adminId },
-      select: { id: true, role: true },
-    });
-    if (!existing || !isAdminActorRole(existing.role)) {
-      throw new NotFoundException('Admin user not found');
-    }
+    await this.assertVisibleAdminUserTarget(adminId);
 
     await this.prisma.user.update({
       where: { id: adminId },
@@ -393,13 +410,7 @@ export class AdminManagementService {
   }
 
   async deleteAdminUser(adminId: string) {
-    const existing = await this.prisma.user.findUnique({
-      where: { id: adminId },
-      select: { id: true, role: true, adminRoleId: true },
-    });
-    if (!existing || !isAdminActorRole(existing.role)) {
-      throw new NotFoundException('Admin user not found');
-    }
+    const existing = await this.assertVisibleAdminUserTarget(adminId);
 
     await this.assertCanMutateProtectedAdmin(adminId);
     await this.prisma.user.delete({ where: { id: adminId } });

@@ -3,6 +3,7 @@ import { AccountStatus, MitraInviteStatus, PriceChangeRequestStatus, Role, Yayas
 import { createHash, randomBytes } from 'crypto';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { buildDashboardFrontendUrl } from 'src/common/frontend-urls';
 import {
   encodeWithdrawalNotes,
   mapDisbursementForClient,
@@ -68,25 +69,6 @@ export class MitraController {
     return `mitra-${String(publicCode || '').trim().toLowerCase()}@${MITRA_PLACEHOLDER_EMAIL_DOMAIN}`;
   }
 
-  private getFrontendBaseUrl() {
-    const fallbackOrigin = (process.env.CORS_ORIGINS || '')
-      .split(',')
-      .map((value) => value.trim())
-      .find(Boolean);
-    return String(process.env.FRONTEND_URL || fallbackOrigin || 'http://localhost:5173').replace(/\/+$/, '');
-  }
-
-  private buildFrontendUrl(path: string, params?: Record<string, string | null | undefined>) {
-    const url = new URL(path.startsWith('/') ? path : `/${path}`, `${this.getFrontendBaseUrl()}/`);
-    Object.entries(params || {}).forEach(([key, rawValue]) => {
-      const value = String(rawValue || '').trim();
-      if (value) {
-        url.searchParams.set(key, value);
-      }
-    });
-    return url.toString();
-  }
-
   private async generateUniqueMitraBusinessCode() {
     for (let attempt = 0; attempt < 30; attempt += 1) {
       const code = `M${randomBytes(3).toString('hex').toUpperCase()}`;
@@ -142,7 +124,7 @@ export class MitraController {
       expiresAt: invite?.expiresAt || null,
       claimedAt: invite?.claimedAt || null,
       revokedAt: invite?.revokedAt || null,
-      inviteUrl: plainToken ? this.buildFrontendUrl('/mitra/claim', { token: plainToken }) : null,
+      inviteUrl: plainToken ? buildDashboardFrontendUrl('/mitra/claim', { token: plainToken }) : null,
     };
   }
 

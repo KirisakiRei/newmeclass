@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { buildDashboardFrontendUrl } from 'src/common/frontend-urls';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentStatus, PaymentType, Prisma, Role, YayasanApprovalStatus } from '@prisma/client';
 import { MIN_PREMIUM_PRICE, resolveCanonicalPaymentAmount } from 'src/common/settings/finance-settings';
@@ -95,9 +96,7 @@ export class PaymentsService {
   }
 
   private getFrontendPaymentReturnUrl(orderId: string) {
-    const frontendUrl = String(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
-    const params = new URLSearchParams({ tab: 'payment', orderId });
-    return `${frontendUrl}/dashboard?${params.toString()}`;
+    return buildDashboardFrontendUrl('/dashboard', { tab: 'payment', orderId });
   }
 
   private normalizePhoneNumber(value?: string | null) {

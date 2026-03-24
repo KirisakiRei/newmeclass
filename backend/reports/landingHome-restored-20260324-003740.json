@@ -1,0 +1,356 @@
+{
+  "id": "cmn3e2fit000292dprisx730z",
+  "key": "landingHome",
+  "value": {
+    "hero": [
+      {
+        "id": "hero-1",
+        "desc": "NEWME CLASS menghadirkan asesmen, kelas, dan pendampingan yang membantu individu maupun institusi mengenali bakat alami dan menumbuhkan potensi secara tepat.",
+        "image": "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1600&q=80",
+        "title": "Temukan Jatidiri dan Potensi Terbaikmu",
+        "ctaLink": "/services",
+        "ctaText": "Lihat Layanan",
+        "subtitle": "PT. MITRA SEMESTA EDUCLASS"
+      },
+      {
+        "id": "hero-2",
+        "desc": "Dari NEWME Test sampai Kelas Gali Bakat, kami membangun perjalanan pengembangan diri yang lebih terarah, hangat, dan relevan dengan kebutuhan zaman.",
+        "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1600&q=80",
+        "title": "Asesmen, Kelas, dan Komunitas dalam Satu Ekosistem",
+        "ctaLink": "/services/personality-tests",
+        "ctaText": "Mulai dari Tes Gratis",
+        "subtitle": "KELAS PEDULI TALENTA"
+      }
+    ],
+    "about": {
+      "badge": "Tentang Kami",
+      "image": "https://images.unsplash.com/photo-1529390079861-591de354faf5?auto=format&fit=crop&w=1200&q=80",
+      "stats": [
+        {
+          "label": "Peserta",
+          "value": "5000+"
+        },
+        {
+          "label": "Mitra",
+          "value": "50+"
+        },
+        {
+          "label": "Program",
+          "value": "5"
+        },
+        {
+          "label": "Kota",
+          "value": "20+"
+        }
+      ],
+      "title": "Siapa Kami",
+      "description": "NEWME CLASS adalah brand dan produk dari PT. MITRA SEMESTA EDUCLASS yang bergerak di bidang edukasi jatidiri, pengembangan potensi, dan penguatan komunitas. Kami membantu individu, keluarga, sekolah, dan yayasan mendapatkan arah tumbuh yang lebih sesuai dengan bakat alami."
+    },
+    "promo": {
+      "badge": "GRATIS",
+      "image": "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80",
+      "tests": [
+        "Test Kepribadian Dasar",
+        "Test Minat Dasar",
+        "Test Bakat Dasar",
+        "Hasil Instan",
+        "Rekomendasi Awal"
+      ],
+      "title": "5 Test Dasar Gratis dari NEWME",
+      "ctaLink": "/register",
+      "ctaText": "Daftar & Mulai Tes",
+      "enabled": true,
+      "subtitle": "Observasi mandiri untuk mengenal bakat dan arah tumbuh Anda.",
+      "description": "Daftar akun Anda dan nikmati akses ke 5 test dasar gratis sebagai langkah awal mengenali karakter, minat, dan bakat alami."
+    },
+    "banners": [
+      {
+        "id": "banner-1",
+        "image": "",
+        "title": "Siap mulai mengenal potensi diri dengan lebih terarah?",
+        "ctaLink": "/services/personality-tests",
+        "ctaText": "Coba Tes Gratis",
+        "enabled": true,
+        "subtitle": "Mulai dari test gratis lalu lanjutkan ke program yang paling sesuai untuk Anda atau institusi Anda."
+      },
+      {
+        "id": "banner-2",
+        "image": "",
+        "title": "Butuh program untuk yayasan atau sekolah?",
+        "ctaLink": "/contact",
+        "ctaText": "Hubungi Kami",
+        "enabled": true,
+        "subtitle": "Diskusikan kebutuhan observasi, kelas, dan pendampingan bersama tim NEWME."
+      }
+    ],
+    "benefits": [
+      {
+        "id": "benefit-1",
+        "icon": "Sparkles",
+        "title": "Lebih Kenal Diri dan Potensi",
+        "description": "Membantu peserta memahami kecenderungan alami sehingga proses belajar dan tumbuh menjadi lebih tepat arah."
+      },
+      {
+        "id": "benefit-2",
+        "icon": "Heart",
+        "title": "Nyaman dengan Gaya Jatidiri",
+        "description": "Mendorong peserta memilih aktivitas, pola belajar, dan lingkungan yang lebih sesuai dengan dirinya."
+      },
+      {
+        "id": "benefit-3",
+        "icon": "Target",
+        "title": "Akselerasi Meraih Impian",
+        "description": "Dengan peta diri yang lebih jelas, peserta dapat menyusun langkah pengembangan secara lebih realistis dan terukur."
+      },
+      {
+        "id": "benefit-4",
+        "icon": "Users",
+        "title": "Akses Produk Komunitas",
+        "description": "Member mendapatkan akses ke ekosistem NEWME seperti kegiatan komunitas, update program, dan benefit lainnya."
+      },
+      {
+        "id": "benefit-5",
+        "icon": "Star",
+        "title": "Benefit dari Mitra NEWME",
+        "description": "Kolaborasi dengan mitra dan merchant membuka peluang bonus, diskon, reward, dan pengalaman belajar yang lebih luas."
+      }
+    ],
+    "finalCta": {
+      "title": "Mulai Kenali Arah dan Potensi Anda",
+      "ctaLink": "/register",
+      "ctaText": "Buat Akun Sekarang",
+      "subtitle": "Bangun langkah pengembangan diri yang lebih jelas bersama ekosistem NEWME CLASS."
+    },
+    "services": [
+      {
+        "id": "service-home-1",
+        "icon": "GraduationCap",
+        "link": "/services/personality-tests",
+        "tags": [
+          "Asesmen Massal",
+          "Psikolog Bersertifikasi",
+          "Sertifikat Resmi"
+        ],
+        "type": "b2b",
+        "badge": "Flagship",
+        "image": "https://images.unsplash.com/photo-1773270196888-0cdacb07edae?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5b3V0aCUyMHRhbGVudCUyMGRldmVsb3BtZW50JTIwd29ya3Nob3B8ZW58MXx8fHwxNzc0MTk2NzgwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+        "title": "Kelas Gali Bakat",
+        "enabled": true,
+        "iconTone": "yellow",
+        "subtitle": "Program Unggulan · B2B",
+        "badgeTone": "yellow",
+        "description": "Program observasi bakat dan pendampingan untuk yayasan, sekolah, dan institusi pendidikan."
+      },
+      {
+        "id": "service-home-2",
+        "icon": "Stethoscope",
+        "link": "/services/clinic",
+        "tags": [
+          "Online / Offline",
+          "Konseling Pribadi",
+          "Follow-up 7 Hari"
+        ],
+        "type": "b2c",
+        "badge": "Licensed",
+        "image": "https://images.unsplash.com/photo-1761039808159-f02b58f07032?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBjb2FjaGluZyUyMHNlc3Npb258ZW58MXx8fHwxNzc0MTk2NzgwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+        "title": "NEWME Clinic",
+        "enabled": true,
+        "iconTone": "emerald",
+        "subtitle": "Konsultasi Psikologi · B2C",
+        "badgeTone": "emerald",
+        "description": "Pendampingan personal melalui sesi konsultasi dan arahan pengembangan diri."
+      },
+      {
+        "id": "service-home-3",
+        "icon": "GraduationCap",
+        "link": "/services/class",
+        "tags": [
+          "12+ Kursus",
+          "Webinar Rutin",
+          "Sertifikat Digital"
+        ],
+        "type": "b2c",
+        "badge": "Best Seller",
+        "image": "https://images.unsplash.com/photo-1545886082-e66c6b9e011a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0YWxlbnQlMjBkaXNjb3ZlcnklMjB5b3V0aCUyMHByb2dyYW18ZW58MXx8fHwxNzc0MTk5MzM2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+        "title": "NEWME Class",
+        "enabled": true,
+        "iconTone": "blue",
+        "subtitle": "Kursus & Webinar · B2C",
+        "badgeTone": "blue",
+        "description": "Kursus pengembangan diri dan webinar interaktif bersama ahli psikologi terbaik."
+      },
+      {
+        "id": "service-home-4",
+        "icon": "ImageIcon",
+        "link": "/services/gallery",
+        "tags": [
+          "Foto Kegiatan",
+          "Video Testimonial",
+          "Highlight Events"
+        ],
+        "type": "b2b",
+        "badge": "Media",
+        "image": "https://images.unsplash.com/photo-1761054783454-7bf31f4d0d25?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxldmVudCUyMGdhbGxlcnklMjBwaG90byUyMGRvY3VtZW50YXRpb258ZW58MXx8fHwxNzc0MTk5MzM2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+        "title": "NEWME Gallery",
+        "enabled": true,
+        "iconTone": "purple",
+        "subtitle": "Dokumentasi & Media",
+        "badgeTone": "purple",
+        "description": "Galeri foto dan video kegiatan dari seluruh program NEWME."
+      },
+      {
+        "id": "service-home-5",
+        "icon": "Network",
+        "link": "/services/net",
+        "tags": [
+          "Diskon s/d 30%",
+          "Networking Event",
+          "Priority Access"
+        ],
+        "type": "b2b",
+        "badge": "New",
+        "image": "https://images.unsplash.com/photo-1728933102332-a4f1a281a621?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0ZWFtJTIwY29sbGFib3JhdGlvbiUyMHdvcmtzaG9wJTIwc2VtaW5hcnxlbnwxfHx8fDE3NzQyMDAzMzl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+        "title": "NEWME Net",
+        "enabled": true,
+        "iconTone": "orange",
+        "subtitle": "Komunitas & Networking",
+        "badgeTone": "orange",
+        "description": "Ekosistem membership eksklusif dengan diskon program, networking event, dan komunitas aktif."
+      }
+    ],
+    "visiMisi": {
+      "misi": [
+        "Membangun kemitraan strategis dengan lembaga pendidikan, yayasan, institusi, dan masyarakat luas.",
+        "Menghadirkan asesmen, kelas, dan pendampingan yang relevan dengan bakat alami peserta.",
+        "Menjadi mitra yang mendorong capaian visi dan misi klien melalui pendekatan edukasi yang lebih personal."
+      ],
+      "visi": "Menjadi bagian dari kemajuan bangsa melalui edukasi jatidiri di berbagai lembaga, institusi, dan komunitas di Indonesia.",
+      "values": [
+        {
+          "desc": "Fokus pada potensi unik setiap individu.",
+          "title": "Peduli Talenta"
+        },
+        {
+          "desc": "Tumbuh bersama yayasan, keluarga, dan komunitas.",
+          "title": "Kolaboratif"
+        },
+        {
+          "desc": "Mendorong aksi nyata, bukan sekadar hasil di atas kertas.",
+          "title": "Berdampak"
+        }
+      ]
+    },
+    "activities": [
+      {
+        "id": "activity-1",
+        "date": "Program Institusi",
+        "image": "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1200&q=80",
+        "title": "Observasi Potensi di Sekolah Mitra",
+        "description": "Pelaksanaan observasi bakat dan karakter belajar untuk siswa bersama yayasan dan sekolah mitra."
+      },
+      {
+        "id": "activity-2",
+        "date": "Program Clinic",
+        "image": "https://images.unsplash.com/photo-1573497620053-ea5300f94f21?auto=format&fit=crop&w=1200&q=80",
+        "title": "Sesi Konsultasi & Pendampingan",
+        "description": "Pendampingan personal untuk membantu peserta merencanakan arah belajar, karier, dan pengembangan diri."
+      },
+      {
+        "id": "activity-3",
+        "date": "Program Community",
+        "image": "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1200&q=80",
+        "title": "Komunitas & Kelas Kolaboratif",
+        "description": "Aktivitas komunitas, kelas, dan forum kolaborasi yang menguatkan jejaring belajar di ekosistem NEWME."
+      }
+    ],
+    "testimonials": [
+      {
+        "id": "testimonial-1",
+        "name": "Tim Yayasan Mitra",
+        "role": "Partner Institusi",
+        "text": "Program NEWME membantu kami membaca potensi siswa secara lebih terarah dan mudah ditindaklanjuti oleh guru.",
+        "avatar": "",
+        "rating": 5
+      },
+      {
+        "id": "testimonial-2",
+        "name": "Peserta NEWME Test",
+        "role": "User Premium",
+        "text": "Hasil test terasa lebih mudah dipahami dan memberi gambaran yang jelas untuk langkah pengembangan diri saya.",
+        "avatar": "",
+        "rating": 5
+      },
+      {
+        "id": "testimonial-3",
+        "name": "Orang Tua Siswa",
+        "role": "Client",
+        "text": "Saya jadi lebih paham bagaimana mendampingi anak sesuai bakat alaminya, bukan sekadar mengikuti arus umum.",
+        "avatar": "",
+        "rating": 5
+      }
+    ],
+    "ecosystemItems": [
+      {
+        "id": "ecosystem-1",
+        "desc": "Pintu masuk terbaik untuk memahami potensi, minat, dan kecenderungan diri.",
+        "href": "/services/personality-tests",
+        "icon": "TestTube",
+        "badge": "Popular",
+        "color": "from-yellow-500/80 to-amber-500/70",
+        "image": "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80",
+        "title": "NEWME Test",
+        "enabled": true,
+        "subtitle": "Asesmen Dasar"
+      },
+      {
+        "id": "ecosystem-2",
+        "desc": "Sesi konsultasi untuk membantu pengguna mengambil langkah yang lebih sadar dan sesuai kebutuhan.",
+        "href": "/services/clinic",
+        "icon": "Stethoscope",
+        "badge": "B to C",
+        "color": "from-emerald-500/80 to-teal-500/70",
+        "image": "https://images.unsplash.com/photo-1573497620053-ea5300f94f21?auto=format&fit=crop&w=1200&q=80",
+        "title": "NEWME Clinic",
+        "enabled": true,
+        "subtitle": "Pendampingan Personal"
+      },
+      {
+        "id": "ecosystem-3",
+        "desc": "Program kelas dan observasi untuk sekolah, yayasan, dan komunitas belajar.",
+        "href": "/services/class",
+        "icon": "GraduationCap",
+        "badge": "B to B",
+        "color": "from-blue-500/80 to-indigo-500/70",
+        "image": "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1200&q=80",
+        "title": "Kelas Gali Bakat",
+        "enabled": true,
+        "subtitle": "Program Institusi"
+      },
+      {
+        "id": "ecosystem-4",
+        "desc": "Ruang untuk melihat perjalanan, cerita, dan dokumentasi tumbuh bersama NEWME.",
+        "href": "/services/gallery",
+        "icon": "ImageIcon",
+        "badge": "Community",
+        "color": "from-purple-500/80 to-fuchsia-500/70",
+        "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80",
+        "title": "NEWME Gallery",
+        "enabled": true,
+        "subtitle": "Dokumentasi"
+      },
+      {
+        "id": "ecosystem-5",
+        "desc": "Jejaring yang memperluas koneksi, benefit, dan kolaborasi lintas member dan mitra.",
+        "href": "/services/net",
+        "icon": "Network",
+        "badge": "Network",
+        "color": "from-orange-500/80 to-amber-500/70",
+        "image": "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=80",
+        "title": "NEWME Net",
+        "enabled": true,
+        "subtitle": "Jejaring & Komunitas"
+      }
+    ]
+  },
+  "updatedAt": "2026-03-23T17:37:00.547Z"
+}

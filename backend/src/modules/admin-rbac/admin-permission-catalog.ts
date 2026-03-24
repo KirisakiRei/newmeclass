@@ -99,9 +99,27 @@ const PAGE_CONFIGS: PermissionPageConfig[] = [
     groupKey: 'content_management',
     groupLabel: 'Manajemen Konten',
     groupOrder: 2,
+    pageKey: 'cms_access',
+    pageLabel: 'Akses CMS',
+    pageOrder: 1,
+    actions: ['manage'],
+  },
+  {
+    groupKey: 'content_management',
+    groupLabel: 'Manajemen Konten',
+    groupOrder: 2,
     pageKey: 'website_content',
     pageLabel: 'Layout Website',
-    pageOrder: 1,
+    pageOrder: 2,
+    actions: ['view', 'edit', 'manage'],
+  },
+  {
+    groupKey: 'content_management',
+    groupLabel: 'Manajemen Konten',
+    groupOrder: 2,
+    pageKey: 'landing_cms',
+    pageLabel: 'Landing CMS',
+    pageOrder: 3,
     actions: ['view', 'edit', 'manage'],
   },
   {
@@ -110,7 +128,7 @@ const PAGE_CONFIGS: PermissionPageConfig[] = [
     groupOrder: 2,
     pageKey: 'hero_slides',
     pageLabel: 'Hero Slides',
-    pageOrder: 2,
+    pageOrder: 4,
     actions: ['view', 'create', 'edit', 'delete', 'manage'],
   },
   {
@@ -119,7 +137,7 @@ const PAGE_CONFIGS: PermissionPageConfig[] = [
     groupOrder: 2,
     pageKey: 'homepage_products',
     pageLabel: 'Produk Homepage',
-    pageOrder: 3,
+    pageOrder: 5,
     actions: ['view', 'create', 'edit', 'delete', 'manage'],
   },
   {
@@ -128,7 +146,7 @@ const PAGE_CONFIGS: PermissionPageConfig[] = [
     groupOrder: 2,
     pageKey: 'shop_products',
     pageLabel: 'Produk Shop',
-    pageOrder: 4,
+    pageOrder: 5,
     actions: ['view', 'create', 'edit', 'delete', 'manage'],
   },
   {
@@ -137,7 +155,7 @@ const PAGE_CONFIGS: PermissionPageConfig[] = [
     groupOrder: 2,
     pageKey: 'testimonials',
     pageLabel: 'Testimonial',
-    pageOrder: 5,
+    pageOrder: 6,
     actions: ['view', 'create', 'edit', 'delete', 'manage'],
   },
   {
@@ -146,7 +164,7 @@ const PAGE_CONFIGS: PermissionPageConfig[] = [
     groupOrder: 2,
     pageKey: 'activities',
     pageLabel: 'Kegiatan',
-    pageOrder: 6,
+    pageOrder: 7,
     actions: ['view', 'create', 'edit', 'delete', 'manage'],
   },
   {
@@ -155,7 +173,7 @@ const PAGE_CONFIGS: PermissionPageConfig[] = [
     groupOrder: 2,
     pageKey: 'banners',
     pageLabel: 'Banners',
-    pageOrder: 7,
+    pageOrder: 8,
     actions: ['view', 'create', 'edit', 'delete', 'manage'],
   },
   {
@@ -164,7 +182,7 @@ const PAGE_CONFIGS: PermissionPageConfig[] = [
     groupOrder: 2,
     pageKey: 'articles',
     pageLabel: 'Artikel',
-    pageOrder: 8,
+    pageOrder: 9,
     actions: ['view', 'create', 'edit', 'delete', 'manage'],
   },
   {
@@ -173,7 +191,7 @@ const PAGE_CONFIGS: PermissionPageConfig[] = [
     groupOrder: 2,
     pageKey: 'media',
     pageLabel: 'Media Gallery',
-    pageOrder: 9,
+    pageOrder: 10,
     actions: ['view', 'create', 'delete', 'manage'],
   },
   {
@@ -182,7 +200,7 @@ const PAGE_CONFIGS: PermissionPageConfig[] = [
     groupOrder: 2,
     pageKey: 'team_management',
     pageLabel: 'Team & Mitra',
-    pageOrder: 10,
+    pageOrder: 11,
     actions: ['view', 'create', 'edit', 'delete'],
   },
   {
@@ -331,6 +349,20 @@ export const ADMIN_PERMISSION_CATALOG: AdminPermissionDefinition[] = PAGE_CONFIG
 export const ADMIN_PERMISSION_KEYS = ADMIN_PERMISSION_CATALOG.map((item) => item.key);
 export const ADMIN_PERMISSION_KEY_SET = new Set(ADMIN_PERMISSION_KEYS);
 
+const HIDDEN_PERMISSION_CATALOG_PAGE_KEYS = new Set([
+  'website_content',
+  'landing_cms',
+  'hero_slides',
+  'homepage_products',
+  'shop_products',
+  'testimonials',
+  'activities',
+  'banners',
+  'articles',
+  'media',
+  'team_management',
+]);
+
 export const ADMIN_PAGE_PERMISSION_MAP = PAGE_CONFIGS.reduce<Record<string, PermissionPageConfig>>((acc, item) => {
   acc[item.pageKey] = item;
   return acc;
@@ -396,7 +428,12 @@ export function getLegacyRolePermissionKeys(role?: Role | null) {
   }
 
   if (normalizedRole === Role.ADMIN) {
-    return ADMIN_PERMISSION_KEYS.filter((key) => !key.startsWith('settings.') && !key.startsWith('admin_management.'));
+    return ADMIN_PERMISSION_KEYS.filter(
+      (key) =>
+        !key.startsWith('settings.')
+        && !key.startsWith('admin_management.')
+        && !key.startsWith('cms_access.'),
+    );
   }
 
   if (normalizedRole === Role.OPERATOR) {
@@ -478,6 +515,10 @@ export function buildPermissionCatalogPayload() {
   >();
 
   ADMIN_PERMISSION_CATALOG.forEach((item) => {
+    if (HIDDEN_PERMISSION_CATALOG_PAGE_KEYS.has(item.pageKey)) {
+      return;
+    }
+
     if (!grouped.has(item.groupKey)) {
       grouped.set(item.groupKey, {
         groupKey: item.groupKey,

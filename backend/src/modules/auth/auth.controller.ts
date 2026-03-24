@@ -6,6 +6,7 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { getDashboardFrontendBaseUrl, getPublicFrontendBaseUrl } from 'src/common/frontend-urls';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
 import { AuthService } from './auth.service';
@@ -17,6 +18,8 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ClaimMitraInviteDto } from './dto/claim-mitra-invite.dto';
+import { CreateBridgeTicketDto } from './dto/create-bridge-ticket.dto';
+import { ExchangeBridgeTicketDto } from './dto/exchange-bridge-ticket.dto';
 
 const AUTH_RATE_LIMIT_TTL_MS = Number(process.env.AUTH_RATE_LIMIT_TTL || 60) * 1000;
 const AUTH_REGISTER_RATE_LIMIT = Number(process.env.AUTH_RATE_LIMIT_REGISTER_LIMIT || 20);
@@ -24,16 +27,12 @@ const AUTH_LOGIN_RATE_LIMIT = Number(process.env.AUTH_RATE_LIMIT_LOGIN_LIMIT || 
 const AUTH_ADMIN_LOGIN_RATE_LIMIT = Number(process.env.AUTH_RATE_LIMIT_ADMIN_LOGIN_LIMIT || 8);
 const AUTH_PASSWORD_RECOVERY_RATE_LIMIT = Number(process.env.AUTH_RATE_LIMIT_PASSWORD_RECOVERY_LIMIT || 8);
 
-const getFrontendBaseUrl = () => {
-  const fallbackOrigin = (process.env.CORS_ORIGINS || '')
-    .split(',')
-    .map((value) => value.trim())
-    .find(Boolean);
-  return String(process.env.FRONTEND_URL || fallbackOrigin || 'http://localhost:5173').replace(/\/+$/, '');
-};
-
-const buildFrontendRedirect = (path: string, query: Request['query']) => {
-  const url = new URL(path.startsWith('/') ? path : `/${path}`, `${getFrontendBaseUrl()}/`);
+const buildFrontendRedirect = (
+  baseUrl: string,
+  path: string,
+  query: Request['query'],
+) => {
+  const url = new URL(path.startsWith('/') ? path : `/${path}`, `${baseUrl}/`);
 
   for (const [key, rawValue] of Object.entries(query || {})) {
     if (Array.isArray(rawValue)) {
@@ -67,7 +66,7 @@ export class AuthController {
 
   @Get('register')
   registerRedirect(@Req() req: Request, @Res() res: Response) {
-    return res.redirect(302, buildFrontendRedirect('/register', req.query));
+    return res.redirect(302, buildFrontendRedirect(getPublicFrontendBaseUrl(), '/register', req.query));
   }
 
   @Throttle({ default: { limit: AUTH_LOGIN_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
@@ -89,6 +88,24 @@ export class AuthController {
   @Post('refresh-session')
   refreshSession(@CurrentUser() user: any) {
     return this.authService.refreshSession(user.sub, user.sid);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  @Post('bridge-ticket')
+  createBridgeTicket(@CurrentUser() user: any, @Body() body: CreateBridgeTicketDto, @Req() req: Request) {
+    return this.authService.createBridgeTicket(user.sub, user.sid, body.target, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    });
+  }
+
+  @Post('bridge-exchange')
+  exchangeBridgeTicket(@Body() body: ExchangeBridgeTicketDto, @Req() req: Request) {
+    return this.authService.exchangeBridgeTicket(body.ticket, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    });
   }
 
   @UseGuards(JwtAuthGuard)
@@ -166,7 +183,7 @@ export class YayasanAuthController {
 
   @Get('register')
   registerRedirect(@Req() req: Request, @Res() res: Response) {
-    return res.redirect(302, buildFrontendRedirect('/yayasan/register', req.query));
+    return res.redirect(302, buildFrontendRedirect(getDashboardFrontendBaseUrl(), '/yayasan/register', req.query));
   }
 
   @Throttle({ default: { limit: AUTH_LOGIN_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })

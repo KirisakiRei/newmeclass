@@ -1,0 +1,53 @@
+{
+  "id": "cmn3e2fit000292dprisx730z",
+  "key": "landingHome",
+  "value": {
+    "hero": [
+      {
+        "id": "h1774287017282",
+        "desc": "",
+        "image": "",
+        "title": "",
+        "ctaLink": "/services",
+        "ctaText": "Mulai Sekarang",
+        "subtitle": ""
+      }
+    ],
+    "about": {
+      "badge": "",
+      "image": "",
+      "stats": [],
+      "title": "",
+      "description": ""
+    },
+    "promo": {
+      "badge": "",
+      "image": "",
+      "tests": [],
+      "title": "",
+      "ctaLink": "",
+      "ctaText": "",
+      "enabled": true,
+      "subtitle": "",
+      "description": ""
+    },
+    "banners": [],
+    "benefits": [],
+    "finalCta": {
+      "title": "",
+      "ctaLink": "",
+      "ctaText": "",
+      "subtitle": ""
+    },
+    "services": [],
+    "visiMisi": {
+      "misi": [],
+      "visi": "",
+      "values": []
+    },
+    "activities": [],
+    "testimonials": [],
+    "ecosystemItems": []
+  },
+  "updatedAt": "2026-03-23T17:30:17.810Z"
+}

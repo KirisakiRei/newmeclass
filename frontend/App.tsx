@@ -2,15 +2,9 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './css/App.css';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import Navbar from './components/Navbar';
-import Footer from './components/Footer';
-import VisitorTracker from './components/VisitorTracker';
-import SEOHead from './components/SEOHead';
-import MaintenancePage from './components/MaintenancePage';
 import ErrorBoundary from './components/ErrorBoundary';
-import ScrollToTop from './components/ScrollToTop';
+import SEOHead from './components/SEOHead';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import { useTheme } from './contexts/ThemeContext';
 import { Button } from './components/ui/button';
 import {
   Dialog,
@@ -28,36 +22,15 @@ import {
   recordSessionActivity,
   touchSessionForTokenKey,
 } from './services/api';
+import { buildPublicWebUrl } from './lib/app-urls';
 
 // Lazy-load all pages to keep the initial bundle focused on the active route.
 // download the code for the page they actually visit.
 
-// Public pages
-const Home = lazy(() => import('./pages/landingpage/Home'));
-const CompanyProfile = lazy(() => import('./pages/landingpage/CompanyProfile'));
-const KelasGaliBakat = lazy(() => import('./pages/landingpage/KelasGaliBakat'));
-const NewmeTest = lazy(() => import('./pages/landingpage/NewmeTest'));
-const Services = lazy(() => import('./pages/landingpage/Services'));
-const Contact = lazy(() => import('./pages/landingpage/Contact'));
-const Shop = lazy(() => import('./pages/landingpage/Shop'));
-const CertificateVerify = lazy(() => import('./pages/landingpage/CertificateVerify'));
-const ArticlesPage = lazy(() => import('./pages/landingpage/ArticlesPage'));
-const ArticleDetail = lazy(() => import('./pages/landingpage/ArticleDetail'));
-const PersonalityTestsLanding = lazy(() => import('./pages/landingpage/PersonalityTestsLanding'));
-const PersonalityTest = lazy(() => import('./pages/landingpage/PersonalityTest'));
-const PersonalityTestResult = lazy(() => import('./pages/landingpage/PersonalityTestResult'));
-const TestSelection = lazy(() => import('./pages/user/TestSelection'));
-const PrivacyPolicy = lazy(() => import('./pages/landingpage/PrivacyPolicy'));
-const NotFound = lazy(() => import('./pages/landingpage/NotFound'));
-
 // Auth & user pages
-const Login = lazy(() => import('./pages/auth/Login'));
-const Register = lazy(() => import('./pages/auth/Register'));
-const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
-const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
+const AuthBridge = lazy(() => import('./pages/auth/AuthBridge'));
 const UserDashboard = lazy(() => import('./pages/user/UserDashboard'));
 const UserTest = lazy(() => import('./pages/user/UserTest'));
-const Wallet = lazy(() => import('./pages/user/Wallet'));
 const TestResult = lazy(() => import('./pages/user/TestResult'));
 const CertificateDownload = lazy(() => import('./pages/shared/CertificateDownload'));
 
@@ -75,20 +48,10 @@ const PersonalityResults = lazy(() => import('./pages/admin/PersonalityResults')
 const PersonalityResultEdit = lazy(() => import('./pages/admin/PersonalityResultEdit'));
 const Certificates = lazy(() => import('./pages/admin/Certificates'));
 const CertificateDetail = lazy(() => import('./pages/admin/CertificateDetail'));
-const Banners = lazy(() => import('./pages/admin/Banners'));
 const Analytics = lazy(() => import('./pages/admin/Analytics'));
 const Settings = lazy(() => import('./pages/admin/Settings'));
 const Referrals = lazy(() => import('./pages/admin/Referrals'));
-const Articles = lazy(() => import('./pages/admin/Articles'));
-const TeamManagement = lazy(() => import('./pages/admin/TeamManagement'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
-const WebsiteContent = lazy(() => import('./pages/admin/WebsiteContent'));
-const HeroSlides = lazy(() => import('./pages/admin/HeroSlides'));
-const HomepageProducts = lazy(() => import('./pages/admin/HomepageProducts'));
-const ShopProducts = lazy(() => import('./pages/admin/ShopProducts'));
-const Testimonials = lazy(() => import('./pages/admin/Testimonials'));
-const Activities = lazy(() => import('./pages/admin/Activities'));
-const MediaGallery = lazy(() => import('./pages/admin/MediaGallery'));
 const PremiumResults = lazy(() => import('./pages/admin/PremiumResults'));
 const AdminYayasan = lazy(() => import('./pages/admin/AdminYayasan'));
 const AdminWithdrawals = lazy(() => import('./pages/admin/AdminWithdrawals'));
@@ -113,6 +76,50 @@ export const API = `${BACKEND_URL}/api`;
 const PageLoader = () => (
   <div className="min-h-[60vh] flex items-center justify-center">
     <div className="w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
+const ExternalRedirect = ({ to, label = 'Mengalihkan...' }) => {
+  useEffect(() => {
+    if (!to) return;
+    window.location.replace(to);
+  }, [to]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#1a1a1a] px-4">
+      <div className="rounded-2xl border border-yellow-400/20 bg-[#2a2a2a] px-8 py-6 text-center text-white">
+        <div className="flex items-center justify-center gap-3">
+          <div className="h-5 w-5 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const RedirectToPublicWeb = ({ path, preserveSearch = true, label }) => {
+  const location = useLocation();
+  const target = useMemo(
+    () => buildPublicWebUrl(path || location.pathname, preserveSearch ? location.search : ''),
+    [location.pathname, location.search, path, preserveSearch],
+  );
+
+  return <ExternalRedirect to={target} label={label || 'Mengalihkan ke public web...'} />;
+};
+
+const DashboardNotFound = () => (
+  <div className="min-h-screen flex items-center justify-center bg-[#1a1a1a] px-6 text-center">
+    <div className="max-w-md rounded-2xl border border-yellow-400/20 bg-[#2a2a2a] px-8 py-7">
+      <h1 className="text-2xl font-bold text-white">Halaman tidak ditemukan</h1>
+      <p className="mt-3 text-sm text-gray-400">
+        Route ini tidak tersedia di dashboard app NEWME.
+      </p>
+      <div className="mt-5 flex justify-center">
+        <Button asChild className="bg-yellow-400 text-black hover:bg-yellow-500">
+          <a href="/admin/login">Kembali ke Admin Login</a>
+        </Button>
+      </div>
+    </div>
   </div>
 );
 
@@ -252,20 +259,15 @@ const SessionManager = () => {
   );
 };
 
-// Component to handle maintenance mode check
 const AppContent = () => {
-  const { settings } = useTheme();
-
-  // Maintenance mode activates once settings load and does not block the initial render.
-  const isMaintenanceMode = settings?.maintenanceMode === true;
-
   return (
     <BrowserRouter>
-      <SessionManager />
       <SEOHead />
-      <VisitorTracker />
+      <SessionManager />
       <Suspense fallback={<PageLoader />}>
       <Routes>
+        <Route path="/" element={<Navigate to="/admin/login" replace />} />
+
         {/* Admin routes */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route
@@ -286,20 +288,20 @@ const AppContent = () => {
           <Route path="questions" element={<Questions />} />
           <Route path="certificates" element={<Certificates />} />
           <Route path="certificates/:id" element={<CertificateDetail />} />
-          <Route path="banners" element={<Banners />} />
+          <Route path="banners" element={<RedirectToPublicWeb path="/cms/landing/banners" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
           <Route path="referrals" element={<Referrals />} />
-          <Route path="articles" element={<Articles />} />
-          <Route path="team-management" element={<TeamManagement />} />
+          <Route path="articles" element={<RedirectToPublicWeb path="/cms/landing/articles" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
+          <Route path="team-management" element={<RedirectToPublicWeb path="/cms/company" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="settings" element={<Settings />} />
           <Route path="admin-users" element={<AdminUsers />} />
-          <Route path="website-content" element={<WebsiteContent />} />
-          <Route path="hero-slides" element={<HeroSlides />} />
-          <Route path="homepage-products" element={<HomepageProducts />} />
-          <Route path="shop-products" element={<ShopProducts />} />
-          <Route path="testimonials" element={<Testimonials />} />
-          <Route path="activities" element={<Activities />} />
-          <Route path="media" element={<MediaGallery />} />
+          <Route path="website-content" element={<RedirectToPublicWeb path="/cms" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
+          <Route path="hero-slides" element={<RedirectToPublicWeb path="/cms/landing/hero" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
+          <Route path="homepage-products" element={<RedirectToPublicWeb path="/cms/landing/products" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
+          <Route path="shop-products" element={<RedirectToPublicWeb path="/cms/shop" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
+          <Route path="testimonials" element={<RedirectToPublicWeb path="/cms/landing/testimonials" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
+          <Route path="activities" element={<RedirectToPublicWeb path="/cms/landing/activities" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
+          <Route path="media" element={<RedirectToPublicWeb path="/cms/media" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
           <Route path="premium-results" element={<PremiumResults />} />
           <Route path="personality-results" element={<PersonalityResults />} />
           <Route path="personality-results/:code" element={<PersonalityResultEdit />} />
@@ -338,84 +340,66 @@ const AppContent = () => {
             </ProtectedRoute>
           }
         />
-        
-        {/* If maintenance mode is ON, show maintenance page for all public routes */}
-        {isMaintenanceMode ? (
-          <Route path="/*" element={
-            <MaintenancePage 
-              message={settings?.maintenanceMessage} 
-              settings={settings}
-            />
-          } />
-        ) : (
-          <>
-            {/* Auth routes (no navbar/footer) */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password/:token" element={<ResetPassword />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute tokenKey="user_token" redirectTo="/login">
-                  <UserDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/user-test"
-              element={
-                <ProtectedRoute tokenKey="user_token" redirectTo="/login">
-                  <UserTest />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/wallet"
-              element={
-                <ProtectedRoute tokenKey="user_token" redirectTo="/login">
-                  <Navigate to="/dashboard" replace />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/test-result/:resultId"
-              element={
-                <ProtectedRoute tokenKey="user_token" redirectTo="/login">
-                  <TestResult />
-                </ProtectedRoute>
-              }
-            />
-            
-            {/* Public routes with navbar/footer */}
-            <Route path="/*" element={
-              <>
-                <Navbar />
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/company-profile" element={<CompanyProfile />} />
-                  <Route path="/kelas-gali-bakat" element={<KelasGaliBakat />} />
-                  <Route path="/newme-test" element={<NewmeTest />} />
-                  <Route path="/services/:serviceId" element={<Services />} />
-                  <Route path="/contact" element={<Contact />} />
-                  <Route path="/shop" element={<Shop />} />
-                  <Route path="/articles" element={<ArticlesPage />} />
-                  <Route path="/articles/:id" element={<ArticleDetail />} />
-                  <Route path="/personality-tests" element={<PersonalityTestsLanding />} />
-                  <Route path="/test/:testType" element={<Navigate to="/user-test" replace />} />
-                  <Route path="/test/result/:testType/:result" element={<PersonalityTestResult />} />
-                  <Route path="/test-selection" element={<TestSelection />} />
-                  <Route path="/certificate-verify" element={<CertificateVerify />} />
-                  <Route path="/verifikasi-sertifikat" element={<CertificateVerify />} />
-                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-                <Footer />
-                <ScrollToTop />
-              </>
-            } />
-          </>
-        )}
+
+        <Route path="/auth/bridge" element={<AuthBridge />} />
+
+        <Route path="/login" element={<RedirectToPublicWeb path="/login" />} />
+        <Route path="/register" element={<RedirectToPublicWeb path="/register" />} />
+        <Route path="/forgot-password" element={<RedirectToPublicWeb path="/forgot-password" />} />
+        <Route path="/reset-password/:token" element={<RedirectToPublicWeb />} />
+        <Route path="/company-profile" element={<RedirectToPublicWeb />} />
+        <Route path="/services" element={<RedirectToPublicWeb />} />
+        <Route path="/services/:serviceId" element={<RedirectToPublicWeb />} />
+        <Route path="/shop" element={<RedirectToPublicWeb />} />
+        <Route path="/articles" element={<RedirectToPublicWeb />} />
+        <Route path="/articles/:id" element={<RedirectToPublicWeb />} />
+        <Route path="/contact" element={<RedirectToPublicWeb />} />
+        <Route path="/privacy-policy" element={<RedirectToPublicWeb />} />
+        <Route path="/certificate/verify" element={<RedirectToPublicWeb />} />
+        <Route path="/certificate-verify" element={<RedirectToPublicWeb path="/certificate/verify" />} />
+        <Route path="/verifikasi-sertifikat" element={<RedirectToPublicWeb path="/certificate/verify" />} />
+        <Route path="/cms/*" element={<RedirectToPublicWeb preserveSearch={false} />} />
+        <Route path="/kelas-gali-bakat" element={<RedirectToPublicWeb path="/services/personality-tests" preserveSearch={false} />} />
+        <Route path="/newme-test" element={<RedirectToPublicWeb path="/services/personality-tests" preserveSearch={false} />} />
+        <Route path="/personality-tests" element={<RedirectToPublicWeb path="/services/personality-tests" preserveSearch={false} />} />
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute tokenKey="user_token" redirectTo="/login">
+              <UserDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user-test"
+          element={
+            <ProtectedRoute tokenKey="user_token" redirectTo="/login">
+              <UserTest />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/wallet"
+          element={
+            <ProtectedRoute tokenKey="user_token" redirectTo="/login">
+              <Navigate to="/dashboard" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/test-result/:resultId"
+          element={
+            <ProtectedRoute tokenKey="user_token" redirectTo="/login">
+              <TestResult />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/test/:testType" element={<Navigate to="/user-test" replace />} />
+        <Route path="/test-selection" element={<Navigate to="/user-test" replace />} />
+        <Route path="/test/result/:testType/:result" element={<Navigate to="/dashboard" replace />} />
+
+        <Route path="*" element={<DashboardNotFound />} />
       </Routes>
       </Suspense>
       <Toaster />
