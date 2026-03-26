@@ -30,6 +30,10 @@ export class UpdateProfileDto {
   description?: string;
 
   @IsOptional()
+  @IsString()
+  yayasanLogoUrl?: string;
+
+  @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'birthDate must be a valid date in YYYY-MM-DD format' })
   birthDate?: string;
 

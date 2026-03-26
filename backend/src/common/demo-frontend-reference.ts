@@ -75,7 +75,7 @@ const DEFAULT_CERTIFICATE_TEMPLATE: Record<CertificateType, CertificateTemplateI
     subtitleText: 'ANALISA KEPRIBADIAN & JATIDIRI',
     completionText:
       'Telah berhasil menyelesaikan program asesmen kepribadian dan dinyatakan kompeten dalam memahami profil kepribadian melalui metode 5 Element.',
-    signerName: 'Dr. Rina Wijaya, M.Psi',
+    signerName: 'Abie Dibyo',
     signerTitle: 'Direktur NEWMECLASS',
     textColor: '#1a1a1a',
     accentColor: '#D4A017',
@@ -93,7 +93,7 @@ const DEFAULT_CERTIFICATE_TEMPLATE: Record<CertificateType, CertificateTemplateI
     subtitleText: 'ANALISA KEPRIBADIAN & JATIDIRI',
     completionText:
       'Telah berhasil menyelesaikan program pengembangan kepribadian eksklusif melalui Yayasan dan dinyatakan kompeten dalam memahami potensi diri.',
-    signerName: 'Dr. Rina Wijaya, M.Psi',
+    signerName: 'Abie Dibyo',
     signerTitle: 'Direktur NEWMECLASS',
     textColor: '#2c1810',
     accentColor: '#B8860B',
@@ -138,54 +138,16 @@ async function loadDemoModule(): Promise<DemoModule> {
 }
 
 export async function getDemoPersonalityTemplates(): Promise<PersonalityTemplateRecord[]> {
-  const module = await loadDemoModule();
-  const rawRows = safeArray(module.personalityResults)
-    .map((item) => {
-      const row = safeObject(item);
-      const code = safeString(row.code);
-      if (!code) return null;
-      return {
-        code,
-        socialType: safeString(row.socialType, 'ambivert'),
-        element: safeString(row.element, 'kayu').toLowerCase(),
-        label: safeString(row.label, code),
-        color: safeString(row.color, '#888888'),
-        aiAnalysis: safeObject(row.aiAnalysis),
-        insights: safeObject(row.insights),
-      };
-    })
-    .filter(Boolean) as PersonalityTemplateRecord[];
-  const rowsByCode = new Map(rawRows.map((row) => [row.code, row]));
-  const manualRowsByCode = new Map(
-    MANUAL_CANONICAL_PERSONALITY_TEMPLATES.map((row) => [
-      row.code,
-      {
-        ...row,
-        element: safeString(row.element, 'kayu').toLowerCase(),
-      } as PersonalityTemplateRecord,
-    ]),
+  const canonicalRows = MANUAL_CANONICAL_PERSONALITY_TEMPLATES.map((row) => ({
+    ...row,
+    element: safeString(row.element, 'kayu').toLowerCase(),
+  })) as PersonalityTemplateRecord[];
+
+  return sortCanonicalPersonalityTemplates(
+    CANONICAL_PERSONALITY_TEMPLATE_CODES.map((code) =>
+      canonicalRows.find((row) => row.code === code) || null,
+    ).filter(Boolean) as PersonalityTemplateRecord[],
   );
-
-  const canonicalRows = CANONICAL_PERSONALITY_TEMPLATE_CODES.map((code) => {
-    const direct = rowsByCode.get(code);
-    if (direct) return direct;
-
-    if (code === 'aA') {
-      const legacyAir = rowsByCode.get('aAi');
-      if (legacyAir) {
-        return {
-          ...legacyAir,
-          code: 'aA',
-          socialType: 'ambivert',
-          element: 'air',
-        } as PersonalityTemplateRecord;
-      }
-    }
-
-    return manualRowsByCode.get(code) || null;
-  }).filter(Boolean) as PersonalityTemplateRecord[];
-
-  return sortCanonicalPersonalityTemplates(canonicalRows);
 }
 
 export async function ensureDemoPersonalityTemplates(db: DemoReferenceClient) {
@@ -194,19 +156,20 @@ export async function ensureDemoPersonalityTemplates(db: DemoReferenceClient) {
       const demoRows = await getDemoPersonalityTemplates();
       if (!demoRows.length) return;
 
-      const existing = await db.personalityResultTemplate.findMany({
-        select: { code: true },
-      });
-      const existingCodes = new Set(existing.map((row) => row.code));
-      const missingRows = demoRows.filter((row) => !existingCodes.has(row.code));
-
-      if (!missingRows.length) return;
-
       await Promise.all(
-        missingRows.map((row) =>
-          db.personalityResultTemplate.create({
-            data: {
+        demoRows.map((row) =>
+          db.personalityResultTemplate.upsert({
+            where: { code: row.code },
+            create: {
               code: row.code,
+              socialType: row.socialType,
+              element: row.element,
+              label: row.label,
+              color: row.color,
+              aiAnalysis: row.aiAnalysis,
+              insights: row.insights,
+            },
+            update: {
               socialType: row.socialType,
               element: row.element,
               label: row.label,

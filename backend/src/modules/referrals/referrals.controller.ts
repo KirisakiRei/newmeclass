@@ -1,10 +1,13 @@
-import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
+import { CreateReferralWithdrawalDto } from './dto/create-referral-withdrawal.dto';
+import { ProcessReferralWithdrawalDto } from './dto/process-referral-withdrawal.dto';
 import { ReferralsService } from './referrals.service';
 import { UpdateReferralSettingsDto } from './dto/update-referral-settings.dto';
 import { ReferralTransactionsQueryDto } from './dto/referral-transactions-query.dto';
@@ -24,6 +27,27 @@ export class ReferralsController {
   @AdminPermission('referrals.edit')
   updateSettings(@Body() body: UpdateReferralSettingsDto) {
     return this.service.updateSettings(body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  @Get('me/wallet')
+  myWallet(@CurrentUser() user: any) {
+    return this.service.getUserWallet(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  @Get('me/withdrawals')
+  myWithdrawals(@CurrentUser() user: any) {
+    return this.service.getUserWithdrawals(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  @Post('me/withdraw')
+  requestWithdraw(@CurrentUser() user: any, @Body() body: CreateReferralWithdrawalDto) {
+    return this.service.requestWithdraw(user.sub, body);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
@@ -48,5 +72,34 @@ export class ReferralsController {
   @AdminPermission('referrals.view')
   stats() {
     return this.service.stats();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @Get('withdrawals')
+  @AdminPermission('referrals.view')
+  withdrawals(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.service.listWithdrawals({ page, pageSize, status, search });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @Put('withdrawals/:id/approve')
+  @AdminPermission('referrals.edit')
+  approveWithdrawal(@Param('id') id: string, @Body() body: ProcessReferralWithdrawalDto) {
+    return this.service.approveWithdrawal(id, body);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @Put('withdrawals/:id/reject')
+  @AdminPermission('referrals.edit')
+  rejectWithdrawal(@Param('id') id: string, @Body() body: ProcessReferralWithdrawalDto) {
+    return this.service.rejectWithdrawal(id, body);
   }
 }

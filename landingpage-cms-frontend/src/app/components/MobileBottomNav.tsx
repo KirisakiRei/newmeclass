@@ -1,8 +1,11 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { Home, LayoutGrid, Phone, ShoppingBag, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { useCMS } from "./cms/CMSContext";
 import { resolveBackendAssetUrl } from "../../lib/public-url";
+import { authAPI } from "../../services/api";
+import { buildDashboardBridgeUrl, clearUserSession, getUserSessionEventName, hasUserSession } from "../../lib/session";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 
 const resolveIcon = (href: string): LucideIcon => {
@@ -20,6 +23,8 @@ function isActive(href: string, pathname: string, exact: boolean) {
 export function MobileBottomNav() {
   const location = useLocation();
   const { data } = useCMS();
+  const [isLoggedIn, setIsLoggedIn] = useState(() => hasUserSession());
+  const [redirecting, setRedirecting] = useState(false);
   const homeLink = data.navigation.mainLinks.find((item) => item.href === "/") || {
     label: "Beranda",
     href: "/",
@@ -42,6 +47,56 @@ export function MobileBottomNav() {
   const right = navItems.slice(2);
   const loginLink = data.navigation.authLinks.login;
   const logoSrc = resolveBackendAssetUrl(data.global.logoUrl, newmeLogo);
+
+  useEffect(() => {
+    let active = true;
+    const validateSession = async () => {
+      if (!hasUserSession()) {
+        if (active) setIsLoggedIn(false);
+        return;
+      }
+
+      try {
+        await authAPI.getProfile();
+        if (active) setIsLoggedIn(true);
+      } catch {
+        clearUserSession();
+        if (active) setIsLoggedIn(false);
+      }
+    };
+    const syncSessionState = () => {
+      void validateSession();
+    };
+
+    void validateSession();
+    window.addEventListener("storage", syncSessionState);
+    window.addEventListener("focus", syncSessionState);
+    document.addEventListener("visibilitychange", syncSessionState);
+    window.addEventListener(getUserSessionEventName(), syncSessionState);
+    return () => {
+      active = false;
+      window.removeEventListener("storage", syncSessionState);
+      window.removeEventListener("focus", syncSessionState);
+      document.removeEventListener("visibilitychange", syncSessionState);
+      window.removeEventListener(getUserSessionEventName(), syncSessionState);
+    };
+  }, [location.pathname]);
+
+  const handleDashboardRedirect = async () => {
+    if (!isLoggedIn || redirecting) return;
+    setRedirecting(true);
+    try {
+      const bridge = await authAPI.createBridgeTicket("/dashboard");
+      const ticket = bridge?.ticket || bridge?.token;
+      if (!ticket) throw new Error("Bridge ticket login tidak ditemukan");
+      window.location.href = buildDashboardBridgeUrl(ticket, "/dashboard");
+    } catch {
+      clearUserSession();
+      window.location.href = loginLink.href;
+    } finally {
+      setRedirecting(false);
+    }
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
@@ -76,21 +131,39 @@ export function MobileBottomNav() {
           })}
 
           <div className="flex flex-1 flex-col items-center justify-center">
-            <Link to={loginLink.href} className="relative -translate-y-5 flex flex-col items-center">
-              <div className="absolute inset-0 rounded-full bg-yellow-500/20 blur-lg" />
-              <div className="relative flex h-[52px] w-[52px] items-center justify-center rounded-full border-2 border-yellow-500/60 bg-[#0a0a0a] shadow-[0_4px_24px_rgba(234,179,8,0.35)]">
-                <div className="absolute inset-1 rounded-full bg-gradient-to-br from-yellow-400/20 to-yellow-600/10" />
-                <img
-                  src={logoSrc}
-                  alt="NEWME"
-                  className="relative h-9 w-9 object-contain"
-                  style={{ mixBlendMode: "screen" }}
-                />
-              </div>
-              <span className="mt-0.5 text-[10px] text-yellow-500" style={{ fontWeight: 700 }}>
-                {loginLink.label}
-              </span>
-            </Link>
+            {isLoggedIn ? (
+              <button type="button" onClick={() => void handleDashboardRedirect()} disabled={redirecting} className="relative -translate-y-5 flex flex-col items-center">
+                <div className="absolute inset-0 rounded-full bg-yellow-500/20 blur-lg" />
+                <div className="relative flex h-[52px] w-[52px] items-center justify-center rounded-full border-2 border-yellow-500/60 bg-[#0a0a0a] shadow-[0_4px_24px_rgba(234,179,8,0.35)]">
+                  <div className="absolute inset-1 rounded-full bg-gradient-to-br from-yellow-400/20 to-yellow-600/10" />
+                  <img
+                    src={logoSrc}
+                    alt="NEWME"
+                    className="relative h-9 w-9 object-contain"
+                    style={{ mixBlendMode: "screen" }}
+                  />
+                </div>
+                <span className="mt-0.5 text-[10px] text-yellow-500" style={{ fontWeight: 700 }}>
+                  {redirecting ? "Proses..." : "Dashboard"}
+                </span>
+              </button>
+            ) : (
+              <Link to={loginLink.href} className="relative -translate-y-5 flex flex-col items-center">
+                <div className="absolute inset-0 rounded-full bg-yellow-500/20 blur-lg" />
+                <div className="relative flex h-[52px] w-[52px] items-center justify-center rounded-full border-2 border-yellow-500/60 bg-[#0a0a0a] shadow-[0_4px_24px_rgba(234,179,8,0.35)]">
+                  <div className="absolute inset-1 rounded-full bg-gradient-to-br from-yellow-400/20 to-yellow-600/10" />
+                  <img
+                    src={logoSrc}
+                    alt="NEWME"
+                    className="relative h-9 w-9 object-contain"
+                    style={{ mixBlendMode: "screen" }}
+                  />
+                </div>
+                <span className="mt-0.5 text-[10px] text-yellow-500" style={{ fontWeight: 700 }}>
+                  {loginLink.label}
+                </span>
+              </Link>
+            )}
           </div>
 
           {right.map((item) => {

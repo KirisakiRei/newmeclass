@@ -34,7 +34,7 @@ const UserTest = () => {
   const [results, setResults] = useState(null);
   const [hasPaidAccess, setHasPaidAccess] = useState(false);
   const [hasUsedFreeTest, setHasUsedFreeTest] = useState(false);
-  const [testPrice, setTestPrice] = useState(100000);
+  const [testPrice, setTestPrice] = useState(99000);
   const [jenjang, setJenjang] = useState('dewasa');
   const [jenjangConfigData, setJenjangConfigData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -236,11 +236,11 @@ const UserTest = () => {
       try {
         const referralCode = userData.usedReferralCode || userData.referredByCode || null;
         const priceRes = await userPaymentsAPI.getTestPrice(referralCode);
-        setTestPrice(priceRes.data.totalPrice || priceRes.data.testPrice || 100000);
+        setTestPrice(priceRes.data.totalPrice || priceRes.data.testPrice || 99000);
       } catch (e) {
         try {
           const fallbackRes = await settingsAPI.getTestPrice();
-          setTestPrice(fallbackRes.data.testPrice || 100000);
+          setTestPrice(fallbackRes.data.testPrice || 99000);
         } catch (_ignored) {
           console.log('Using default price');
         }

@@ -621,6 +621,54 @@ export class MitraController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.MITRA)
+  @Get('yayasan/:id/price-change-requests')
+  async yayasanPriceChangeRequests(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    await this.getManagedYayasanBase(user.sub, id);
+
+    const normalizedStatus = String(status || '').trim().toUpperCase();
+    const normalizedSearch = String(search || '').trim().toLowerCase();
+    const where: any = { mitraId: user.sub, yayasanId: id };
+    if (normalizedStatus) where.status = normalizedStatus;
+
+    const { page: currentPage, pageSize: currentPageSize, skip, take } = resolvePagination(
+      { page, pageSize },
+      { pageSize: 10, maxPageSize: 100 },
+    );
+
+    const rows = await this.prisma.yayasanPriceChangeRequest.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const yayasan = await this.prisma.user.findUnique({
+      where: { id },
+      select: { fullName: true, email: true },
+    });
+
+    const filtered = rows
+      .map((row) =>
+        this.mapPriceChangeRequest(row, {
+          yayasanName: yayasan?.fullName || 'Yayasan',
+          yayasanEmail: yayasan?.email || null,
+        }),
+      )
+      .filter((row) => {
+        if (!normalizedSearch) return true;
+        return `${row.yayasanName || ''} ${row.yayasanEmail || ''} ${row.reason || ''}`.toLowerCase().includes(normalizedSearch);
+      });
+
+    return buildPaginatedResult(filtered.slice(skip, skip + take), filtered.length, currentPage, currentPageSize);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.MITRA)
   @Get('price-change-requests')
   async priceChangeRequests(
     @CurrentUser() user: any,

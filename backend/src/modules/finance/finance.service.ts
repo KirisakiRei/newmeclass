@@ -334,7 +334,10 @@ export class FinanceService {
         const ledger = ledgerMap.get(order.id) || null;
         const status = toClientPaymentStatus(order.status);
         const jalur = this.getJalurFromPricing(pricing, ledger);
-        const split = this.computeSplitFromPricing(Number(order.amount || 0), pricing, settings.devFeePercent, ledger || undefined);
+        const isApproved = status === 'approved';
+        const split = isApproved
+          ? this.computeSplitFromPricing(Number(order.amount || 0), pricing, settings.devFeePercent, ledger || undefined)
+          : null;
         return {
           _id: order.id,
           id: order.id,

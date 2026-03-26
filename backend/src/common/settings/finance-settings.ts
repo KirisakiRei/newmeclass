@@ -1,4 +1,4 @@
-export const MIN_PREMIUM_PRICE = 100000;
+export const MIN_PREMIUM_PRICE = 99000;
 export const DEFAULT_DEV_FEE_PERCENT = 5;
 
 export function resolveCanonicalPaymentAmount(source: Record<string, any> | null | undefined) {

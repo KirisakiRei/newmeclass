@@ -40,7 +40,7 @@ export function HeroCarousel() {
         </motion.div>
       </AnimatePresence>
 
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col justify-center px-6 pt-16">
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col justify-center px-6 pb-36 pt-16 md:pb-32">
         <AnimatePresence mode="wait">
           <motion.div
             key={current}
@@ -76,17 +76,7 @@ export function HeroCarousel() {
 
         {/* Bottom bar */}
         <div className="absolute bottom-8 left-4 right-4 sm:left-6 sm:right-6">
-          <div className="mb-6 flex flex-col gap-2 rounded-xl border border-yellow-500/20 bg-[#18181b]/80 px-4 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:gap-6 sm:px-6 sm:py-3 sm:w-fit">
-            <a href={`tel:${data.global.phone.replace(/\s|-/g, "")}`} className="flex items-center gap-2 text-xs text-yellow-500 transition-colors hover:text-yellow-400 sm:text-sm">
-              <Phone className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" /> <span>{data.global.phone}</span>
-            </a>
-            <div className="hidden sm:block h-4 w-px bg-white/10" />
-            <a href={`mailto:${data.global.email}`} className="flex items-center gap-2 text-xs text-yellow-500 transition-colors hover:text-yellow-400 sm:text-sm">
-              <Mail className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" /> <span>{data.global.email}</span>
-            </a>
-          </div>
-
-          <div className="flex items-center justify-between">
+          <div className="flex items-end justify-between gap-6">
             <div className="flex items-center gap-4">
               {slides.map((_, i) => (
                 <button key={i} onClick={() => setCurrent(i)} className="group flex items-center gap-2">
@@ -103,13 +93,33 @@ export function HeroCarousel() {
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-3">
-              <button onClick={prev} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white transition-colors hover:border-yellow-500 hover:text-yellow-500">
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button onClick={next} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white transition-colors hover:border-yellow-500 hover:text-yellow-500">
-                <ChevronRight className="h-4 w-4" />
-              </button>
+
+            <div className="flex max-w-xs flex-col items-end gap-4">
+              <div className="flex flex-col gap-2 rounded-xl border border-yellow-500/20 bg-[#18181b]/80 px-4 py-3 backdrop-blur-md sm:px-5">
+                <a
+                  href={`tel:${data.global.phone.replace(/\s|-/g, "")}`}
+                  className="flex items-center justify-end gap-2 text-xs text-yellow-500 transition-colors hover:text-yellow-400 sm:text-sm"
+                >
+                  <Phone className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                  <span className="text-right">{data.global.phone}</span>
+                </a>
+                <a
+                  href={`mailto:${data.global.email}`}
+                  className="flex items-center justify-end gap-2 text-xs text-yellow-500 transition-colors hover:text-yellow-400 sm:text-sm"
+                >
+                  <Mail className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                  <span className="text-right break-all sm:break-normal">{data.global.email}</span>
+                </a>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button onClick={prev} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white transition-colors hover:border-yellow-500 hover:text-yellow-500">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button onClick={next} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white transition-colors hover:border-yellow-500 hover:text-yellow-500">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router";
 import {
   NavigationMenu,
@@ -10,11 +11,15 @@ import {
 import { Button } from "./ui/button";
 import { useCMS } from "./cms/CMSContext";
 import { resolveBackendAssetUrl } from "../../lib/public-url";
+import { authAPI } from "../../services/api";
+import { buildDashboardBridgeUrl, clearUserSession, getUserSessionEventName, hasUserSession } from "../../lib/session";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 
 export function Navbar() {
   const location = useLocation();
   const { data } = useCMS();
+  const [isLoggedIn, setIsLoggedIn] = useState(() => hasUserSession());
+  const [redirecting, setRedirecting] = useState(false);
   const siteName = data.global.siteName || "NEWME CLASS";
   const [brandPrimary, brandAccent = ""] = siteName.split(" ");
   const navLinks = data.navigation.mainLinks;
@@ -22,6 +27,56 @@ export function Navbar() {
   const loginLink = data.navigation.authLinks.login;
   const registerLink = data.navigation.authLinks.register;
   const logoSrc = resolveBackendAssetUrl(data.global.logoUrl, newmeLogo);
+
+  useEffect(() => {
+    let active = true;
+    const validateSession = async () => {
+      if (!hasUserSession()) {
+        if (active) setIsLoggedIn(false);
+        return;
+      }
+
+      try {
+        await authAPI.getProfile();
+        if (active) setIsLoggedIn(true);
+      } catch {
+        clearUserSession();
+        if (active) setIsLoggedIn(false);
+      }
+    };
+    const syncSessionState = () => {
+      void validateSession();
+    };
+
+    void validateSession();
+    window.addEventListener("storage", syncSessionState);
+    window.addEventListener("focus", syncSessionState);
+    document.addEventListener("visibilitychange", syncSessionState);
+    window.addEventListener(getUserSessionEventName(), syncSessionState);
+    return () => {
+      active = false;
+      window.removeEventListener("storage", syncSessionState);
+      window.removeEventListener("focus", syncSessionState);
+      document.removeEventListener("visibilitychange", syncSessionState);
+      window.removeEventListener(getUserSessionEventName(), syncSessionState);
+    };
+  }, [location.pathname]);
+
+  const handleDashboardRedirect = async () => {
+    if (!isLoggedIn || redirecting) return;
+    setRedirecting(true);
+    try {
+      const bridge = await authAPI.createBridgeTicket("/dashboard");
+      const ticket = bridge?.ticket || bridge?.token;
+      if (!ticket) throw new Error("Bridge ticket login tidak ditemukan");
+      window.location.href = buildDashboardBridgeUrl(ticket, "/dashboard");
+    } catch {
+      clearUserSession();
+      window.location.href = loginLink.href;
+    } finally {
+      setRedirecting(false);
+    }
+  };
 
   return (
     <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-[#0a0a0a]/80 backdrop-blur-lg">
@@ -108,16 +163,29 @@ export function Navbar() {
         </NavigationMenu>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <Button
-            variant="ghost"
-            className="text-sm text-zinc-300 hover:bg-yellow-500/5 hover:text-yellow-500"
-            asChild
-          >
-            <Link to={loginLink.href}>{loginLink.label}</Link>
-          </Button>
-          <Button className="bg-yellow-500 text-sm text-black hover:bg-yellow-400" asChild>
-            <Link to={registerLink.href}>{registerLink.label}</Link>
-          </Button>
+          {isLoggedIn ? (
+            <Button
+              type="button"
+              className="bg-yellow-500 text-sm text-black hover:bg-yellow-400"
+              onClick={() => void handleDashboardRedirect()}
+              disabled={redirecting}
+            >
+              {redirecting ? "Mengarahkan..." : "Dashboard"}
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                className="text-sm text-zinc-300 hover:bg-yellow-500/5 hover:text-yellow-500"
+                asChild
+              >
+                <Link to={loginLink.href}>{loginLink.label}</Link>
+              </Button>
+              <Button className="bg-yellow-500 text-sm text-black hover:bg-yellow-400" asChild>
+                <Link to={registerLink.href}>{registerLink.label}</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>

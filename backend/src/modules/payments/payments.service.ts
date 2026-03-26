@@ -38,6 +38,7 @@ const MIDTRANS_SANDBOX_APP_URL = 'https://app.sandbox.midtrans.com';
 const MIDTRANS_PRODUCTION_APP_URL = 'https://app.midtrans.com';
 const MIDTRANS_SANDBOX_API_URL = 'https://api.sandbox.midtrans.com';
 const MIDTRANS_PRODUCTION_API_URL = 'https://api.midtrans.com';
+const USER_REFERRAL_SETTINGS_KEY = 'userReferralProgramSettings';
 
 @Injectable()
 export class PaymentsService {
@@ -282,6 +283,15 @@ export class PaymentsService {
       where: { role: Role.USER, myReferralCode: code },
       include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
     });
+  }
+
+  private async getUserReferralBonus(db: PrismaLike) {
+    const row = await db.setting.findUnique({ where: { key: USER_REFERRAL_SETTINGS_KEY } });
+    const value = row?.value && typeof row.value === 'object' && !Array.isArray(row.value)
+      ? (row.value as Record<string, any>)
+      : {};
+    const bonus = Number(value.bonusPerReferral ?? USER_REFERRAL_BONUS);
+    return Number.isFinite(bonus) && bonus > 0 ? bonus : USER_REFERRAL_BONUS;
   }
 
   async getTestPricing(userId?: string, referralCode?: string, db: PrismaLike = this.prisma): Promise<PricingContext> {
@@ -913,12 +923,13 @@ export class PaymentsService {
           select: { id: true, myReferralCode: true },
         })
       : null;
+    const bonusPerReferral = await this.getUserReferralBonus(tx);
 
     await this.createReferralCommissionIfMissing(tx, {
       userId: userReferrer?.id || null,
       referralCode: userReferrer?.myReferralCode || null,
       sourceOrderId: order.orderId,
-      commission: userReferrer ? USER_REFERRAL_BONUS : 0,
+      commission: userReferrer ? bonusPerReferral : 0,
     });
   }
 

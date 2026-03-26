@@ -1,5 +1,9 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Put, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { mkdirSync } from 'fs';
+import { extname, resolve } from 'path';
 import { Role, YayasanApprovalStatus } from '@prisma/client';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import {
@@ -335,6 +339,65 @@ export class YayasanController {
       ...wallet,
       transactions: buildPaginatedResult(wallet.transactions.slice(start, start + currentPageSize), wallet.transactions.length, currentPage, currentPageSize),
     };
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.YAYASAN)
+  @UseInterceptors(FileInterceptor('file', {
+    storage: diskStorage({
+      destination: (_req, _file, callback) => {
+        const dir = resolve(process.cwd(), 'uploads', 'yayasan');
+        mkdirSync(dir, { recursive: true });
+        callback(null, dir);
+      },
+      filename: (_req, file, callback) => {
+        callback(null, `logo-${Date.now()}${extname(file.originalname || '') || '.png'}`);
+      },
+    }),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, callback) => {
+      callback(null, file.mimetype.startsWith('image/'));
+    },
+  }))
+  @Post('settings/logo-upload')
+  async uploadLogo(@CurrentUser() user: any, @UploadedFile() file: any) {
+    if (!file) {
+      throw new BadRequestException('File logo wajib diunggah.');
+    }
+
+    const existing = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      include: { profile: true },
+    });
+    const profileExtra =
+      existing?.profile?.extra && typeof existing.profile.extra === 'object'
+        ? (existing.profile.extra as Record<string, any>)
+        : {};
+    const yayasanLogoUrl = `/uploads/yayasan/${file.filename}`;
+
+    await this.prisma.user.update({
+      where: { id: user.sub },
+      data: {
+        profile: {
+          upsert: {
+            create: {
+              extra: {
+                ...profileExtra,
+                yayasanLogoUrl,
+              },
+            },
+            update: {
+              extra: {
+                ...profileExtra,
+                yayasanLogoUrl,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return { url: yayasanLogoUrl };
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

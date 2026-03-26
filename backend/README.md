@@ -29,10 +29,10 @@ NestJS + Prisma + MySQL backend for NEWME SaaS platform.
 - Local backend infra only: `docker compose -f docker-compose.dev.yml up -d`
 
 ## Production VPS
-1. Use [backend/.env.production.example](/c:/Users/LENOVO/Documents/Project/2026/newme/backend/.env.production.example) as the reference for production variables.
-2. For CI/CD deployment, GitHub Actions writes the real `/opt/newme/.env.production` file on the VPS from repository Secrets and Variables.
-3. The VPS pulls images from GHCR and runs [docker-compose.prod.yml](/c:/Users/LENOVO/Documents/Project/2026/newme/docker-compose.prod.yml).
-4. Server setup and CI/CD parameter mapping are documented in [deploy/vps/README.md](/c:/Users/LENOVO/Documents/Project/2026/newme/deploy/vps/README.md).
+1. Use [/.env.example](/c:/Users/LENOVO/Documents/Project/2026/newme/.env.example) as the reference for runtime variables.
+2. Windows local and VPS both use [compose.yml](/c:/Users/LENOVO/Documents/Project/2026/newme/compose.yml).
+3. Manual deploy helper is [deploy/vps/manual-deploy.sh](/c:/Users/LENOVO/Documents/Project/2026/newme/deploy/vps/manual-deploy.sh).
+4. Deployment steps are documented in [deploy/vps/README.md](/c:/Users/LENOVO/Documents/Project/2026/newme/deploy/vps/README.md).
 
 Production notes:
 - Frontend image is built from the static `frontend/dist` output and served by Nginx.

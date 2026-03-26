@@ -4,102 +4,40 @@ on:
   workflow_dispatch:
     inputs:
       git_ref:
-        description: "Git ref to build and deploy"
+        description: "Git ref to deploy"
         required: true
         default: "main"
       run_seed:
-        description: "Run optional production seed after deploy"
+        description: "Run production seed after deploy"
         required: true
         type: boolean
         default: false
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: production-deploy
   cancel-in-progress: false
 
 env:
-  REGISTRY: ghcr.io
-  FRONTEND_IMAGE: ghcr.io/kirisakirei/newmeclass-frontend
-  BACKEND_IMAGE: ghcr.io/kirisakirei/newmeclass-backend
-  BACKEND_TOOLS_IMAGE: ghcr.io/kirisakirei/newmeclass-backend-tools
+  REPO_URL: https://github.com/KirisakiRei/newmeclass.git
   DEPLOY_PATH: /opt/newme
+  APP_DIR: /opt/newme/app
 
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.meta.outputs.image_tag }}
-      git_commit: ${{ steps.meta.outputs.git_commit }}
-    steps:
-      - name: Checkout target ref
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.git_ref }}
-
-      - name: Set build metadata
-        id: meta
-        shell: bash
-        run: |
-          GIT_COMMIT="$(git rev-parse HEAD)"
-          echo "git_commit=${GIT_COMMIT}" >> "$GITHUB_OUTPUT"
-          echo "image_tag=sha-${GIT_COMMIT}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push backend runtime image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          target: runtime
-          push: true
-          tags: |
-            ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.image_tag }}
-            ${{ env.BACKEND_IMAGE }}:prod-latest
-
-      - name: Build and push backend tools image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          target: build
-          push: true
-          tags: |
-            ${{ env.BACKEND_TOOLS_IMAGE }}:${{ steps.meta.outputs.image_tag }}
-            ${{ env.BACKEND_TOOLS_IMAGE }}:prod-latest
-
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: true
-          build-args: |
-            REACT_APP_BACKEND_URL=
-          tags: |
-            ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.image_tag }}
-            ${{ env.FRONTEND_IMAGE }}:prod-latest
-
   deploy:
     runs-on: ubuntu-latest
-    needs: build-and-push
     steps:
       - name: Checkout target ref
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref }}
+
+      - name: Resolve commit
+        id: meta
+        shell: bash
+        run: echo "git_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Prepare SSH key
         shell: bash
@@ -112,15 +50,17 @@ jobs:
       - name: Render production env file
         shell: bash
         env:
-          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
-          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
-          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
-          BACKEND_TOOLS_IMAGE: ${{ env.BACKEND_TOOLS_IMAGE }}
-          FRONTEND_PORT_RAW: ${{ vars.FRONTEND_PORT }}
           APP_URL: ${{ vars.APP_URL }}
-          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+          PUBLIC_FRONTEND_URL: ${{ vars.PUBLIC_FRONTEND_URL }}
+          DASHBOARD_FRONTEND_URL: ${{ vars.DASHBOARD_FRONTEND_URL }}
           CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
           UPLOAD_PUBLIC_BASE_URL: ${{ vars.UPLOAD_PUBLIC_BASE_URL }}
+          MIDTRANS_IS_PRODUCTION: ${{ vars.MIDTRANS_IS_PRODUCTION }}
+          DISBURSEMENT_PROVIDER: ${{ vars.DISBURSEMENT_PROVIDER }}
+          MIDTRANS_IRIS_SANDBOX_BASE_URL: ${{ vars.MIDTRANS_IRIS_SANDBOX_BASE_URL }}
+          MIDTRANS_IRIS_PRODUCTION_BASE_URL: ${{ vars.MIDTRANS_IRIS_PRODUCTION_BASE_URL }}
+          MIDTRANS_IRIS_PAYOUTS_PATH: ${{ vars.MIDTRANS_IRIS_PAYOUTS_PATH }}
+          FRONTEND_PORT_RAW: ${{ vars.FRONTEND_PORT }}
           NODE_ENV: production
           PORT: 5000
           API_PREFIX: api
@@ -160,10 +100,12 @@ jobs:
           BULLMQ_DEFAULT_REMOVE_ON_FAIL: 5000
           QUEUE_CONCURRENCY_PAYMENT: 10
           QUEUE_CONCURRENCY_SCORING: 20
-          MIDTRANS_IS_PRODUCTION: "false"
           MIDTRANS_SERVER_KEY: ${{ secrets.MIDTRANS_SERVER_KEY }}
           MIDTRANS_CLIENT_KEY: ${{ secrets.MIDTRANS_CLIENT_KEY }}
           MIDTRANS_MERCHANT_ID: ${{ secrets.MIDTRANS_MERCHANT_ID }}
+          MIDTRANS_IRIS_API_KEY: ${{ secrets.MIDTRANS_IRIS_API_KEY }}
+          MIDTRANS_IRIS_SANDBOX_API_KEY: ${{ secrets.MIDTRANS_IRIS_SANDBOX_API_KEY }}
+          MIDTRANS_IRIS_PRODUCTION_API_KEY: ${{ secrets.MIDTRANS_IRIS_PRODUCTION_API_KEY }}
           MIDTRANS_SANITIZED: "true"
           MIDTRANS_3DS: "true"
           MIDTRANS_WEBHOOK_PATH: /api/payments/midtrans/webhook
@@ -194,16 +136,16 @@ jobs:
           FRONTEND_PORT="${FRONTEND_PORT_RAW:-80}"
           SMTP_PORT="${SMTP_PORT_RAW:-2525}"
           cat > .env.production.rendered <<EOF
-          FRONTEND_IMAGE=${FRONTEND_IMAGE}
-          BACKEND_IMAGE=${BACKEND_IMAGE}
-          BACKEND_TOOLS_IMAGE=${BACKEND_TOOLS_IMAGE}
-          IMAGE_TAG=${IMAGE_TAG}
-          FRONTEND_PORT=${FRONTEND_PORT}
-          REACT_APP_BACKEND_URL=
           APP_URL=${APP_URL}
-          FRONTEND_URL=${FRONTEND_URL}
+          PUBLIC_FRONTEND_URL=${PUBLIC_FRONTEND_URL}
+          DASHBOARD_FRONTEND_URL=${DASHBOARD_FRONTEND_URL}
+          FRONTEND_URL=${DASHBOARD_FRONTEND_URL}
           CORS_ORIGINS=${CORS_ORIGINS}
           UPLOAD_PUBLIC_BASE_URL=${UPLOAD_PUBLIC_BASE_URL}
+          FRONTEND_PORT=${FRONTEND_PORT}
+          VITE_BACKEND_URL=
+          VITE_DASHBOARD_URL=${DASHBOARD_FRONTEND_URL}
+          NGINX_BACKEND_UPSTREAM=http://backend:5000
           NODE_ENV=${NODE_ENV}
           PORT=${PORT}
           API_PREFIX=${API_PREFIX}
@@ -247,6 +189,13 @@ jobs:
           MIDTRANS_SERVER_KEY=${MIDTRANS_SERVER_KEY}
           MIDTRANS_CLIENT_KEY=${MIDTRANS_CLIENT_KEY}
           MIDTRANS_MERCHANT_ID=${MIDTRANS_MERCHANT_ID}
+          DISBURSEMENT_PROVIDER=${DISBURSEMENT_PROVIDER:-manual}
+          MIDTRANS_IRIS_API_KEY=${MIDTRANS_IRIS_API_KEY}
+          MIDTRANS_IRIS_SANDBOX_API_KEY=${MIDTRANS_IRIS_SANDBOX_API_KEY}
+          MIDTRANS_IRIS_PRODUCTION_API_KEY=${MIDTRANS_IRIS_PRODUCTION_API_KEY}
+          MIDTRANS_IRIS_SANDBOX_BASE_URL=${MIDTRANS_IRIS_SANDBOX_BASE_URL:-https://app.sandbox.midtrans.com/iris/api/v1}
+          MIDTRANS_IRIS_PRODUCTION_BASE_URL=${MIDTRANS_IRIS_PRODUCTION_BASE_URL:-https://app.midtrans.com/iris/api/v1}
+          MIDTRANS_IRIS_PAYOUTS_PATH=${MIDTRANS_IRIS_PAYOUTS_PATH:-/payouts}
           MIDTRANS_SANITIZED=${MIDTRANS_SANITIZED}
           MIDTRANS_3DS=${MIDTRANS_3DS}
           MIDTRANS_WEBHOOK_PATH=${MIDTRANS_WEBHOOK_PATH}
@@ -275,37 +224,35 @@ jobs:
           SEED_SUPERADMIN_NAME=${SEED_SUPERADMIN_NAME}
           EOF
 
-      - name: Validate rendered compose config
+      - name: Validate compose config
         shell: bash
-        run: docker compose --env-file .env.production.rendered -f docker-compose.prod.yml config > /dev/null
+        run: docker compose --env-file .env.production.rendered -f compose.yml config > /dev/null
 
-      - name: Create deploy directory on VPS
-        shell: bash
-        run: ssh "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}" "mkdir -p '${{ env.DEPLOY_PATH }}'"
-
-      - name: Copy deployment files to VPS
+      - name: Upload env file to VPS
         shell: bash
         run: |
-          scp docker-compose.prod.yml "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_PATH }}/docker-compose.prod.yml"
+          ssh "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}" "mkdir -p '${{ env.DEPLOY_PATH }}'"
           scp .env.production.rendered "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_PATH }}/.env.production"
 
       - name: Deploy on VPS
         shell: bash
         env:
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          DEPLOY_COMMIT: ${{ steps.meta.outputs.git_commit }}
           RUN_SEED: ${{ inputs.run_seed }}
         run: |
           ssh "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}" "
             set -e
-            cd '${{ env.DEPLOY_PATH }}'
-            if [ -n '${GHCR_READ_TOKEN}' ] && [ -n '${GHCR_USERNAME}' ]; then
-              echo '${GHCR_READ_TOKEN}' | docker login ghcr.io -u '${GHCR_USERNAME}' --password-stdin
+            mkdir -p '${{ env.DEPLOY_PATH }}'
+            if [ ! -d '${{ env.APP_DIR }}/.git' ]; then
+              git clone '${{ env.REPO_URL }}' '${{ env.APP_DIR }}'
             fi
-            docker compose --env-file .env.production -f docker-compose.prod.yml pull
-            docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+            cd '${{ env.APP_DIR }}'
+            git fetch --all --tags --prune
+            git checkout --force '${DEPLOY_COMMIT}'
+            cp '${{ env.DEPLOY_PATH }}/.env.production' .env
+            docker compose up -d --build
             if [ '${RUN_SEED}' = 'true' ]; then
-              docker compose --env-file .env.production -f docker-compose.prod.yml --profile ops run --rm seed
+              docker compose --profile ops run --rm seed
             fi
             docker image prune -f
           "

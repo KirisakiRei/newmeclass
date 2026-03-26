@@ -24,7 +24,7 @@ export const DEFAULT_SITE_SETTINGS = {
   allowRegistration: true,
   popupEnabled: true,
   requirePayment: true,
-  paymentAmount: 100000,
+  paymentAmount: 99000,
   bankName: 'BCA',
   bankAccountNumber: '1234567890',
   bankAccountName: 'NEWME CLASS',

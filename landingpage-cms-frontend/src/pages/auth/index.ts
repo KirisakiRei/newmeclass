@@ -1,4 +1,4 @@
-export { LoginPage } from "../../app/components/pages/LoginPage";
-export { RegisterPage } from "../../app/components/pages/RegisterPage";
-export { ForgotPasswordPage } from "../../app/components/pages/ForgotPasswordPage";
-export { ResetPasswordPage } from "../../app/components/pages/ResetPasswordPage";
+export { LoginPage } from "./LoginPage";
+export { RegisterPage } from "./RegisterPage";
+export { ForgotPasswordPage } from "./ForgotPasswordPage";
+export { ResetPasswordPage } from "./ResetPasswordPage";

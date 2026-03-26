@@ -15,6 +15,7 @@ import {
   HelpCircle,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Menu,
   Package,
   Settings,
@@ -79,6 +80,7 @@ const NAVIGATION = [
     label: 'Pengaturan',
     icon: Settings,
     children: [
+      { label: 'Running Text', href: '/admin/running-text', icon: Megaphone, permission: 'settings.view' },
       { label: 'Pengaturan Website', href: '/admin/settings', icon: Settings, permission: 'settings.view' },
       { label: 'Manajemen Admin', href: '/admin/admin-users', icon: Shield, permission: 'admin_management.view' },
     ],

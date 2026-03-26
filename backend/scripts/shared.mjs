@@ -114,7 +114,7 @@ export function sleep(ms) {
 }
 
 export function ensureReportsDir() {
-  const reportsDir = path.join(backendRoot, 'reports');
+  const reportsDir = path.join(repoRoot, '.dev-artifacts', 'backend', 'reports');
   fs.mkdirSync(reportsDir, { recursive: true });
   return reportsDir;
 }

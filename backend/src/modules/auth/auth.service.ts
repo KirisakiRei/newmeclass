@@ -1114,6 +1114,26 @@ export class AuthService {
     };
   }
 
+  async logout(userId: string, sessionId?: string | null) {
+    await this.getValidSessionOrThrow(userId, sessionId);
+    const revokedAt = new Date();
+    await this.prisma.authSession.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt,
+        expiresAt: revokedAt,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Logout berhasil.',
+    };
+  }
+
   async createBridgeTicket(
     userId: string,
     sessionId?: string | null,
@@ -1312,6 +1332,7 @@ export class AuthService {
                 institutionName: body.institutionName ?? existingExtra.institutionName ?? null,
                 institutionAddress: body.institutionAddress ?? existingExtra.institutionAddress ?? null,
                 description: body.description ?? existingExtra.description ?? null,
+                yayasanLogoUrl: body.yayasanLogoUrl ?? existingExtra.yayasanLogoUrl ?? null,
                 userType: existingExtra.userType ?? null,
               },
             },
@@ -1327,6 +1348,7 @@ export class AuthService {
                 institutionName: body.institutionName ?? existingExtra.institutionName ?? null,
                 institutionAddress: body.institutionAddress ?? existingExtra.institutionAddress ?? null,
                 description: body.description ?? existingExtra.description ?? null,
+                yayasanLogoUrl: body.yayasanLogoUrl ?? existingExtra.yayasanLogoUrl ?? null,
                 userType: existingExtra.userType ?? null,
               },
             },

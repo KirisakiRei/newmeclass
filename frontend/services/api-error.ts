@@ -14,12 +14,19 @@ const stringifyMessage = (value) => {
 export const getApiErrorMessage = (error, fallback = 'Terjadi kesalahan. Silakan coba lagi.') => {
   if (!error) return fallback;
 
-  const detail = stringifyMessage(error.response.data.detail);
+  const responseData = error.response?.data || {};
+
+  const detail = stringifyMessage(responseData.detail);
   if (detail.trim()) {
     return detail;
   }
 
-  const message = stringifyMessage(error.userMessage || error.response.data.message || error.message);
+  const messages = stringifyMessage(responseData.messages);
+  if (messages.trim()) {
+    return messages;
+  }
+
+  const message = stringifyMessage(error.userMessage || responseData.message || error.message);
   if (message.trim()) {
     return message;
   }

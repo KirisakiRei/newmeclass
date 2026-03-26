@@ -1,9 +1,13 @@
 import { Prisma, PrismaClient, Role, AccountStatus, CertificateType } from '@prisma/client';
+import { execFile } from 'child_process';
 import { createHash } from 'crypto';
+import { resolve } from 'path';
+import { promisify } from 'util';
 import {
   ensureDemoCertificateTemplate,
   ensureDemoPersonalityTemplates,
 } from '../src/common/demo-frontend-reference';
+import { MIN_PREMIUM_PRICE } from '../src/common/settings/finance-settings';
 import {
   ADMIN_PERMISSION_CATALOG,
   getMappedLegacyRoleSlug,
@@ -14,6 +18,8 @@ import { CoreScoringCatalogService } from '../src/modules/scoring/core-scoring-c
 import { DEFAULT_QUESTION_CATALOG } from '../src/modules/questions/default-question-catalog';
 
 const prisma = new PrismaClient();
+const execFileAsync = promisify(execFile);
+const LEGACY_PREMIUM_PRICE = 100000;
 
 function hashPassword(password: string) {
   return createHash('sha256').update(password).digest('hex');
@@ -45,6 +51,21 @@ async function runWithRetry<T>(label: string, task: () => Promise<T>, maxAttempt
   }
 
   throw lastError;
+}
+
+async function ensureSeedLandingReferenceContent() {
+  const backendRoot = resolve(__dirname, '..', '..');
+  await execFileAsync(process.execPath, ['scripts/sync-landing-reference-content.mjs'], {
+    cwd: backendRoot,
+    env: process.env,
+  });
+}
+
+function normalizeSeedPremiumPrice(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return MIN_PREMIUM_PRICE;
+  if (parsed === LEGACY_PREMIUM_PRICE) return MIN_PREMIUM_PRICE;
+  return Math.max(parsed, MIN_PREMIUM_PRICE);
 }
 
 async function seedCore() {
@@ -236,18 +257,39 @@ async function seedCore() {
     }
   }
 
+  const generalRow = await prisma.setting.findUnique({
+    where: { key: 'general' },
+  });
+  const generalValue = ((generalRow?.value as Record<string, any>) || {});
+  const nextGeneralValue = {
+    ...generalValue,
+    maintenanceMode: Boolean(generalValue.maintenanceMode ?? false),
+    testPrice: normalizeSeedPremiumPrice(generalValue.testPrice),
+    paymentAmount: normalizeSeedPremiumPrice(generalValue.paymentAmount),
+  };
+
   await prisma.setting.upsert({
     where: { key: 'general' },
-    update: {},
+    update: {
+      value: nextGeneralValue,
+    },
     create: {
       key: 'general',
-      value: {
-        maintenanceMode: false,
-        testPrice: 100000,
-        paymentAmount: 100000,
-      },
+      value: nextGeneralValue,
     },
   });
+
+  for (const pricingKey of ['paymentAmount', 'testPrice'] as const) {
+    const existingPricingRow = await prisma.setting.findUnique({
+      where: { key: pricingKey },
+    });
+    const nextPricingValue = normalizeSeedPremiumPrice(existingPricingRow?.value);
+    await prisma.setting.upsert({
+      where: { key: pricingKey },
+      update: { value: nextPricingValue },
+      create: { key: pricingKey, value: nextPricingValue },
+    });
+  }
 
   await prisma.referralSetting.upsert({
     where: { id: 'default-ref-setting' },
@@ -327,6 +369,7 @@ async function seedCore() {
   await ensureDemoPersonalityTemplates(prisma as any);
   await ensureDemoCertificateTemplate(prisma as any, CertificateType.INDIVIDU);
   await ensureDemoCertificateTemplate(prisma as any, CertificateType.YAYASAN);
+  await ensureSeedLandingReferenceContent();
 }
 
 async function main() {

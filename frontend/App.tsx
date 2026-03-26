@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from './components/ui/dialog';
 import { Toaster } from './components/ui/toaster';
+import VisitorTracker from './components/VisitorTracker';
 import {
   clearAuthStorage,
   getLastSessionActivity,
@@ -49,6 +50,7 @@ const PersonalityResultEdit = lazy(() => import('./pages/admin/PersonalityResult
 const Certificates = lazy(() => import('./pages/admin/Certificates'));
 const CertificateDetail = lazy(() => import('./pages/admin/CertificateDetail'));
 const Analytics = lazy(() => import('./pages/admin/Analytics'));
+const RunningText = lazy(() => import('./pages/admin/RunningText'));
 const Settings = lazy(() => import('./pages/admin/Settings'));
 const Referrals = lazy(() => import('./pages/admin/Referrals'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
@@ -263,6 +265,7 @@ const AppContent = () => {
   return (
     <BrowserRouter>
       <SEOHead />
+      <VisitorTracker />
       <SessionManager />
       <Suspense fallback={<PageLoader />}>
       <Routes>
@@ -293,6 +296,7 @@ const AppContent = () => {
           <Route path="articles" element={<RedirectToPublicWeb path="/cms/landing/articles" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
           <Route path="team-management" element={<RedirectToPublicWeb path="/cms/company" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
           <Route path="analytics" element={<Analytics />} />
+          <Route path="running-text" element={<RunningText />} />
           <Route path="settings" element={<Settings />} />
           <Route path="admin-users" element={<AdminUsers />} />
           <Route path="website-content" element={<RedirectToPublicWeb path="/cms" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />

@@ -2,6 +2,7 @@ import { Body, Controller, ForbiddenException, Get, Param, Post, Query, UseGuard
 import { Role } from '@prisma/client';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { MIN_PREMIUM_PRICE } from 'src/common/settings/finance-settings';
 import { PaymentsService } from '../payments/payments.service';
 import { UploadUserProofDto } from './dto/upload-user-proof.dto';
 import { CreateQrisDto } from './dto/create-qris.dto';
@@ -16,7 +17,7 @@ export class UserPaymentsController {
   uploadProof(@CurrentUser() user: any, @Body() body: UploadUserProofDto) {
     return this.paymentsService.uploadManualProof({
       userId: user.sub,
-      amount: Number(body.paymentAmount || 100000),
+      amount: Number(body.paymentAmount || MIN_PREMIUM_PRICE),
       method: body.paymentMethod || 'Transfer Bank',
       fileUrl: body.fileUrl || (body.file ? `/uploads/proof-${Date.now()}.png` : '/uploads/proof.png'),
     });
@@ -79,7 +80,7 @@ export class UserPaymentsController {
 
     const order = await this.paymentsService.createOrder({
       userId: user.sub,
-      amount: Number(body.amount || pricing.totalPrice || pricing.basePrice || 100000),
+      amount: Number(body.amount || pricing.totalPrice || pricing.basePrice || MIN_PREMIUM_PRICE),
       paymentType: 'TEST_PAYMENT',
       idempotencyKey: body.idempotencyKey,
       metadata: { source: 'user-payments.create-qris', pricing },
@@ -104,7 +105,7 @@ export class UserPaymentsController {
     const pricing = await this.paymentsService.getTestPricing(user.sub);
     const order = await this.paymentsService.createOrReuseSnapOrder({
       userId: user.sub,
-      amount: Number(body.amount || pricing.totalPrice || pricing.basePrice || 100000),
+      amount: Number(body.amount || pricing.totalPrice || pricing.basePrice || MIN_PREMIUM_PRICE),
       paymentType: 'TEST_PAYMENT',
       idempotencyKey: body.idempotencyKey,
       replacePending: body.replacePending,

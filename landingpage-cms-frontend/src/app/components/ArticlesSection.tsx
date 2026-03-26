@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { Badge } from "./ui/badge";
 import { Link } from "react-router";
 import { ArrowRight } from "lucide-react";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { ImageWithFallback } from "./media/ImageWithFallback";
 import { useCMS } from "./cms/CMSContext";
 
 export function ArticlesSection() {

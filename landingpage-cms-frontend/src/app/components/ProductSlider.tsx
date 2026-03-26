@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { Badge } from "./ui/badge";
 import { Link } from "react-router";
 import { ArrowRight, Stethoscope, GraduationCap, TestTube, Network, ImageIcon, Star, type LucideIcon } from "lucide-react";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { ImageWithFallback } from "./media/ImageWithFallback";
 import { useCMS } from "./cms/CMSContext";
 
 const ICON_MAP: Record<string, LucideIcon> = {

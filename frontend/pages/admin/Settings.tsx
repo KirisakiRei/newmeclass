@@ -163,7 +163,7 @@ export default function Settings() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard icon={CreditCard} label="Gateway Aktif" value={systemSummary?.paymentGateway?.activeProvider || 'MIDTRANS'} note={`Mode ${systemSummary?.paymentGateway?.mode || 'sandbox'}`} color="text-yellow-400" />
-        <SummaryCard icon={Landmark} label="Harga Test Premium" value={fmt(systemSummary?.pricing?.testPrice || settings.paymentAmount || 100000)} note="Harga dasar test premium individu" color="text-green-400" />
+        <SummaryCard icon={Landmark} label="Harga Test Premium" value={fmt(systemSummary?.pricing?.testPrice || settings.paymentAmount || DEFAULT_SITE_SETTINGS.paymentAmount)} note="Harga dasar test premium individu" color="text-green-400" />
         <SummaryCard icon={ShieldCheck} label="Fee Pengembang" value={`${systemSummary?.developerFee?.percent ?? settings.devFeePercent ?? 5}%`} note="Dipakai untuk pembagian pendapatan" color="text-cyan-400" />
         <SummaryCard icon={GraduationCap} label="Skema Referral Yayasan" value={fmt(referralSummary.totalPrice)} note={`Budget share ${fmt(referralSummary.shareBudget)}`} color="text-purple-400" />
       </div>
@@ -177,7 +177,7 @@ export default function Settings() {
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div>
               <Label className="text-gray-300">Harga Test Premium</Label>
-              <Input type="number" value={settings.paymentAmount || 100000} onChange={(event) => handleChange('paymentAmount', Number(event.target.value || 0))} className="bg-[#1a1a1a] text-white" />
+              <Input type="number" value={settings.paymentAmount || DEFAULT_SITE_SETTINGS.paymentAmount} onChange={(event) => handleChange('paymentAmount', Number(event.target.value || 0))} className="bg-[#1a1a1a] text-white" />
             </div>
             <div>
               <Label className="text-gray-300">Developer Fee Percent</Label>

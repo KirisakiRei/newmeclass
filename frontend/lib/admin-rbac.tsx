@@ -85,6 +85,7 @@ const ADMIN_ROUTE_RULES = [
   { prefix: '/admin/revenue', permission: 'revenue.view' },
   { prefix: '/admin/transactions', permission: 'transactions.view' },
   { prefix: '/admin/questions', permission: 'questions.view' },
+  { prefix: '/admin/running-text', permission: 'settings.view' },
   { prefix: '/admin/banners', permission: 'banners.view' },
   { prefix: '/admin/referrals', permission: 'referrals.view' },
   { prefix: '/admin/articles', permission: 'articles.view' },
@@ -126,6 +127,7 @@ const ADMIN_REDIRECT_ORDER = [
   '/admin/withdrawals',
   '/admin/mitra-withdrawals',
   '/admin/analytics',
+  '/admin/running-text',
   '/admin/settings',
   '/admin/admin-users',
 ];

@@ -128,9 +128,9 @@ const AdminLogin = () => {
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-gray-400 text-sm">
+              {/* <p className="text-gray-400 text-sm">
                 Hubungi administrator jika lupa password
-              </p>
+              </p> */}
             </div>
           </CardContent>
         </Card>

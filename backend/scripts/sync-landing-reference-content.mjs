@@ -21,13 +21,17 @@ const LANDING_KEYS = {
   navigation: 'landingNavigation',
 };
 
-const logoSourcePath = path.join(
-  repoRoot,
-  'landingpage-cms-frontend',
-  'src',
-  'assets',
-  '585f88d5e9a2256caa217475b070012672c11723.png',
-);
+const logoSourceCandidates = [
+  path.join(backendRoot, 'src', 'assets', 'seed-newme-class-logo.png'),
+  path.join(backendRoot, 'uploads', 'content', 'seed-newme-class-logo.png'),
+  path.join(
+    repoRoot,
+    'landingpage-cms-frontend',
+    'src',
+    'assets',
+    '585f88d5e9a2256caa217475b070012672c11723.png',
+  ),
+];
 const logoTargetDirectory = path.join(backendRoot, 'uploads', 'content');
 const logoFileName = 'seed-newme-class-logo.png';
 const logoTargetPath = path.join(logoTargetDirectory, logoFileName);
@@ -913,6 +917,14 @@ const hasMeaningfulContent = (value) => {
   return isFilledScalar(value);
 };
 
+const hasMeaningfulHeroSlides = (value) => (
+  Array.isArray(value)
+  && value.some((item) => {
+    if (!isPlainObject(item)) return false;
+    return [item.title, item.desc, item.image, item.subtitle].some((entry) => isFilledScalar(entry));
+  })
+);
+
 const mergePreferExisting = (current, fallback) => {
   if (Array.isArray(fallback)) {
     return Array.isArray(current) && hasMeaningfulContent(current) ? current : fallback;
@@ -939,7 +951,8 @@ const mergePreferExisting = (current, fallback) => {
 };
 
 async function ensureLogoAsset() {
-  if (!fs.existsSync(logoSourcePath)) return null;
+  const logoSourcePath = logoSourceCandidates.find((candidate) => fs.existsSync(candidate));
+  if (!logoSourcePath) return null;
 
   fs.mkdirSync(logoTargetDirectory, { recursive: true });
   fs.copyFileSync(logoSourcePath, logoTargetPath);
@@ -961,6 +974,7 @@ async function upsertSetting(key, fallbackValue) {
   const nextValue = mergePreferExisting(existing?.value, fallbackValue);
 
   if (key === LANDING_KEYS.home) {
+    nextValue.hero = hasMeaningfulHeroSlides(nextValue.hero) ? nextValue.hero : fallbackValue.hero;
     nextValue.services = fallbackValue.services;
   }
 

@@ -7,6 +7,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
+import { MIN_PREMIUM_PRICE } from '../../common/settings/finance-settings';
 import { PaymentsService } from './payments.service';
 import { PaymentsOpsService } from './payments-ops.service';
 import { UploadProofDto } from './dto/upload-proof.dto';
@@ -24,7 +25,7 @@ export class PaymentsController {
   uploadProof(@CurrentUser() user: any, @Body() body: UploadProofDto) {
     return this.service.uploadManualProof({
       userId: user.sub,
-      amount: Number(body.paymentAmount || 100000),
+      amount: Number(body.paymentAmount || MIN_PREMIUM_PRICE),
       method: body.paymentMethod || 'Transfer Bank',
       fileUrl: body.fileUrl || (body.file ? `/uploads/proof-${Date.now()}.png` : '/uploads/proof.png'),
     });

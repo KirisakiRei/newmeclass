@@ -1,4 +1,5 @@
 import { AccountStatus, PaymentStatus, TestStatus } from '@prisma/client';
+import { MIN_PREMIUM_PRICE } from '../settings/finance-settings';
 
 type AnyRecord = Record<string, any>;
 
@@ -10,9 +11,13 @@ const APPROVED_PAYMENT_STATUSES = new Set<PaymentStatus>([
 
 export function toClientPaymentStatus(status?: PaymentStatus | string | null) {
   if (!status) return 'unpaid';
-  if (APPROVED_PAYMENT_STATUSES.has(status as PaymentStatus)) return 'approved';
-  if (String(status).toUpperCase() === PaymentStatus.PENDING) return 'pending';
-  if (String(status).toUpperCase() === PaymentStatus.REJECTED) return 'rejected';
+  const normalized = String(status).toUpperCase();
+  if (APPROVED_PAYMENT_STATUSES.has(normalized as PaymentStatus)) return 'approved';
+  if (normalized === PaymentStatus.PENDING) return 'pending';
+  if (normalized === PaymentStatus.CANCEL) return 'cancelled';
+  if (normalized === PaymentStatus.EXPIRE) return 'expired';
+  if (normalized === PaymentStatus.REJECTED || normalized === PaymentStatus.DENY) return 'rejected';
+  if (normalized === PaymentStatus.FAILURE) return 'failed';
   return 'unpaid';
 }
 
@@ -97,7 +102,7 @@ export function mapUserForClient(user: AnyRecord | null | undefined, extra: AnyR
   const referralPrice = extra.referralPrice ?? yayasanProfile.referralPrice ?? 0;
   const yayasanShare = extra.yayasanShare ?? referralPrice;
   const mitraShare = extra.mitraShare ?? 0;
-  const totalPrice = extra.totalPrice ?? (100000 + mitraShare + yayasanShare);
+  const totalPrice = extra.totalPrice ?? (MIN_PREMIUM_PRICE + mitraShare + yayasanShare);
   const approvalStatus = extra.approvalStatus ?? yayasanProfile.approvalStatus ?? null;
   const isMitraApproved = extra.isMitraApproved ?? approvalStatus === 'APPROVED';
   const referralActive = extra.referralActive ?? (user.role === 'YAYASAN' ? isMitraApproved : true);
@@ -172,6 +177,7 @@ export function mapUserForClient(user: AnyRecord | null | undefined, extra: AnyR
     yayasanEmail: extra.yayasanEmail ?? profileExtra.yayasanEmail ?? profileExtra.referralMeta?.yayasanEmail ?? null,
     yayasanReferralCode:
       extra.yayasanReferralCode ?? profileExtra.yayasanReferralCode ?? profileExtra.referralMeta?.yayasanCode ?? null,
+    yayasanLogoUrl: extra.yayasanLogoUrl ?? profileExtra.yayasanLogoUrl ?? null,
     mitraId: extra.mitraId ?? profileExtra.mitraId ?? profileExtra.referralMeta?.parentMitraId ?? null,
     mitraName: extra.mitraName ?? profileExtra.mitraName ?? profileExtra.referralMeta?.parentMitraName ?? null,
     mitraEmail: extra.mitraEmail ?? profileExtra.mitraEmail ?? profileExtra.referralMeta?.parentMitraEmail ?? null,

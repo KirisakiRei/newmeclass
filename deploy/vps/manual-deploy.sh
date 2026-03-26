@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BRANCH="${1:-dev}"
+BRANCH="${1:-main}"
 RUN_SEED="${2:-false}"
 REPO_URL="${REPO_URL:-https://github.com/KirisakiRei/newmeclass.git}"
 BASE_DIR="${BASE_DIR:-/opt/newme}"
@@ -29,6 +29,7 @@ if [ ! -d "${APP_DIR}/.git" ]; then
   git clone --branch "${BRANCH}" --single-branch "${REPO_URL}" "${APP_DIR}"
 else
   cd "${APP_DIR}"
+  git fetch --prune origin
   git fetch origin "${BRANCH}"
   git checkout "${BRANCH}"
   git pull --ff-only origin "${BRANCH}"
@@ -36,10 +37,12 @@ fi
 
 cd "${APP_DIR}"
 
-docker compose --env-file "${ENV_FILE}" -f docker-compose.vps.yml up -d --build
+cp "${ENV_FILE}" "${APP_DIR}/.env"
+
+docker compose up -d --build
 
 if [ "${RUN_SEED}" = "true" ]; then
-  docker compose --env-file "${ENV_FILE}" -f docker-compose.vps.yml --profile ops run --rm seed
+  docker compose --profile ops run --rm seed
 fi
 
 docker image prune -f

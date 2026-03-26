@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle, Copy, CreditCard, Droplets, FileText, Flame, Gift, Info, Leaf, Loader2, Lock, LogOut, Mountain, Play, Share2, Sparkles, Trophy, User, Wind } from 'lucide-react';
+import { CheckCircle, Copy, CreditCard, Droplets, FileText, Flame, Gift, Home, Info, Leaf, Loader2, Lock, LogOut, Mountain, Play, Share2, Sparkles, Trophy, User, Wind } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
@@ -9,12 +9,13 @@ import { Input } from '../../components/ui/input';
 import ResponsiveTabs from '../../components/ui/responsive-tabs';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import { useToast } from '../../hooks/use-toast';
-import { authAPI, personalAnalysisAPI, referralAPI, userPaymentsAPI } from '../../services/api';
+import { authAPI, clearAuthStorage, personalAnalysisAPI, referralAPI, runningInfoAPI, userPaymentsAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import { buildFrontendUrl } from '../../lib/public-url';
 import { copyTextToClipboard } from '../../lib/clipboard';
 import { ensureMidtransSnapLoaded } from '../../lib/midtrans-snap';
 import { formatCurrency } from '../../lib/utils';
+import { buildPublicWebUrl } from '../../lib/app-urls';
 
 const fmt = formatCurrency;
 const isApprovedPayment = (status) => ['approved', 'success', 'settlement', 'capture', 'paid'].includes(String(status || '').toLowerCase());
@@ -25,6 +26,19 @@ const asArray = (value) => (Array.isArray(value) ? value : []);
 const asNumber = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+};
+const DEFAULT_RUNNING_INFO_SETTINGS = {
+  enabled: true,
+  durationSeconds: 28,
+};
+const normalizeRunningInfoSettings = (value) => {
+  const rawDuration = Number(value?.durationSeconds);
+  return {
+    enabled: value?.enabled === undefined ? DEFAULT_RUNNING_INFO_SETTINGS.enabled : Boolean(value.enabled),
+    durationSeconds: Number.isFinite(rawDuration)
+      ? Math.min(120, Math.max(10, Math.round(rawDuration)))
+      : DEFAULT_RUNNING_INFO_SETTINGS.durationSeconds,
+  };
 };
 const normalizeElementKey = (value) => String(value || '').trim().toUpperCase();
 const FIVE_ELEMENTS = [
@@ -90,6 +104,40 @@ const FIVE_ELEMENTS = [
   },
 ];
 
+const getAllowedTabs = (isYayasanLinked = false) => (
+  ['dashboard', 'results', 'elements', 'test', 'payment', ...(isYayasanLinked ? [] : ['referral'])]
+);
+
+const PERSONALITY_CATEGORY_GROUPS = [
+  {
+    title: 'EXTROVERT',
+    titleClassName: 'text-yellow-400',
+    items: [
+      { code: 'eK', label: 'Extrovert Kayu', codeClassName: 'text-green-400' },
+      { code: 'eA', label: 'Extrovert Api', codeClassName: 'text-red-400' },
+      { code: 'eT', label: 'Extrovert Tanah', codeClassName: 'text-yellow-400' },
+      { code: 'eL', label: 'Extrovert Logam', codeClassName: 'text-gray-300' },
+    ],
+  },
+  {
+    title: 'INTROVERT',
+    titleClassName: 'text-purple-400',
+    items: [
+      { code: 'iK', label: 'Introvert Kayu', codeClassName: 'text-green-400' },
+      { code: 'iA', label: 'Introvert Api', codeClassName: 'text-red-400' },
+      { code: 'iT', label: 'Introvert Tanah', codeClassName: 'text-yellow-400' },
+      { code: 'iL', label: 'Introvert Logam', codeClassName: 'text-gray-300' },
+    ],
+  },
+  {
+    title: 'AMBIVERT',
+    titleClassName: 'text-blue-400',
+    items: [
+      { code: 'aA', label: 'Ambivert Air', codeClassName: 'text-blue-400' },
+    ],
+  },
+];
+
 export default function UserDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -97,11 +145,16 @@ export default function UserDashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [premiumResult, setPremiumResult] = useState(null);
-  const [pricing, setPricing] = useState({ totalPrice: 100000, basePrice: 100000 });
+  const [pricing, setPricing] = useState({ totalPrice: 99000, basePrice: 99000 });
   const [referralSettings, setReferralSettings] = useState(null);
+  const [referralWallet, setReferralWallet] = useState(null);
+  const [runningInfos, setRunningInfos] = useState([]);
+  const [runningInfoSettings, setRunningInfoSettings] = useState(DEFAULT_RUNNING_INFO_SETTINGS);
+  const [withdrawForm, setWithdrawForm] = useState({ amount: '', danaNumber: '', accountName: '', notes: '' });
+  const [withdrawing, setWithdrawing] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
     const requestedTab = String(searchParams.get('tab') || '').trim().toLowerCase();
-    return ['dashboard', 'results', 'elements', 'test', 'payment', 'referral'].includes(requestedTab)
+    return getAllowedTabs(false).includes(requestedTab)
       ? requestedTab
       : 'dashboard';
   });
@@ -120,10 +173,10 @@ export default function UserDashboard() {
 
   useEffect(() => {
     const requestedTab = String(searchParams.get('tab') || '').trim().toLowerCase();
-    if (['dashboard', 'results', 'elements', 'test', 'payment', 'referral'].includes(requestedTab)) {
+    if (getAllowedTabs(Boolean(user?.isYayasanLinked)).includes(requestedTab)) {
       setActiveTab(requestedTab);
     }
-  }, [searchParams]);
+  }, [searchParams, user?.isYayasanLinked]);
 
   useEffect(() => {
     if (!snapData?.orderId || isApprovedPayment(user?.paymentStatus)) {
@@ -158,9 +211,9 @@ export default function UserDashboard() {
       { id: 'elements', label: '5 Element', icon: Info },
       { id: 'test', label: 'Test', icon: FileText },
       { id: 'payment', label: 'Pembayaran', icon: CreditCard },
-      { id: 'referral', label: 'Referral', icon: Gift },
+      ...(user?.isYayasanLinked ? [] : [{ id: 'referral', label: 'Referral', icon: Gift }]),
     ];
-  }, []);
+  }, [user?.isYayasanLinked]);
 
   const bootstrap = async () => {
     try {
@@ -171,7 +224,17 @@ export default function UserDashboard() {
       }
       const profile = (await authAPI.getProfile()).data;
       setUser(profile);
-      await Promise.all([loadPricing(profile), loadPremiumResult(), loadPendingPayment(), loadReferralSettings()]);
+      if (profile?.isYayasanLinked && activeTab === 'referral') {
+        setActiveTab('dashboard');
+      }
+      await Promise.all([
+        loadPricing(profile),
+        loadPremiumResult(),
+        loadPendingPayment(),
+        loadReferralSettings(),
+        loadRunningInfo(),
+        ...(profile?.isYayasanLinked ? [] : [loadReferralWallet()]),
+      ]);
     } catch (error) {
       localStorage.removeItem('user_token');
       localStorage.removeItem('user_data');
@@ -185,6 +248,9 @@ export default function UserDashboard() {
     const profile = (await authAPI.getProfile()).data;
     setUser(profile);
     await loadPricing(profile);
+    if (profile?.isYayasanLinked && activeTab === 'referral') {
+      setActiveTab('dashboard');
+    }
     return profile;
   };
 
@@ -228,7 +294,7 @@ export default function UserDashboard() {
 
   const loadPricing = async (profile) => {
     const response = await userPaymentsAPI.getTestPrice(profile?.usedReferralCode || profile?.referredByCode || undefined);
-    setPricing(response.data || { totalPrice: 100000, basePrice: 100000 });
+    setPricing(response.data || { totalPrice: 99000, basePrice: 99000 });
   };
 
   const loadPremiumResult = async () => {
@@ -246,6 +312,26 @@ export default function UserDashboard() {
       setReferralSettings(response.data || null);
     } catch {
       setReferralSettings(null);
+    }
+  };
+
+  const loadReferralWallet = async () => {
+    try {
+      const response = await referralAPI.getMyWallet();
+      setReferralWallet(response.data || null);
+    } catch {
+      setReferralWallet(null);
+    }
+  };
+
+  const loadRunningInfo = async () => {
+    try {
+      const response = await runningInfoAPI.getActive();
+      setRunningInfos(Array.isArray(response.data?.items) ? response.data.items : []);
+      setRunningInfoSettings(normalizeRunningInfoSettings(response.data?.settings));
+    } catch {
+      setRunningInfos([]);
+      setRunningInfoSettings(DEFAULT_RUNNING_INFO_SETTINGS);
     }
   };
 
@@ -267,10 +353,19 @@ export default function UserDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('user_token');
-    localStorage.removeItem('user_data');
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } catch {
+      // Tetap lanjutkan pembersihan lokal agar user tidak tertahan jika token sudah invalid.
+    } finally {
+      clearAuthStorage('user_token');
+      navigate('/login', { replace: true });
+    }
+  };
+
+  const handleGoHome = () => {
+    window.location.href = buildPublicWebUrl('/');
   };
 
   const openSnapFallbackWindow = (paymentUrl, options = {}) => {
@@ -514,6 +609,41 @@ export default function UserDashboard() {
     }
   };
 
+  const handleReferralWithdraw = async () => {
+    if (!withdrawForm.amount || !withdrawForm.danaNumber || !withdrawForm.accountName) {
+      toast({
+        title: 'Data belum lengkap',
+        description: 'Isi nominal, nomor DANA, dan nama akun terlebih dahulu.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setWithdrawing(true);
+    try {
+      await referralAPI.requestWithdraw({
+        amount: Number(withdrawForm.amount),
+        danaNumber: withdrawForm.danaNumber,
+        accountName: withdrawForm.accountName,
+        notes: withdrawForm.notes || undefined,
+      });
+      setWithdrawForm({ amount: '', danaNumber: '', accountName: '', notes: '' });
+      toast({
+        title: 'Request withdraw dikirim',
+        description: 'Permintaan pencairan referral Anda sedang menunggu persetujuan admin.',
+      });
+      await loadReferralWallet();
+    } catch (error) {
+      toast({
+        title: 'Gagal mengajukan withdraw',
+        description: getApiErrorMessage(error, 'Periksa nominal dan data akun DANA Anda.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   const hasPremiumAccess = isApprovedPayment(user?.paymentStatus);
   const hasCompletedPremium = user?.paidTestStatus === 'completed';
   const hasCompletedFree = user?.freeTestStatus === 'completed';
@@ -576,6 +706,9 @@ export default function UserDashboard() {
     const fallbackCareer = premiumInsights.rekomendasiKarir || premiumInsights.dibutuhkanPadaProfesi;
     return fallbackCareer ? [fallbackCareer] : [];
   })();
+  const runningTextVisible = Boolean(runningInfoSettings?.enabled) && runningInfos.length > 0;
+  const runningTextDuration = normalizeRunningInfoSettings(runningInfoSettings).durationSeconds;
+  const runningTextTracks = Array.from({ length: 2 });
 
   if (loading || !user) {
     return <div className="min-h-screen bg-gradient-to-b from-[#1a1a1a] to-[#2a2a2a] flex items-center justify-center"><LoadingSpinner size="lg" text="Memuat dashboard..." /></div>;
@@ -583,16 +716,76 @@ export default function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1a1a1a] to-[#2a2a2a]">
+      <style>
+        {`
+          @keyframes dashboard-running-text-marquee {
+            from { transform: translate3d(0, 0, 0); }
+            to { transform: translate3d(-50%, 0, 0); }
+          }
+
+          .dashboard-running-text-track {
+            animation-name: dashboard-running-text-marquee;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            will-change: transform;
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .dashboard-running-text-track {
+              animation: none !important;
+              transform: none !important;
+              width: 100% !important;
+            }
+
+            .dashboard-running-text-duplicate {
+              display: none !important;
+            }
+          }
+        `}
+      </style>
+      {runningTextVisible && (
+        <div className="w-full overflow-hidden border-b border-yellow-300/50 bg-yellow-400 text-[#1a1a1a] shadow-[0_8px_28px_rgba(250,204,21,0.18)]">
+          <div
+            className="dashboard-running-text-track flex w-max min-w-full"
+            style={{ animationDuration: `${runningTextDuration}s` }}
+          >
+            {runningTextTracks.map((_, trackIndex) => (
+              <div
+                key={`dashboard-running-track-${trackIndex}`}
+                className={`inline-flex min-w-full shrink-0 items-center gap-8 px-4 py-3 text-sm font-semibold sm:px-6 ${trackIndex === 1 ? 'dashboard-running-text-duplicate' : ''}`}
+              >
+                {runningInfos.map((item, index) => (
+                  <span key={`${item.id || item.message}-${trackIndex}-${index}`} className="inline-flex items-center gap-3">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#1a1a1a]" />
+                    <span>{item.message}</span>
+                    {item.linkUrl && item.linkText ? (
+                      <a href={item.linkUrl} target="_blank" rel="noreferrer" className="font-black underline underline-offset-4">
+                        {item.linkText}
+                      </a>
+                    ) : null}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Selamat Datang, {user.fullName}</h1>
             <p className="text-gray-400">Dashboard NEWME CLASS</p>
           </div>
-          <Button onClick={handleLogout} variant="outline" className="border-red-400/50 text-red-400">
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={handleGoHome} variant="outline" className="border-yellow-400/40 text-yellow-300">
+              <Home className="mr-2 h-4 w-4" />
+              Home
+            </Button>
+            <Button onClick={handleLogout} variant="outline" className="border-red-400/50 text-red-400">
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
         </div>
         <ResponsiveTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
         {activeTab === 'dashboard' && (
@@ -612,7 +805,7 @@ export default function UserDashboard() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <Card className="border-yellow-400/20 bg-[#2a2a2a]"><CardContent className="p-5"><p className="text-sm text-gray-400">Status Pembayaran</p><p className={`mt-2 text-lg font-semibold ${hasPremiumAccess ? 'text-green-400' : isPendingPayment(user.paymentStatus) ? 'text-yellow-400' : 'text-red-400'}`}>{hasPremiumAccess ? 'Berhasil' : isPendingPayment(user.paymentStatus) ? 'Proses' : 'Belum Dibayar'}</p></CardContent></Card>
               <Card className="border-yellow-400/20 bg-[#2a2a2a]"><CardContent className="p-5"><p className="text-sm text-gray-400">Status Test Premium</p><p className={`mt-2 text-lg font-semibold ${hasCompletedPremium ? 'text-purple-400' : hasPremiumAccess ? 'text-blue-400' : 'text-gray-300'}`}>{hasCompletedPremium ? 'Selesai' : hasPremiumAccess ? 'Siap Dimulai' : 'Menunggu Pembayaran'}</p></CardContent></Card>
-              <Card className="border-yellow-400/20 bg-[#2a2a2a]"><CardContent className="p-5"><p className="text-sm text-gray-400">Harga Test Premium</p><p className="mt-2 text-lg font-semibold text-yellow-400">{fmt(pricing.totalPrice || pricing.basePrice || 100000)}</p></CardContent></Card>
+              <Card className="border-yellow-400/20 bg-[#2a2a2a]"><CardContent className="p-5"><p className="text-sm text-gray-400">Harga Test Premium</p><p className="mt-2 text-lg font-semibold text-yellow-400">{fmt(pricing.totalPrice || pricing.basePrice || 99000)}</p></CardContent></Card>
             </div>
           </div>
         )}
@@ -756,7 +949,7 @@ export default function UserDashboard() {
                 <div className="text-center">
                   <p className="text-lg font-semibold text-white">Belum ada hasil test premium</p>
                   <p className="mt-2 text-sm text-gray-400">Selesaikan pembayaran dan test premium untuk melihat hasil lengkap Anda.</p>
-                  <Button className="mt-4 bg-yellow-400 text-black hover:bg-yellow-500" onClick={() => setActiveTab('test')}>Mulai dari tab test</Button>
+                  <Button className="mt-4 bg-yellow-400 text-black hover:bg-yellow-500" onClick={() => setActiveTab('test')}>Mulai Tes Premium</Button>
                 </div>
               )}
             </CardContent>
@@ -827,30 +1020,18 @@ export default function UserDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-yellow-400">EXTROVERT</h4>
-                    <div className="space-y-1 text-sm text-gray-300">
-                      <p><span className="text-green-400">eK</span> - Extrovert Kayu</p>
-                      <p><span className="text-red-400">eA</span> - Extrovert Api</p>
-                      <p><span className="text-yellow-400">eT</span> - Extrovert Tanah</p>
+                  {PERSONALITY_CATEGORY_GROUPS.map((group) => (
+                    <div key={group.title} className="space-y-2">
+                      <h4 className={`font-semibold ${group.titleClassName}`}>{group.title}</h4>
+                      <div className="space-y-1 text-sm text-gray-300">
+                        {group.items.map((item) => (
+                          <p key={item.code}>
+                            <span className={item.codeClassName}>{item.code}</span> - {item.label}
+                          </p>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-purple-400">INTROVERT</h4>
-                    <div className="space-y-1 text-sm text-gray-300">
-                      <p><span className="text-green-400">iK</span> - Introvert Kayu</p>
-                      <p><span className="text-red-400">iA</span> - Introvert Api</p>
-                      <p><span className="text-yellow-400">iT</span> - Introvert Tanah</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-blue-400">AMBIVERT</h4>
-                    <div className="space-y-1 text-sm text-gray-300">
-                      <p><span className="text-gray-300">aL</span> - Ambivert Logam</p>
-                      <p><span className="text-blue-400">aAi</span> - Ambivert Air</p>
-                      <p><span className="text-yellow-400">aT</span> - Ambivert Tanah</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -936,7 +1117,7 @@ export default function UserDashboard() {
               <CardContent className="space-y-4">
                 <div className="rounded-xl bg-[#1a1a1a] p-5">
                   <p className="text-sm text-gray-400">Nominal pembayaran</p>
-                  <p className="mt-2 text-3xl font-black text-yellow-400">{fmt(pricing.totalPrice || pricing.basePrice || 100000)}</p>
+                  <p className="mt-2 text-3xl font-black text-yellow-400">{fmt(pricing.totalPrice || pricing.basePrice || 99000)}</p>
                   <p className="mt-2 text-sm text-gray-300">
                     {user.isYayasanLinked
                       ? 'Jalur yayasan langsung memakai akses premium penuh.'
@@ -1156,22 +1337,114 @@ export default function UserDashboard() {
                 </div>
               </CardContent>
             </Card>
-            {user.isYayasanLinked && (
-              <Card className="border-green-400/20 bg-[#2a2a2a]">
+            <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+              <Card className="border-yellow-400/20 bg-[#2a2a2a]">
                 <CardHeader>
-                  <CardTitle className="text-white">Afiliasi Yayasan</CardTitle>
+                  <CardTitle className="text-white">Wallet Referral</CardTitle>
                   <CardDescription className="text-gray-400">
-                    Informasi hubungan akun Anda dengan yayasan yang menaungi akun ini.
+                    Saldo referral user hanya bisa dicairkan lewat DANA.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-3 text-sm">
+                <CardContent className="space-y-4">
                   <div className="rounded-lg bg-[#1a1a1a] p-4">
-                    <p className="text-gray-400">Yayasan</p>
-                    <p className="mt-1 text-white">{user.yayasanName || '-'}</p>
+                    <p className="text-sm text-gray-400">Saldo tersedia</p>
+                    <p className="mt-2 text-3xl font-black text-yellow-400">{fmt(referralWallet?.availableBalance || 0)}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-[#1a1a1a] p-4">
+                      <p className="text-sm text-gray-400">Ditahan</p>
+                      <p className="mt-2 font-semibold text-blue-300">{fmt(referralWallet?.reserveBalance || 0)}</p>
+                    </div>
+                    <div className="rounded-lg bg-[#1a1a1a] p-4">
+                      <p className="text-sm text-gray-400">Sudah dibayar</p>
+                      <p className="mt-2 font-semibold text-green-400">{fmt(referralWallet?.paidWithdraw || 0)}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-yellow-400/15 bg-yellow-400/5 p-4 text-sm text-gray-300">
+                    Minimum withdraw: <span className="font-semibold text-yellow-300">{fmt(referralWallet?.minimumWithdraw || referralSettings?.minimumWithdraw || 50000)}</span>
                   </div>
                 </CardContent>
               </Card>
-            )}
+
+              <Card className="border-yellow-400/20 bg-[#2a2a2a]">
+                <CardHeader>
+                  <CardTitle className="text-white">Ajukan Withdraw DANA</CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Admin akan meninjau request sebelum payout dikirim.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <p className="mb-2 text-sm text-gray-400">Nominal</p>
+                      <Input
+                        type="number"
+                        value={withdrawForm.amount}
+                        onChange={(event) => setWithdrawForm((prev) => ({ ...prev, amount: event.target.value }))}
+                        className="border-yellow-400/20 bg-[#1a1a1a] text-white"
+                        placeholder="50000"
+                      />
+                    </div>
+                    <div>
+                      <p className="mb-2 text-sm text-gray-400">Nomor DANA</p>
+                      <Input
+                        value={withdrawForm.danaNumber}
+                        onChange={(event) => setWithdrawForm((prev) => ({ ...prev, danaNumber: event.target.value }))}
+                        className="border-yellow-400/20 bg-[#1a1a1a] text-white"
+                        placeholder="08xxxxxxxxxx"
+                      />
+                    </div>
+                    <div>
+                      <p className="mb-2 text-sm text-gray-400">Nama Akun DANA</p>
+                      <Input
+                        value={withdrawForm.accountName}
+                        onChange={(event) => setWithdrawForm((prev) => ({ ...prev, accountName: event.target.value }))}
+                        className="border-yellow-400/20 bg-[#1a1a1a] text-white"
+                        placeholder="Nama pemilik akun"
+                      />
+                    </div>
+                    <div>
+                      <p className="mb-2 text-sm text-gray-400">Catatan</p>
+                      <Input
+                        value={withdrawForm.notes}
+                        onChange={(event) => setWithdrawForm((prev) => ({ ...prev, notes: event.target.value }))}
+                        className="border-yellow-400/20 bg-[#1a1a1a] text-white"
+                        placeholder="Opsional"
+                      />
+                    </div>
+                  </div>
+                  <Button className="bg-yellow-400 text-black hover:bg-yellow-500" disabled={withdrawing} onClick={() => void handleReferralWithdraw()}>
+                    {withdrawing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Kirim Request Withdraw
+                  </Button>
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-white">Riwayat Wallet Referral</p>
+                    {(referralWallet?.walletItems || []).length > 0 ? (
+                      <div className="space-y-2">
+                        {referralWallet.walletItems.slice(0, 8).map((item) => (
+                          <div key={item.id} className="flex items-center justify-between rounded-lg bg-[#1a1a1a] p-3">
+                            <div>
+                              <p className="text-sm font-medium text-white">{item.description}</p>
+                              <p className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleString('id-ID')}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className={`font-semibold ${item.amount >= 0 ? 'text-green-400' : 'text-yellow-400'}`}>
+                                {item.amount >= 0 ? '+' : '-'}{fmt(Math.abs(item.amount || 0))}
+                              </p>
+                              <p className="text-xs text-gray-500">{item.status}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg bg-[#1a1a1a] p-4 text-sm text-gray-400">
+                        Belum ada mutasi wallet referral.
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
             {referralSettings && (
               <Card className="border-yellow-400/20 bg-[#2a2a2a]">
                 <CardHeader>

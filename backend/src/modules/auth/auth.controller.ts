@@ -90,6 +90,12 @@ export class AuthController {
     return this.authService.refreshSession(user.sub, user.sid);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  logout(@CurrentUser() user: any) {
+    return this.authService.logout(user.sub, user.sid);
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.USER)
   @Post('bridge-ticket')

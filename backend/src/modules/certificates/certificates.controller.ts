@@ -303,6 +303,27 @@ export class CertificatesController {
     return new Date(value).toLocaleDateString('id-ID');
   }
 
+  private async resolveYayasanSecondaryLogo(targetUser: any) {
+    const targetExtra = this.safeObject(targetUser?.profile?.extra);
+    const yayasanId = String(targetExtra.yayasanId || '').trim();
+    const yayasanCode = String(targetExtra.yayasanReferralCode || targetUser?.referredByCode || '').trim();
+
+    const yayasan = yayasanId
+      ? await this.prisma.user.findUnique({
+          where: { id: yayasanId },
+          include: { profile: true },
+        })
+      : yayasanCode
+        ? await this.prisma.user.findFirst({
+            where: { role: Role.YAYASAN, myReferralCode: yayasanCode },
+            include: { profile: true },
+          })
+        : null;
+
+    const yayasanExtra = this.safeObject(yayasan?.profile?.extra);
+    return String(yayasanExtra.yayasanLogoUrl || '').trim() || null;
+  }
+
   private buildCertificatePdf(cert: any) {
     const lines = [
       'NEWME DIGITAL CERTIFICATE',
@@ -613,6 +634,9 @@ export class CertificatesController {
       where: { certType: this.toCertificateType(enrichedCert.certType) },
     });
     const template = await mapCertificateTemplateForClient(this.prisma, templateRow);
+    const yayasanSecondaryLogo = enrichedCert.certType === 'yayasan'
+      ? await this.resolveYayasanSecondaryLogo(targetUser)
+      : null;
 
     return {
       certificateNumber: enrichedCert.certificateNumber,
@@ -627,7 +651,12 @@ export class CertificatesController {
         || this.safeObject(targetUser.profile?.extra).publicCode
         || targetUser.myReferralCode
         || null,
-      template,
+      template: yayasanSecondaryLogo
+        ? {
+            ...template,
+            secondaryLogoUrl: yayasanSecondaryLogo,
+          }
+        : template,
       result,
     };
   }

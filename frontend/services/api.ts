@@ -77,6 +77,7 @@ const isCertificateUserEndpoint = (url = '') => (
 const isCertificatePublicEndpoint = (url = '') => url.startsWith('/certificates/verify/');
 const isReferralAdminEndpoint = (url = '', method = 'get') => (
   url.startsWith('/referrals/')
+  && !url.startsWith('/referrals/me/')
   && !(url === '/referrals/settings' && String(method).toLowerCase() === 'get')
 );
 const isCertificateAdminEndpoint = (url = '') => (
@@ -468,6 +469,11 @@ export const analyticsAPI = {
     url: '/analytics/pageview',
     params: { page, ...(sessionId ? { sessionId } : {}) },
   }),
+  trackHeartbeat: (sessionId) => apiClient.request({
+    method: 'post',
+    url: '/analytics/heartbeat',
+    params: { ...(sessionId ? { sessionId } : {}) },
+  }),
   getStats: () => apiClient.get('/analytics/stats'),
   getOnlineUsers: () => apiClient.get('/analytics/online-users'),
   cleanup: () => apiClient.delete('/analytics/cleanup'),
@@ -505,6 +511,7 @@ export const authAPI = {
   login: (data) => apiClient.post('/auth/login', data),
   getProfile: () => apiClient.get('/auth/me'),
   refreshSession: () => apiClient.post('/auth/refresh-session'),
+  logout: () => apiClient.post('/auth/logout'),
   createBridgeTicket: (target) => apiClient.post('/auth/bridge-ticket', { target }),
   exchangeBridgeTicket: (ticket) => apiClient.post('/auth/bridge-exchange', { ticket }),
   updateProfile: (data) => apiClient.put('/auth/profile', data),
@@ -539,14 +546,18 @@ export const userPaymentsAPI = {
 // Referral API
 export const referralAPI = {
   getSettings: () => apiClient.get('/referrals/settings'),
-  updateSettings: (formData) => apiClient.put('/referrals/settings', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
+  updateSettings: (data) => apiClient.put('/referrals/settings', data),
+  getMyWallet: () => apiClient.get('/referrals/me/wallet'),
+  getMyWithdrawals: () => apiClient.get('/referrals/me/withdrawals'),
+  requestWithdraw: (data) => apiClient.post('/referrals/me/withdraw', data),
   getLeaderboard: (limit) => apiClient.get('/referrals/leaderboard', {
     params: { limit: limit || 20 },
   }),
   getTransactions: (params) => apiClient.get('/referrals/transactions', { params }),
   getStats: () => apiClient.get('/referrals/stats'),
+  getWithdrawals: (params) => apiClient.get('/referrals/withdrawals', { params }),
+  approveWithdrawal: (id, data) => apiClient.put(`/referrals/withdrawals/${id}/approve`, data),
+  rejectWithdrawal: (id, data) => apiClient.put(`/referrals/withdrawals/${id}/reject`, data),
 };
 
 // Articles API
@@ -567,12 +578,10 @@ export const articlesAPI = {
 export const runningInfoAPI = {
   getActive: () => apiClient.get('/running-info', { params: { isActive: true } }),
   getAll: () => apiClient.get('/running-info/all'),
-  create: (formData) => apiClient.post('/running-info', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  update: (id, formData) => apiClient.put(`/running-info/${id}`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
+  getSettings: () => apiClient.get('/running-info/settings'),
+  updateSettings: (data) => apiClient.put('/running-info/settings', data),
+  create: (data) => apiClient.post('/running-info', data),
+  update: (id, data) => apiClient.put(`/running-info/${id}`, data),
   delete: (id) => apiClient.delete(`/running-info/${id}`),
 };
 
@@ -636,6 +645,13 @@ export const yayasanAPI = {
   getTestResults: (params) => apiClient.get('/yayasan/test-results', { params }),
   getWallet: (params) => apiClient.get('/yayasan/wallet', { params }),
   withdraw: (data) => apiClient.post('/yayasan/wallet/withdraw', data),
+  uploadLogo: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post('/yayasan/settings/logo-upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
   getAdminList: (params) => apiClient.get('/yayasan/admin/list', { params }),
   getAdminDetail: (id) => apiClient.get(`/yayasan/admin/${id}/detail`),
   toggleActive: (id) => apiClient.put(`/yayasan/admin/${id}/toggle-active`, {}),

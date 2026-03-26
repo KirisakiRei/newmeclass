@@ -16,6 +16,21 @@ export class AnalyticsController {
     return this.prisma.pageView.create({ data: { page: page || '/', sessionId: sessionId || `sess-${Date.now()}` } });
   }
 
+  @Post('heartbeat')
+  async heartbeat(@Query('sessionId') sessionId?: string) {
+    const resolvedSessionId = String(sessionId || '').trim() || `sess-${Date.now()}`;
+    return this.prisma.onlineSession.upsert({
+      where: { sessionId: resolvedSessionId },
+      create: {
+        sessionId: resolvedSessionId,
+        lastSeenAt: new Date(),
+      },
+      update: {
+        lastSeenAt: new Date(),
+      },
+    });
+  }
+
   @Get('stats')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)

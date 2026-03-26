@@ -1,19 +1,29 @@
 const DASHBOARD_URL = String(import.meta.env.VITE_DASHBOARD_URL || '')
   .trim()
   .replace(/\/+$/, '');
+const USER_TOKEN_KEY = 'user_token';
+const USER_SESSION_EVENT = 'newme-user-session-changed';
 
 export const getDashboardBaseUrl = () => DASHBOARD_URL || 'http://localhost:5173';
+export const hasUserSession = () => typeof window !== 'undefined' && Boolean(localStorage.getItem(USER_TOKEN_KEY));
+export const emitUserSessionChanged = () => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(USER_SESSION_EVENT));
+};
+export const getUserSessionEventName = () => USER_SESSION_EVENT;
 
 export const setUserSession = (token: string, user?: unknown) => {
-  localStorage.setItem('user_token', token);
+  localStorage.setItem(USER_TOKEN_KEY, token);
   if (user) {
     localStorage.setItem('user_data', JSON.stringify(user));
   }
+  emitUserSessionChanged();
 };
 
 export const clearUserSession = () => {
-  localStorage.removeItem('user_token');
+  localStorage.removeItem(USER_TOKEN_KEY);
   localStorage.removeItem('user_data');
+  emitUserSessionChanged();
 };
 
 export const setAdminSession = (token: string, admin?: unknown) => {

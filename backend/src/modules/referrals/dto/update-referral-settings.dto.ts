@@ -1,20 +1,23 @@
-import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class UpdateReferralSettingsDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(100)
-  baseCommissionPercent?: number;
+  bonusPerReferral?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(100)
-  maxCommissionPercent?: number;
+  minimumWithdraw?: number;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  isActive?: boolean;
 
   @IsOptional()
   @IsString()

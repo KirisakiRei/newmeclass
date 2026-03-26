@@ -33,6 +33,30 @@ const COLORS = {
 
 const fmt = formatCurrency;
 
+const SUCCESS_TRANSACTION_STATUSES = new Set(['approved']);
+
+function getTransactionStatusMeta(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+
+  if (normalized === 'approved') {
+    return { label: 'Berhasil', className: 'bg-green-400/15 text-green-400', canShowSplit: true };
+  }
+  if (normalized === 'pending') {
+    return { label: 'Pending', className: 'bg-yellow-400/15 text-yellow-400', canShowSplit: false };
+  }
+  if (normalized === 'cancelled' || normalized === 'canceled') {
+    return { label: 'Dibatalkan', className: 'bg-zinc-400/15 text-zinc-300', canShowSplit: false };
+  }
+  if (normalized === 'expired') {
+    return { label: 'Kadaluarsa', className: 'bg-orange-400/15 text-orange-300', canShowSplit: false };
+  }
+  if (normalized === 'rejected') {
+    return { label: 'Ditolak', className: 'bg-red-400/15 text-red-400', canShowSplit: false };
+  }
+
+  return { label: 'Gagal', className: 'bg-red-400/15 text-red-400', canShowSplit: false };
+}
+
 function SummaryCard({ icon: Icon, label, value, note, color = 'text-white' }) {
   return (
     <Card className="border-yellow-400/20 bg-[#2a2a2a]">
@@ -91,6 +115,7 @@ function BreakdownDialog({ open, onOpenChange, title, data }) {
 
 function SplitDialog({ item, onClose }) {
   if (!item) return null;
+  if (!SUCCESS_TRANSACTION_STATUSES.has(String(item.status || '').trim().toLowerCase())) return null;
   const split = item.split || {};
   const total = Math.max(Number(split.grossAmount || item.amount || 0), 0);
   const segments = [
@@ -421,7 +446,7 @@ export default function LaporanPendapatan() {
                 </div>
                 <div className="rounded-lg bg-[#1a1a1a] p-4">
                   <p className="text-xs text-gray-400">Harga Tes Premium</p>
-                  <p className="mt-1 font-semibold text-yellow-400">{fmt(settingsSummary?.pricing?.testPrice || 100000)}</p>
+                  <p className="mt-1 font-semibold text-yellow-400">{fmt(settingsSummary?.pricing?.testPrice || 99000)}</p>
                   <p className="mt-1 text-xs text-gray-500">Jalur yayasan tetap memakai total {fmt(settingsSummary?.pricing?.referralTotalPrice || 250000)} dengan budget share {fmt(settingsSummary?.pricing?.referralShareBudget || 150000)}.</p>
                 </div>
                 <div className="rounded-lg bg-[#1a1a1a] p-4">
@@ -458,7 +483,9 @@ export default function LaporanPendapatan() {
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((trx) => (
+                  {transactions.map((trx) => {
+                    const statusMeta = getTransactionStatusMeta(trx.status);
+                    return (
                     <tr key={trx.id || trx._id} className="border-b border-yellow-400/5">
                       <td className="px-4 py-3 text-xs text-gray-400">{trx.date ? new Date(trx.date).toLocaleString('id-ID') : '-'}</td>
                       <td className="px-4 py-3">
@@ -473,20 +500,23 @@ export default function LaporanPendapatan() {
                       <td className="px-4 py-3 uppercase text-gray-300">{trx.method}</td>
                       <td className="px-4 py-3 text-right font-semibold text-yellow-400">{fmt(trx.amount || 0)}</td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full px-2.5 py-1 text-xs ${
-                          trx.status === 'approved' ? 'bg-green-400/15 text-green-400' : trx.status === 'pending' ? 'bg-yellow-400/15 text-yellow-400' : 'bg-red-400/15 text-red-400'
-                        }`}>
-                          {trx.status === 'approved' ? 'Berhasil' : trx.status === 'pending' ? 'Pending' : 'Gagal'}
+                        <span className={`rounded-full px-2.5 py-1 text-xs ${statusMeta.className}`}>
+                          {statusMeta.label}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <Button variant="outline" size="sm" className="border-yellow-400/30 text-yellow-400" onClick={() => setSplitItem(trx)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Lihat
-                        </Button>
+                        {statusMeta.canShowSplit ? (
+                          <Button variant="outline" size="sm" className="border-yellow-400/30 text-yellow-400" onClick={() => setSplitItem(trx)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Lihat
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-gray-500">Tidak tersedia</span>
+                        )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {!transactions.length ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-10 text-center text-gray-500">Belum ada transaksi yang bisa ditampilkan.</td>

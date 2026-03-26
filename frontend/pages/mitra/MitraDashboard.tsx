@@ -180,10 +180,19 @@ export default function MitraDashboard() {
 
   const handleCreateRequest = async () => {
     if (!requestTarget) return;
+    const normalizedReason = String(requestForm.reason || '').trim();
+    if (normalizedReason.length < 10) {
+      toast({
+        title: 'Alasan belum lengkap',
+        description: 'Alasan ubah harga minimal 10 karakter agar admin bisa meninjau permintaan dengan jelas.',
+        variant: 'destructive',
+      });
+      return;
+    }
     try {
       await mitraAPI.createPriceChangeRequest(requestTarget._id, {
         requestedYayasanShare: Number(requestForm.requestedYayasanShare || 0),
-        reason: requestForm.reason,
+        reason: normalizedReason,
       });
       toast({ title: 'Berhasil', description: 'Permintaan ubah harga telah dikirim ke admin' });
       setRequestTarget(null);
@@ -656,6 +665,8 @@ export default function MitraDashboard() {
                 type="number"
                 value={requestForm.requestedYayasanShare}
                 onChange={(e) => setRequestForm({ ...requestForm, requestedYayasanShare: Number(e.target.value) })}
+                min={0}
+                max={SHARE_BUDGET}
                 className="bg-[#1a1a1a] border-yellow-400/20 text-white"
               />
             </div>
@@ -666,6 +677,7 @@ export default function MitraDashboard() {
             <div>
               <Label className="text-gray-400 text-sm">Alasan Ubah Harga</Label>
               <Textarea value={requestForm.reason} onChange={(e) => setRequestForm({ ...requestForm, reason: e.target.value })} className="bg-[#1a1a1a] border-yellow-400/20 text-white min-h-[120px]" />
+              <p className="mt-2 text-xs text-gray-500">Minimal 10 karakter agar alasan perubahan harga jelas untuk admin.</p>
             </div>
             <Button onClick={handleCreateRequest} className="w-full bg-yellow-400 text-black hover:bg-yellow-500">
               <Edit className="w-4 h-4 mr-2" /> Kirim Permintaan ke Admin

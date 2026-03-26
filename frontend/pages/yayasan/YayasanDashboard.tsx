@@ -50,10 +50,11 @@ export default function YayasanDashboard() {
   const [resultOpen, setResultOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [downloadingUserId, setDownloadingUserId] = useState('');
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', bankName: '', bankAccount: '', accountName: '' });
   const [withdrawing, setWithdrawing] = useState(false);
-  const [profileForm, setProfileForm] = useState({ name: '', email: '', phone: '', address: '', description: '' });
+  const [profileForm, setProfileForm] = useState({ name: '', email: '', phone: '', address: '', description: '', yayasanLogoUrl: '' });
   const [usersPage, setUsersPage] = useState(1);
   const [usersPageSize, setUsersPageSize] = useState(10);
   const [usersPagination, setUsersPagination] = useState(createEmptyPageState(10));
@@ -90,6 +91,7 @@ export default function YayasanDashboard() {
         phone: profile.phone || '',
         address: profile.address || '',
         description: profile.description || '',
+        yayasanLogoUrl: profile.yayasanLogoUrl || '',
       });
       await loadDashboardData(profile);
     } catch {
@@ -184,6 +186,7 @@ export default function YayasanDashboard() {
         institutionName: profileForm.name,
         institutionAddress: profileForm.address,
         description: profileForm.description,
+        yayasanLogoUrl: profileForm.yayasanLogoUrl,
       });
       setYayasan(response.data);
       setProfileForm({
@@ -192,12 +195,31 @@ export default function YayasanDashboard() {
         phone: response.data.phone || '',
         address: response.data.address || '',
         description: response.data.description || '',
+        yayasanLogoUrl: response.data.yayasanLogoUrl || '',
       });
       toast({ title: 'Profil diperbarui', description: 'Informasi yayasan berhasil disimpan.' });
     } catch (error) {
       toast({ title: 'Gagal memperbarui profil', description: getApiErrorMessage(error, 'Periksa email dan nomor telepon Anda.'), variant: 'destructive' });
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleUploadLogo = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const response = await yayasanAPI.uploadLogo(file);
+      const nextUrl = response.data?.url || '';
+      setProfileForm((prev) => ({ ...prev, yayasanLogoUrl: nextUrl }));
+      setYayasan((prev) => (prev ? { ...prev, yayasanLogoUrl: nextUrl } : prev));
+      toast({ title: 'Logo berhasil diunggah', description: 'Logo yayasan akan dipakai pada sertifikat jalur yayasan.' });
+    } catch (error) {
+      toast({ title: 'Gagal upload logo', description: getApiErrorMessage(error, 'Pastikan file gambar valid.'), variant: 'destructive' });
+    } finally {
+      setUploadingLogo(false);
+      event.target.value = '';
     }
   };
 
@@ -464,6 +486,24 @@ export default function YayasanDashboard() {
             <CardHeader><CardTitle className="text-white">Edit Profil Yayasan</CardTitle></CardHeader>
             <CardContent>
               <form onSubmit={handleSaveProfile} className="space-y-4">
+                <div className="rounded-xl border border-yellow-400/20 bg-[#1a1a1a] p-4">
+                  <Label className="text-gray-400">Logo Yayasan untuk Sertifikat</Label>
+                  <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-center">
+                    <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl border border-yellow-400/20 bg-[#111]">
+                      {profileForm.yayasanLogoUrl ? (
+                        <img src={profileForm.yayasanLogoUrl} alt="Logo Yayasan" className="h-full w-full object-contain" />
+                      ) : (
+                        <span className="px-3 text-center text-xs text-gray-500">Belum ada logo</span>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <Input type="file" accept="image/*" onChange={handleUploadLogo} className="border-yellow-400/30 bg-[#1a1a1a] text-white file:text-white" />
+                      <p className="text-xs text-gray-500">
+                        {uploadingLogo ? 'Sedang mengunggah logo...' : 'Logo ini akan tampil sebagai logo yayasan pada sertifikat user jalur yayasan.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div><Label className="text-gray-400">Nama Yayasan</Label><Input value={profileForm.name} onChange={(event) => setProfileForm((prev) => ({ ...prev, name: event.target.value }))} className="mt-1 border-yellow-400/30 bg-[#1a1a1a] text-white" /></div>
                   <div><Label className="text-gray-400">Email</Label><Input type="email" value={profileForm.email} onChange={(event) => setProfileForm((prev) => ({ ...prev, email: event.target.value }))} className="mt-1 border-yellow-400/30 bg-[#1a1a1a] text-white" /></div>

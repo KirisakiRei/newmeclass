@@ -12,7 +12,7 @@
   - queue worker (`payment.apply-status`)
 - Deterministic scoring engine with versioned rule support and snapshot persistence
 - Compatibility endpoints implemented for frontend families (`/wallet/*`, `/test-results/*`, `/test-access/*`, `/finance/*`, `/yayasan/*`, `/mitra/*`, `/website-content/*`, `/settings/*`, etc.)
-- Docker deployment assets: `Dockerfile`, `docker-compose.yml`, Nginx config
+- Docker deployment assets: `Dockerfile`, `compose.yml`, Nginx config
 - Env templates: `.env.example` and `.env`
 - Unit tests baseline for payment mapping and scoring determinism
 

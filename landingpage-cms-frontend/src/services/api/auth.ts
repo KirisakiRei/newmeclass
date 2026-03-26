@@ -11,6 +11,11 @@ export const authAPI = {
       method: 'POST',
       body: data,
     }),
+  logout: () =>
+    request('/auth/logout', {
+      method: 'POST',
+      tokenKey: 'user_token',
+    }),
   forgotPassword: (email: string) =>
     request('/auth/forgot-password', {
       method: 'POST',
