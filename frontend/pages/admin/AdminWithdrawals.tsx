@@ -16,6 +16,17 @@ import axios from 'axios';
 import { useAdminAccess } from '../../lib/admin-rbac';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const getCsrfToken = () => {
+  if (typeof document === 'undefined') return '';
+  const match = document.cookie.match(/(?:^|;\s*)nm_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+};
+const buildRequestConfig = () => ({
+  withCredentials: true,
+  headers: {
+    ...(getCsrfToken() ? { 'X-CSRF-Token': getCsrfToken() } : {}),
+  },
+});
 
 export default function AdminWithdrawals() {
   const { toast } = useToast();
@@ -30,14 +41,11 @@ export default function AdminWithdrawals() {
   const [processing, setProcessing] = useState(false);
   const canManageWithdrawals = adminAccess.hasPermission('yayasan_withdrawals.manage');
 
-  const token = () => localStorage.getItem('admin_token');
-  const headers = () => ({ Authorization: `Bearer ${token()}` });
-
   useEffect(() => { loadWithdrawals(); }, []);
 
   const loadWithdrawals = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/yayasan/admin/withdrawals`, { headers: headers() });
+      const res = await axios.get(`${API_URL}/api/yayasan/admin/withdrawals`, buildRequestConfig());
       const payload = res?.data?.data ?? res?.data;
       setWithdrawals(Array.isArray(payload) ? payload : payload?.items || []);
     } catch (e) {
@@ -72,7 +80,7 @@ export default function AdminWithdrawals() {
       await axios.put(
         `${API_URL}/api/yayasan/admin/withdrawals/${withdrawalId}/${actionType === 'approve' ? 'approve' : 'reject'}`,
         { status: actionType === 'approve' ? 'APPROVED' : 'REJECTED', notes, providerMode },
-        { headers: headers() }
+        buildRequestConfig()
       );
       toast({
         title: 'Berhasil',

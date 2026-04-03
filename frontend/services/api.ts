@@ -5,10 +5,37 @@ import { normalizeSiteSettings } from '../lib/site-settings';
 
 const API_BASE_URL = String(process.env.REACT_APP_BACKEND_URL || '').trim().replace(/\/+$/, '');
 const API_URL = API_BASE_URL ? `${API_BASE_URL}/api` : '/api';
-const getStoredToken = (...keys) => keys.map((key) => localStorage.getItem(key)).find(Boolean);
 const TOKEN_REFRESH_THRESHOLD_MS = 2 * 60 * 1000;
-const SESSION_META_PREFIX = 'session_meta_';
-const SESSION_ACTIVITY_PREFIX = 'session_last_activity_';
+const AUTH_CHANNEL_NAME = 'newme-dashboard-auth';
+const LEGACY_LOCAL_STORAGE_KEYS = [
+  'admin_token',
+  'admin_data',
+  'admin_user',
+  'yayasan_token',
+  'yayasan_data',
+  'mitra_token',
+  'mitra_data',
+  'user_token',
+  'user_data',
+];
+const LEGACY_SESSION_STORAGE_KEYS = [
+  'session_meta_admin_token',
+  'session_meta_user_token',
+  'session_meta_yayasan_token',
+  'session_meta_mitra_token',
+  'session_presence_admin_token',
+  'session_presence_user_token',
+  'session_presence_yayasan_token',
+  'session_presence_mitra_token',
+  'session_profile_admin_token',
+  'session_profile_user_token',
+  'session_profile_yayasan_token',
+  'session_profile_mitra_token',
+  'session_last_activity_admin_token',
+  'session_last_activity_user_token',
+  'session_last_activity_yayasan_token',
+  'session_last_activity_mitra_token',
+];
 const TOKEN_KEY_CONFIG = {
   admin_token: {
     idleTimeoutMs: 10 * 60 * 1000,
@@ -34,6 +61,59 @@ const TOKEN_KEY_CONFIG = {
     redirectTo: '/login',
     dataKeys: ['user_token', 'user_data'],
   },
+};
+const REFRESH_ENDPOINT_BY_AUDIENCE = {
+  admin_token: '/admin/refresh',
+  yayasan_token: '/yayasan/refresh',
+  mitra_token: '/mitra/refresh',
+  user_token: '/auth/refresh',
+};
+function normalizeCertificateViewer(value?: string | null) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'admin') return 'admin';
+  if (normalized === 'yayasan') return 'yayasan';
+  if (normalized === 'mitra') return 'mitra';
+  if (normalized === 'user') return 'user';
+  return '';
+}
+
+function inferCertificateTokenKeyFromViewer(viewer?: string | null) {
+  if (viewer === 'admin') return 'admin_token';
+  if (viewer === 'yayasan') return 'yayasan_token';
+  if (viewer === 'mitra') return 'mitra_token';
+  if (viewer === 'user') return 'user_token';
+  return null;
+}
+
+function inferCertificateTokenKeyFromActiveSessions() {
+  if (typeof window === 'undefined') return null;
+  if (Boolean(getAuthState('yayasan_token')?.active)) return 'yayasan_token';
+  if (Boolean(getAuthState('mitra_token')?.active)) return 'mitra_token';
+  if (Boolean(getAuthState('admin_token')?.active)) return 'admin_token';
+  if (Boolean(getAuthState('user_token')?.active)) return 'user_token';
+  return null;
+}
+
+const resolveTokenKeyFromPathname = (pathname = '') => {
+  if (pathname.startsWith('/admin')) return 'admin_token';
+  if (pathname.startsWith('/yayasan')) return 'yayasan_token';
+  if (pathname.startsWith('/mitra')) return 'mitra_token';
+  if (pathname.startsWith('/certificate-download')) {
+    const viewer = normalizeCertificateViewer(
+      typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('viewer') : '',
+    );
+    return inferCertificateTokenKeyFromViewer(viewer) || inferCertificateTokenKeyFromActiveSessions();
+  }
+  if (
+    pathname.startsWith('/dashboard')
+    || pathname.startsWith('/user-test')
+    || pathname.startsWith('/wallet')
+    || pathname.startsWith('/test-result')
+    || pathname.startsWith('/auth/bridge')
+  ) {
+    return 'user_token';
+  }
+  return null;
 };
 const isAdminEndpoint = (url = '') => (
   url.startsWith('/admin/')
@@ -89,6 +169,7 @@ const isCertificateAdminEndpoint = (url = '') => (
 // Create axios instance with default config
 const apiClient = axios.create({
   baseURL: API_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -96,137 +177,208 @@ const apiClient = axios.create({
 setupInstanceAxiosNormalizer(apiClient);
 
 const refreshPromiseByTokenKey = new Map();
+const getRefreshPromiseKey = (tokenKey) => String(tokenKey || '');
+let legacyAuthStoragePurged = false;
+let authChannel = null;
+const authStateByTokenKey = new Map();
 
-const getRefreshPromiseKey = (tokenKey, token) => `${String(tokenKey || '')}:${String(token || '')}`;
+const getCsrfToken = () => {
+  if (typeof document === 'undefined') return '';
+  const match = document.cookie.match(/(?:^|;\s*)nm_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+};
 
-const persistSessionMeta = (tokenKey, session) => {
-  if (!tokenKey || !session) return;
+const getAuthState = (tokenKey) => (
+  tokenKey
+    ? authStateByTokenKey.get(tokenKey) || {
+      active: false,
+      profile: null,
+      session: null,
+      lastActivityAt: Date.now(),
+    }
+    : null
+);
+
+const setAuthState = (tokenKey, nextState) => {
+  if (!tokenKey) return;
+  authStateByTokenKey.set(tokenKey, {
+    active: Boolean(nextState?.active),
+    profile: nextState?.profile || null,
+    session: nextState?.session || null,
+    lastActivityAt: Number(nextState?.lastActivityAt || Date.now()),
+  });
+};
+
+const clearAuthState = (tokenKey) => {
+  if (!tokenKey) return;
+  authStateByTokenKey.delete(tokenKey);
+};
+
+const getChannel = () => {
+  if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null;
+  if (!authChannel) {
+    authChannel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+    authChannel.onmessage = (event) => {
+      const payload = event?.data || {};
+      const tokenKey = String(payload?.tokenKey || '').trim();
+      const action = String(payload?.action || '').trim();
+      if (!tokenKey) return;
+
+      if (action === 'cleared') {
+        clearAuthState(tokenKey);
+      } else if (action === 'updated') {
+        const current = getAuthState(tokenKey);
+        setAuthState(tokenKey, {
+          ...current,
+          active: true,
+          lastActivityAt: Date.now(),
+        });
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('newme-dashboard-session', {
+          detail: {
+            tokenKey,
+            action,
+            source: 'broadcast',
+          },
+        }));
+      }
+    };
+  }
+  return authChannel;
+};
+
+const emitSessionEvent = (tokenKey, action) => {
+  if (typeof window === 'undefined' || !tokenKey) return;
+  window.dispatchEvent(new CustomEvent('newme-dashboard-session', {
+    detail: {
+      tokenKey,
+      action,
+    },
+  }));
+  getChannel()?.postMessage({ tokenKey, action });
+};
+
+const purgeLegacyAuthStorage = () => {
+  if (legacyAuthStoragePurged || typeof window === 'undefined') return;
+  legacyAuthStoragePurged = true;
   try {
-    localStorage.setItem(`${SESSION_META_PREFIX}${tokenKey}`, JSON.stringify(session));
+    LEGACY_LOCAL_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+    LEGACY_SESSION_STORAGE_KEYS.forEach((key) => sessionStorage.removeItem(key));
   } catch {}
 };
 
 export const getSessionPolicy = (tokenKey) => TOKEN_KEY_CONFIG[tokenKey] || null;
 
-export const getSessionMeta = (tokenKey) => {
-  if (!tokenKey) return null;
-  try {
-    const raw = localStorage.getItem(`${SESSION_META_PREFIX}${tokenKey}`);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
+export const getSessionEventName = () => 'newme-dashboard-session';
+
+export const getSessionMeta = (tokenKey) => getAuthState(tokenKey)?.session || null;
+
+export const setSessionPresence = (tokenKey, active, profile = null, session = null) => {
+  if (!tokenKey) return;
+  purgeLegacyAuthStorage();
+  if (active) {
+    const current = getAuthState(tokenKey);
+    setAuthState(tokenKey, {
+      active: true,
+      profile: profile ?? current?.profile ?? null,
+      session: session ?? current?.session ?? null,
+      lastActivityAt: Date.now(),
+    });
+    emitSessionEvent(tokenKey, 'updated');
+    return;
   }
+
+  clearAuthState(tokenKey);
+  emitSessionEvent(tokenKey, 'cleared');
 };
+
+export const hasSessionPresence = (tokenKey) => Boolean(getAuthState(tokenKey)?.active);
+
+export const getStoredSessionProfile = (tokenKey) => getAuthState(tokenKey)?.profile || null;
+
+export const resolveTokenKeyForPath = (pathname = '') => resolveTokenKeyFromPathname(pathname);
 
 export const recordSessionActivity = (tokenKey, ts = Date.now()) => {
   if (!tokenKey) return;
-  try {
-    sessionStorage.setItem(`${SESSION_ACTIVITY_PREFIX}${tokenKey}`, String(ts));
-  } catch {}
+  const current = getAuthState(tokenKey);
+  if (!current?.active) return;
+  setAuthState(tokenKey, {
+    ...current,
+    lastActivityAt: ts,
+  });
 };
 
-export const getLastSessionActivity = (tokenKey) => {
-  if (!tokenKey) return Date.now();
-  try {
-    const raw = sessionStorage.getItem(`${SESSION_ACTIVITY_PREFIX}${tokenKey}`);
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : Date.now();
-  } catch {
-    return Date.now();
-  }
-};
+export const getLastSessionActivity = (tokenKey) => Number(getAuthState(tokenKey)?.lastActivityAt || Date.now());
 
 export const clearAuthStorage = (tokenKey) => {
+  purgeLegacyAuthStorage();
   const config = TOKEN_KEY_CONFIG[tokenKey];
   if (config) {
-    config.dataKeys.forEach((key) => localStorage.removeItem(key));
+    config.dataKeys.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+    });
   } else if (tokenKey) {
-    localStorage.removeItem(tokenKey);
+    try {
+      localStorage.removeItem(tokenKey);
+    } catch {}
   }
-  localStorage.removeItem(`${SESSION_META_PREFIX}${tokenKey}`);
-  sessionStorage.removeItem(`${SESSION_ACTIVITY_PREFIX}${tokenKey}`);
-};
-
-const decodeJwtPayload = (token) => {
-  if (!token || typeof token !== 'string') return null;
-  const parts = token.split('.');
-  if (parts.length < 2) return null;
-
-  try {
-    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized + '='.repeat((4 - (normalized.length % 4 || 4)) % 4);
-    return JSON.parse(window.atob(padded));
-  } catch {
-    return null;
-  }
-};
-
-const isTokenNearExpiry = (token) => {
-  const payload = decodeJwtPayload(token);
-  if (!payload?.exp) return false;
-  const expiresAt = Number(payload.exp) * 1000;
-  if (!Number.isFinite(expiresAt)) return false;
-  return (expiresAt - Date.now()) <= TOKEN_REFRESH_THRESHOLD_MS;
+  setSessionPresence(tokenKey, false);
 };
 
 const resolveTokenConfig = (url = '', method = 'get') => {
+  if (url === '/settings/jenjang-config' && String(method).toLowerCase() === 'get') {
+    return { tokenKey: null };
+  }
   if (isAdminEndpoint(url) || isCertificateAdminEndpoint(url) || isReferralAdminEndpoint(url, method)) {
-    return { tokenKey: 'admin_token', token: getStoredToken('admin_token') };
+    return { tokenKey: 'admin_token' };
   }
   if (isYayasanEndpoint(url)) {
-    return { tokenKey: 'yayasan_token', token: getStoredToken('yayasan_token') };
+    return { tokenKey: 'yayasan_token' };
   }
   if (isMitraEndpoint(url)) {
-    return { tokenKey: 'mitra_token', token: getStoredToken('mitra_token') };
+    return { tokenKey: 'mitra_token' };
   }
   if (isCertificateUserEndpoint(url)) {
-    const tokenKey = localStorage.getItem('user_token') ? 'user_token' : 'yayasan_token';
-    return { tokenKey, token: getStoredToken('user_token', 'yayasan_token') };
+    const tokenKey = resolveTokenKeyFromPathname(typeof window !== 'undefined' ? window.location.pathname : '') || 'user_token';
+    return { tokenKey };
   }
   if (url.startsWith('/auth/')) {
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin') && localStorage.getItem('admin_token')) {
-      return { tokenKey: 'admin_token', token: getStoredToken('admin_token') };
-    }
-    if (localStorage.getItem('user_token')) return { tokenKey: 'user_token', token: getStoredToken('user_token') };
-    if (localStorage.getItem('yayasan_token')) return { tokenKey: 'yayasan_token', token: getStoredToken('yayasan_token') };
-    if (localStorage.getItem('mitra_token')) return { tokenKey: 'mitra_token', token: getStoredToken('mitra_token') };
-    if (localStorage.getItem('admin_token')) return { tokenKey: 'admin_token', token: getStoredToken('admin_token') };
-    return { tokenKey: null, token: null };
+    return {
+      tokenKey: resolveTokenKeyFromPathname(typeof window !== 'undefined' ? window.location.pathname : ''),
+    };
   }
   if (isUserEndpoint(url)) {
-    return { tokenKey: 'user_token', token: getStoredToken('user_token') };
+    return { tokenKey: 'user_token' };
   }
-  return { tokenKey: null, token: getStoredToken('admin_token', 'user_token', 'yayasan_token', 'mitra_token') };
+  return { tokenKey: null };
 };
 
-const refreshSessionToken = async (tokenKey, token, options = {}) => {
-  const { swallowError = true } = options;
-  if (!tokenKey || !token) return token;
+const refreshSessionToken = async (tokenKey, options = {}) => {
+  const { swallowError = true, profile = null } = options;
+  if (!tokenKey) return null;
 
-  const refreshKey = getRefreshPromiseKey(tokenKey, token);
+  const refreshKey = getRefreshPromiseKey(tokenKey);
   const existing = refreshPromiseByTokenKey.get(refreshKey);
   if (existing) {
     return existing;
   }
 
-  const promise = axios.post(`${API_URL}/auth/refresh-session`, {}, {
+  const endpoint = REFRESH_ENDPOINT_BY_AUDIENCE[tokenKey];
+  const promise = axios.post(`${API_URL}${endpoint}`, {}, {
+    withCredentials: true,
     headers: {
-      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
+      ...(getCsrfToken() ? { 'X-CSRF-Token': getCsrfToken() } : {}),
     },
   }).then((response) => {
-    const refreshedToken = response?.data?.token || response?.data?.access_token || token;
-    const currentStoredToken = localStorage.getItem(tokenKey);
-    if (refreshedToken && currentStoredToken === token) {
-      localStorage.setItem(tokenKey, refreshedToken);
-      if (response?.data?.session) {
-        persistSessionMeta(tokenKey, response.data.session);
-      }
-      recordSessionActivity(tokenKey);
-    }
-    return refreshedToken;
+    setSessionPresence(tokenKey, true, profile || getStoredSessionProfile(tokenKey), response?.data?.session || null);
+    return true;
   }).catch((error) => {
-    if (swallowError) return token;
+    if (swallowError) return false;
     throw error;
   }).finally(() => {
     refreshPromiseByTokenKey.delete(refreshKey);
@@ -239,17 +391,10 @@ const refreshSessionToken = async (tokenKey, token, options = {}) => {
 // Add request interceptor for auth token
 apiClient.interceptors.request.use(
   async (config) => {
-    const url = config.url || '';
-    const method = config.method || 'get';
-    const tokenConfig = resolveTokenConfig(url, method);
-    let token = tokenConfig.token;
-
-    if (token && url !== '/auth/refresh-session' && isTokenNearExpiry(token)) {
-      token = await refreshSessionToken(tokenConfig.tokenKey, token);
-    }
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const method = String(config.method || 'get').toUpperCase();
+    const csrfToken = getCsrfToken();
+    if (csrfToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      config.headers['X-CSRF-Token'] = csrfToken;
     }
 
     return config;
@@ -296,6 +441,9 @@ export const institutionAPI = {
 // Admin API
 export const adminAPI = {
   login: (data) => apiClient.post('/admin/login', data),
+  logout: () => apiClient.post('/admin/logout'),
+  refresh: () => apiClient.post('/admin/refresh'),
+  getSession: () => apiClient.get('/admin/session'),
   getDashboardStats: () => apiClient.get('/admin/dashboard/stats'),
   getCurrentAdmin: () => apiClient.get('/admin/me'),
   getPermissionCatalog: () => apiClient.get('/admin/permissions'),
@@ -505,13 +653,23 @@ export const settingsAPI = {
   updateJenjangConfig: (data) => apiClient.put('/settings/jenjang-config', data),
 };
 
+export const locationAPI = {
+  getProvinces: () => apiClient.get('/landing/public/locations/provinces'),
+  getCities: (provinceId) => apiClient.get('/landing/public/locations/cities', { params: { provinceId } }),
+  getDistricts: (cityId) => apiClient.get('/landing/public/locations/districts', { params: { cityId } }),
+  getVillages: (districtId) => apiClient.get('/landing/public/locations/villages', { params: { districtId } }),
+};
+
 // User Auth API
 export const authAPI = {
   register: (data) => apiClient.post('/auth/register', data),
   login: (data) => apiClient.post('/auth/login', data),
+  getSession: () => apiClient.get('/auth/session'),
   getProfile: () => apiClient.get('/auth/me'),
-  refreshSession: () => apiClient.post('/auth/refresh-session'),
+  refreshSession: () => apiClient.post('/auth/refresh'),
   logout: () => apiClient.post('/auth/logout'),
+  forgotPassword: (email) => apiClient.post('/auth/forgot-password', { email }),
+  resetPassword: (token, password) => apiClient.post('/auth/reset-password', { token, password }),
   createBridgeTicket: (target) => apiClient.post('/auth/bridge-ticket', { target }),
   exchangeBridgeTicket: (ticket) => apiClient.post('/auth/bridge-exchange', { ticket }),
   updateProfile: (data) => apiClient.put('/auth/profile', data),
@@ -520,11 +678,12 @@ export const authAPI = {
 };
 
 export const touchSessionForTokenKey = async (tokenKey) => {
-  const token = tokenKey ? localStorage.getItem(tokenKey) : null;
-  if (!tokenKey || !token) return null;
-  const refreshedToken = await refreshSessionToken(tokenKey, token, { swallowError: false });
-  return refreshedToken;
+  if (!tokenKey) return null;
+  return refreshSessionToken(tokenKey, { swallowError: false });
 };
+
+purgeLegacyAuthStorage();
+getChannel();
 
 // User Payments API
 export const userPaymentsAPI = {
@@ -637,8 +796,14 @@ export const walletAPI = {
 export const yayasanAPI = {
   register: (data) => apiClient.post('/yayasan/register', data),
   login: (data) => apiClient.post('/yayasan/login', data),
+  logout: () => apiClient.post('/yayasan/logout'),
+  refresh: () => apiClient.post('/yayasan/refresh'),
+  getSession: () => apiClient.get('/yayasan/session'),
+  forgotPassword: (email) => apiClient.post('/yayasan/forgot-password', { email }),
+  resetPassword: (token, password) => apiClient.post('/yayasan/reset-password', { token, password }),
   getMitraReferralStatus: (code) => apiClient.get(`/mitra/referral/${encodeURIComponent(code)}/status`),
   getProfile: () => apiClient.get('/yayasan/me'),
+  updateProfile: (data) => apiClient.put('/yayasan/profile', data),
   getDashboardStats: () => apiClient.get('/yayasan/dashboard/stats'),
   getUsers: (params) => apiClient.get('/yayasan/users', { params }),
   getUserDetail: (id) => apiClient.get(`/yayasan/users/${id}/detail`),
@@ -664,9 +829,15 @@ export const yayasanAPI = {
 export const mitraAPI = {
   register: (data) => apiClient.post('/mitra/register', data),
   login: (data) => apiClient.post('/mitra/login', data),
+  logout: () => apiClient.post('/mitra/logout'),
+  refresh: () => apiClient.post('/mitra/refresh'),
+  getSession: () => apiClient.get('/mitra/session'),
+  forgotPassword: (email) => apiClient.post('/mitra/forgot-password', { email }),
+  resetPassword: (token, password) => apiClient.post('/mitra/reset-password', { token, password }),
   validateInvite: (token) => apiClient.get('/mitra/invite/validate', { params: { token } }),
   claimInvite: (data) => apiClient.post('/mitra/invite/claim', data),
   getProfile: () => apiClient.get('/mitra/me'),
+  updateProfile: (data) => apiClient.put('/mitra/profile', data),
   getDashboardStats: () => apiClient.get('/mitra/dashboard/stats'),
   getYayasan: (params) => apiClient.get('/mitra/yayasan', { params }),
   getYayasanDetail: (id) => apiClient.get(`/mitra/yayasan/${id}/detail`),
@@ -687,7 +858,7 @@ export const mitraAPI = {
   reviewAdminPriceChangeRequest: (id, data) => apiClient.put(`/mitra/admin/price-change-requests/${id}/review`, data),
   toggleActive: (id) => apiClient.put(`/mitra/admin/${id}/toggle-active`, {}),
   verify: (id) => apiClient.put(`/mitra/admin/${id}/verify`, {}),
-  resetPassword: (id) => apiClient.post(`/mitra/admin/${id}/reset-password`),
+  sendResetPasswordEmail: (id) => apiClient.post(`/mitra/admin/${id}/reset-password`),
   getWithdrawals: (params) => apiClient.get('/mitra/admin/withdrawals', { params }),
   approveWithdrawal: (id, data) => apiClient.put(`/mitra/admin/withdrawals/${id}/approve`, data),
   rejectWithdrawal: (id, data) => apiClient.put(`/mitra/admin/withdrawals/${id}/reject`, data),

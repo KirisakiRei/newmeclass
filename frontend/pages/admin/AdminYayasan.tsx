@@ -16,6 +16,17 @@ import { createEmptyPageState, extractPaginatedResponse } from '../../lib/pagina
 import { useAdminAccess } from '../../lib/admin-rbac';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const getCsrfToken = () => {
+  if (typeof document === 'undefined') return '';
+  const match = document.cookie.match(/(?:^|;\s*)nm_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+};
+const buildRequestConfig = () => ({
+  withCredentials: true,
+  headers: {
+    ...(getCsrfToken() ? { 'X-CSRF-Token': getCsrfToken() } : {}),
+  },
+});
 
 export default function AdminYayasan() {
   const { toast } = useToast();
@@ -31,8 +42,6 @@ export default function AdminYayasan() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [pagination, setPagination] = useState(createEmptyPageState(10));
-  const token = () => localStorage.getItem('admin_token');
-  const headers = () => ({ Authorization: `Bearer ${token()}` });
   const detailUsers = Array.isArray(detailYayasan?.users) ? detailYayasan.users : [];
   const detailStats = detailYayasan?.stats || {};
   const canManageYayasan = adminAccess.hasPermission('yayasan.manage');
@@ -42,7 +51,7 @@ export default function AdminYayasan() {
   const loadYayasan = async () => {
     try {
       const res = await axios.get(`${API_URL}/api/yayasan/admin/list`, {
-        headers: headers(),
+        ...buildRequestConfig(),
         params: {
           page,
           pageSize,
@@ -59,7 +68,7 @@ export default function AdminYayasan() {
   const toggleActive = async (id, current) => {
     if (!canManageYayasan) return;
     try {
-      await axios.put(`${API_URL}/api/yayasan/admin/${id}/toggle-active`, {}, { headers: headers() });
+      await axios.put(`${API_URL}/api/yayasan/admin/${id}/toggle-active`, {}, buildRequestConfig());
       setYayasanList(prev => prev.map(y => y._id === id ? { ...y, isActive: !current } : y));
       toast({ title: 'Berhasil', description: `Yayasan ${!current ? 'diaktifkan' : 'dinonaktifkan'}` });
     } catch (e) {
@@ -70,7 +79,7 @@ export default function AdminYayasan() {
   const verify = async (id) => {
     if (!canManageYayasan) return;
     try {
-      await axios.put(`${API_URL}/api/yayasan/admin/${id}/verify`, {}, { headers: headers() });
+      await axios.put(`${API_URL}/api/yayasan/admin/${id}/verify`, {}, buildRequestConfig());
       setYayasanList(prev => prev.map(y => y._id === id ? { ...y, isVerified: true } : y));
       toast({ title: 'Berhasil', description: 'Yayasan diverifikasi' });
     } catch (e) {
@@ -84,7 +93,7 @@ export default function AdminYayasan() {
     setUserSearch('');
     setLoadingDetail(true);
     try {
-      const res = await axios.get(`${API_URL}/api/yayasan/admin/${id}/detail`, { headers: headers() });
+      const res = await axios.get(`${API_URL}/api/yayasan/admin/${id}/detail`, buildRequestConfig());
       setDetailYayasan(res.data);
     } catch (e) {
       toast({ title: 'Error', description: 'Gagal memuat detail yayasan', variant: 'destructive' });

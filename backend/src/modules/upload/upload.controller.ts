@@ -7,9 +7,10 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { AuthAudience, Role } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { AuthAudienceAccess } from 'src/common/auth/auth-audience.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -44,6 +45,7 @@ export class UploadController {
 
   @Post('image')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission([
     'settings.manage',

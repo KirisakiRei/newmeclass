@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { articlesAPI, landingAPI, mediaAPI } from "../../../services/api";
-import { clearAdminSession } from "../../../lib/session";
+import { clearAdminSession, hasAdminSession } from "../../../lib/session";
 
 export interface HeroSlide {
   id: string;
@@ -621,7 +621,7 @@ export function CMSProvider({ children }: { children: ReactNode }) {
   const isCmsSession =
     typeof window !== "undefined"
     && window.location.pathname.startsWith("/cms")
-    && Boolean(localStorage.getItem("admin_token"));
+    && !window.location.pathname.startsWith("/cms/login");
 
   const load = useCallback(async () => {
     try {

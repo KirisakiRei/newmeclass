@@ -15,7 +15,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { CertificateType, Role } from '@prisma/client';
+import { AuthAudience, CertificateType, Role } from '@prisma/client';
 import { Throttle } from '@nestjs/throttler';
 import { Response, Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -24,6 +24,7 @@ import { extname, resolve } from 'path';
 import { mkdirSync } from 'fs';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { AuthAudienceAccess } from 'src/common/auth/auth-audience.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { buildSimplePdf } from 'src/common/utils/pdf';
@@ -448,6 +449,7 @@ export class CertificatesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('certificates.view')
   @Get('template')
@@ -461,6 +463,7 @@ export class CertificatesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('certificates.edit')
   @Put('template')
@@ -486,6 +489,7 @@ export class CertificatesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('certificates.manage')
   @UseInterceptors(FileInterceptor('file', {
@@ -525,6 +529,7 @@ export class CertificatesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('certificates.view')
   @Get('issued')
@@ -552,6 +557,7 @@ export class CertificatesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('certificates.create')
   @Post('issue')
@@ -595,6 +601,7 @@ export class CertificatesController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('certificates.view')
   @Get('detail/:id')
@@ -619,6 +626,7 @@ export class CertificatesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @AuthAudienceAccess([AuthAudience.USER, AuthAudience.YAYASAN, AuthAudience.ADMIN])
   @Get('preview-data/:userId')
   async previewData(@CurrentUser() currentUser: any, @Param('userId') userId: string) {
     await this.assertCertificateAccess(currentUser, userId);
@@ -687,6 +695,7 @@ export class CertificatesController {
 
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: CERT_GENERATE_RATE_LIMIT, ttl: CERT_DOWNLOAD_RATE_LIMIT_TTL_MS } })
+  @AuthAudienceAccess([AuthAudience.USER, AuthAudience.YAYASAN, AuthAudience.ADMIN])
   @Get('generate-newme/:userId')
   async generateNewme(@CurrentUser() currentUser: any, @Param('userId') userId: string, @Res() response: Response) {
     await this.assertCertificateAccess(currentUser, userId);

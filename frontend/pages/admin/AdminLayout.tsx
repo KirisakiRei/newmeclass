@@ -30,7 +30,7 @@ import {
 import { Button } from '../../components/ui/button';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import { useToast } from '../../hooks/use-toast';
-import { adminAPI, mitraAPI, yayasanAPI } from '../../services/api';
+import { adminAPI, clearAuthStorage, getStoredSessionProfile, setSessionPresence, mitraAPI, yayasanAPI } from '../../services/api';
 import {
   AdminAccessProvider,
   canAccessAdminPath,
@@ -95,13 +95,8 @@ const AdminLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState({});
   const [authChecking, setAuthChecking] = useState(true);
-  const [adminUser, setAdminUser] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('admin_user') || 'null');
-    } catch {
-      return null;
-    }
-  });
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [adminUser, setAdminUser] = useState(() => getStoredSessionProfile('admin_token') || getStoredAdminUser());
   const [withdrawalBadges, setWithdrawalBadges] = useState({
     yayasan: 0,
     mitra: 0,
@@ -151,18 +146,14 @@ const AdminLayout = () => {
 
   useEffect(() => {
     const validateSession = async () => {
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        navigate('/admin/login', { replace: true });
-        return;
-      }
-
       try {
         const response = await adminAPI.getCurrentAdmin();
-        setAdminUser(response.data);
-        setStoredAdminUser(response.data);
+        const profile = response?.data || response;
+        setAdminUser(profile);
+        setStoredAdminUser(profile);
+        setSessionPresence('admin_token', true, profile, response?.data?.session || response?.session || null);
       } catch {
-        localStorage.removeItem('admin_token');
+        clearAuthStorage('admin_token');
         clearStoredAdminUser();
         navigate('/admin/login', { replace: true });
         return;
@@ -243,19 +234,28 @@ const AdminLayout = () => {
       description: 'Role ini belum memiliki permission view ke halaman admin mana pun.',
       variant: 'destructive',
     });
-    localStorage.removeItem('admin_token');
+    clearAuthStorage('admin_token');
     clearStoredAdminUser();
     navigate('/admin/login', { replace: true });
   }, [adminUser, authChecking, location.pathname, navigate, toast]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('admin_token');
-    clearStoredAdminUser();
-    toast({
-      title: 'Logout berhasil',
-      description: 'Sesi admin telah diakhiri.',
-    });
-    navigate('/admin/login', { replace: true });
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await adminAPI.logout();
+    } catch {
+      // Tetap bersihkan state lokal jika cookie backend sudah invalid atau logout gagal.
+    } finally {
+      clearAuthStorage('admin_token');
+      clearStoredAdminUser();
+      toast({
+        title: 'Logout berhasil',
+        description: 'Sesi admin telah diakhiri.',
+      });
+      navigate('/admin/login', { replace: true });
+      setLoggingOut(false);
+    }
   };
 
   const toggleGroup = (groupLabel) => {
@@ -434,11 +434,12 @@ const AdminLayout = () => {
         ) : null}
         <Button
           onClick={handleLogout}
+          disabled={loggingOut}
           variant="outline"
           className={`w-full border-yellow-400 text-yellow-400 hover:bg-yellow-400/10 ${collapsed ? 'px-2' : ''}`}
         >
           <LogOut className="h-4 w-4" />
-          {!collapsed ? <span className="ml-2">Logout</span> : null}
+          {!collapsed ? <span className="ml-2">{loggingOut ? 'Logout...' : 'Logout'}</span> : null}
         </Button>
       </div>
     </>

@@ -106,20 +106,38 @@ export function mapUserForClient(user: AnyRecord | null | undefined, extra: AnyR
   const approvalStatus = extra.approvalStatus ?? yayasanProfile.approvalStatus ?? null;
   const isMitraApproved = extra.isMitraApproved ?? approvalStatus === 'APPROVED';
   const referralActive = extra.referralActive ?? (user.role === 'YAYASAN' ? isMitraApproved : true);
+  const adminRole = extra.adminRole ?? user.adminRole ?? null;
+
+  const safeAdminRole = adminRole
+    ? {
+        id: adminRole.id ?? null,
+        name: adminRole.name ?? null,
+        slug: adminRole.slug ?? null,
+        description: adminRole.description ?? null,
+        isProtected: Boolean(adminRole.isProtected),
+      }
+    : null;
 
   return {
-    ...user,
-    ...extra,
     _id: user.id,
     id: user.id,
+    createdAt: user.createdAt ?? null,
+    updatedAt: user.updatedAt ?? null,
     publicId: extra.publicId ?? user.myReferralCode ?? null,
     businessId: extra.businessId ?? user.myReferralCode ?? null,
     memberCode: extra.memberCode ?? user.myReferralCode ?? null,
     name: extra.name || user.fullName,
     username: extra.username || user.username || user.fullName,
     fullName: user.fullName,
+    email: user.email ?? null,
+    role: user.role,
+    authProvider: extra.authProvider ?? user.primaryAuthProvider ?? 'LOCAL',
+    hasPassword: extra.hasPassword ?? Boolean(user.passwordHash),
+    avatarUrl: extra.avatarUrl ?? user.avatarUrl ?? null,
+    onboardingCompleted: extra.onboardingCompleted ?? Boolean(user.onboardingCompletedAt),
+    onboardingCompletedAt: extra.onboardingCompletedAt ?? user.onboardingCompletedAt ?? null,
     adminRoleId: extra.adminRoleId ?? user.adminRoleId ?? null,
-    adminRole: extra.adminRole ?? user.adminRole ?? null,
+    adminRole: safeAdminRole,
     permissionKeys: extra.permissionKeys ?? user.permissionKeys ?? [],
     isProtectedAdminRole: extra.isProtectedAdminRole ?? user.isProtectedAdminRole ?? false,
     phone,
@@ -140,6 +158,7 @@ export function mapUserForClient(user: AnyRecord | null | undefined, extra: AnyR
     myReferralCode: user.myReferralCode ?? null,
     usedReferralCode: extra.usedReferralCode ?? user.referredByCode ?? null,
     referredByCode: user.referredByCode ?? null,
+    emailVerifiedAt: user.emailVerifiedAt ?? null,
     paymentStatus: extra.paymentStatus ?? toClientPaymentStatus(user.paymentStatus),
     freeTestStatus: extra.freeTestStatus ?? toClientTestStatus(user.freeTestStatus),
     paidTestStatus: extra.paidTestStatus ?? toClientTestStatus(user.paidTestStatus),
@@ -168,9 +187,6 @@ export function mapUserForClient(user: AnyRecord | null | undefined, extra: AnyR
     isCapacityFull:
       extra.isCapacityFull
       ?? (capacityLimit === null ? false : Number(capacityUsed || 0) >= Number(capacityLimit || 0)),
-    referralMeta: extra.referralMeta ?? profileExtra.referralMeta ?? null,
-    referralOwnerRole: extra.referralOwnerRole ?? profileExtra.referralOwnerRole ?? profileExtra.referralMeta?.referrerRole ?? null,
-    affiliationType: extra.affiliationType ?? profileExtra.affiliationType ?? null,
     isYayasanLinked: extra.isYayasanLinked ?? profileExtra.isYayasanLinked ?? false,
     yayasanId: extra.yayasanId ?? profileExtra.yayasanId ?? profileExtra.referralMeta?.yayasanId ?? null,
     yayasanName: extra.yayasanName ?? profileExtra.yayasanName ?? profileExtra.referralMeta?.yayasanName ?? null,
@@ -190,6 +206,9 @@ export function mapUserForClient(user: AnyRecord | null | undefined, extra: AnyR
     balance: extra.balance ?? wallet.availableBalance ?? 0,
     walletBalance: extra.walletBalance ?? wallet.availableBalance ?? 0,
     reserveBalance: extra.reserveBalance ?? wallet.reserveBalance ?? 0,
+    usersCount: extra.usersCount ?? null,
+    totalCommission: extra.totalCommission ?? null,
+    users: Array.isArray(extra.users) ? extra.users : undefined,
   };
 }
 

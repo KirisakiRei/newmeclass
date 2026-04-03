@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { motion } from "motion/react";
 import { ArrowRight, Loader2, Mail } from "lucide-react";
-import { Button } from "../../app/components/ui/button";
 import { authAPI } from "../../services/api";
+import { Button } from "../../app/components/ui/button";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 
 export function ForgotPasswordPage() {
@@ -12,16 +12,16 @@ export function ForgotPasswordPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError("");
     setSuccess("");
     try {
       setLoading(true);
       await authAPI.forgotPassword(email);
-      setSuccess("Jika email Anda terdaftar, kami akan mengirimkan tautan reset password.");
+      setSuccess("Jika email terdaftar, kami telah mengirimkan link reset password ke inbox Anda.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal memproses permintaan reset password");
+      setError(err instanceof Error ? err.message : "Belum bisa mengirim email reset password");
     } finally {
       setLoading(false);
     }
@@ -34,9 +34,14 @@ export function ForgotPasswordPage() {
           <div className="mb-4 h-16 w-16">
             <img src={newmeLogo} alt="NEWME" className="h-full w-full object-contain" style={{ mixBlendMode: "screen" }} />
           </div>
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-yellow-500/10 text-yellow-500">
+            <Mail className="h-6 w-6" />
+          </div>
           <p className="mb-1 inline-block rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-500">RESET PASSWORD</p>
-          <h1 className="mt-3 mb-2 text-2xl font-extrabold text-white">Lupa Password</h1>
-          <p className="text-sm leading-7 text-zinc-400">Masukkan email akun Anda. Kami akan mengirimkan tautan untuk membuat password baru.</p>
+          <h1 className="mt-3 mb-2 text-2xl font-extrabold text-white">Reset Password</h1>
+          <p className="text-sm leading-7 text-zinc-400">
+            Masukkan email akun Anda. Jika terdaftar, kami akan mengirim link untuk membuat password baru.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -45,12 +50,12 @@ export function ForgotPasswordPage() {
             <div className="relative">
               <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
               <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 type="email"
                 required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-10 pr-4 text-sm text-white placeholder:text-zinc-600 outline-none transition-colors focus:border-yellow-500/50 focus:bg-white/[0.06]"
-                placeholder="email@contoh.com"
+                placeholder="Masukkan email akun Anda"
               />
             </div>
           </div>
@@ -59,7 +64,7 @@ export function ForgotPasswordPage() {
           {success && <div className="rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-200">{success}</div>}
 
           <Button type="submit" disabled={loading} className="w-full bg-yellow-500 py-5 text-black hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-70">
-            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Memproses...</> : <>Kirim Link Reset <ArrowRight className="ml-1 h-4 w-4" /></>}
+            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Mengirim...</> : <>Kirim Link Reset <ArrowRight className="ml-1 h-4 w-4" /></>}
           </Button>
         </form>
 

@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
-import { authAPI, clearAuthStorage, settingsAPI } from '../../services/api';
+import { authAPI, clearAuthStorage, setSessionPresence, settingsAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import { DEFAULT_SITE_SETTINGS } from '../../lib/site-settings';
 
@@ -24,11 +24,28 @@ const Login = () => {
   });
 
   useEffect(() => {
-    if (localStorage.getItem('user_token')) {
-      navigate('/dashboard', { replace: true });
-      return;
-    }
-    loadSettings();
+    let active = true;
+    const bootstrap = async () => {
+      try {
+        const response = await authAPI.getSession();
+        if (!active) return;
+        const payload = response?.data || response;
+        if (!payload?.authenticated) {
+          loadSettings();
+          return;
+        }
+        setSessionPresence('user_token', true, payload?.viewer || null, payload?.session || null);
+        navigate('/dashboard', { replace: true });
+      } catch {
+        if (active) {
+          loadSettings();
+        }
+      }
+    };
+    void bootstrap();
+    return () => {
+      active = false;
+    };
   }, [navigate]);
 
   const loadSettings = async () => {
@@ -46,15 +63,14 @@ const Login = () => {
 
     try {
       const response = await authAPI.login(formData);
-      
-      if (response.data.success) {
+      const payload = response?.data || response;
+      if (payload?.success) {
         clearAuthStorage('user_token');
-        localStorage.setItem('user_token', response.data.token || response.data.access_token);
-        localStorage.setItem('user_data', JSON.stringify(response.data.user));
+        setSessionPresence('user_token', true, payload?.user || null, payload?.session || null);
         
         toast({
           title: 'Login Berhasil',
-          description: `Selamat datang, ${response.data.user.fullName}!`
+          description: `Selamat datang, ${payload?.user?.fullName || 'User'}!`
         });
         
         navigate('/dashboard');
@@ -152,9 +168,9 @@ const Login = () => {
           </form>
 
           <div className="mt-4 text-center">
-            <Link to="/forgot-password" className="text-yellow-400/80 text-sm hover:text-yellow-400 hover:underline">
-              Lupa Password
-            </Link>
+            <p className="text-xs text-gray-500">
+              Reset password via email sedang dinonaktifkan sementara. Hubungi tim support jika Anda butuh bantuan login.
+            </p>
           </div>
 
           <div className="mt-4 text-center space-y-2">

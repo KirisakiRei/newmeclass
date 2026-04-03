@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { useCMS } from "../../app/components/cms/CMSContext";
@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import { Button } from "../../app/components/ui/button";
 import { Badge } from "../../app/components/ui/badge";
-import { clearAdminSession } from "../../lib/session";
+import { adminAuthAPI } from "../../services/api";
+import { clearAdminSession, getAdminSession, getAdminSessionEventName, hasAdminSession } from "../../lib/session";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 import { SeoHead } from "../../app/components/SeoHead";
 
@@ -139,31 +140,65 @@ export function CMSLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
-  const adminProfile = useMemo(() => {
-    try {
-      const raw = localStorage.getItem("admin_data");
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  }, []);
+  const [adminProfile, setAdminProfile] = useState(() => getAdminSession());
   const adminInitial = String(adminProfile?.fullName || adminProfile?.name || "A").trim().charAt(0).toUpperCase() || "A";
   const adminName = String(adminProfile?.fullName || adminProfile?.name || "Admin CMS").trim();
 
   useEffect(() => {
-    const ensureToken = () => {
-      if (localStorage.getItem("admin_token")) return;
-      clearAdminSession();
-      navigate("/cms/login", { replace: true });
+    let active = true;
+
+    const ensureSession = async () => {
+      try {
+        const sessionState = await adminAuthAPI.getSession();
+        if (!sessionState?.authenticated) {
+          clearAdminSession();
+          if (active) {
+            setAdminProfile(null);
+            navigate("/cms/login", { replace: true });
+          }
+          return;
+        }
+        const viewer = sessionState?.viewer || null;
+        if (!active) return;
+        setAdminProfile(viewer);
+      } catch {
+        clearAdminSession();
+        if (active) {
+          navigate("/cms/login", { replace: true });
+        }
+      }
     };
 
-    ensureToken();
-    window.addEventListener("focus", ensureToken);
-    window.addEventListener("storage", ensureToken);
+    const handleFocus = () => {
+      void ensureSession();
+    };
+    const handleSessionEvent = (event: Event) => {
+      const detail = (event as CustomEvent<{ action?: string }>).detail;
+      if (detail?.action === "cleared" || !hasAdminSession()) {
+        if (active) {
+          setAdminProfile(null);
+          navigate("/cms/login", { replace: true });
+        }
+        return;
+      }
+
+      const cachedAdmin = getAdminSession();
+      if (cachedAdmin && active) {
+        setAdminProfile(cachedAdmin);
+        return;
+      }
+
+      void ensureSession();
+    };
+
+    void ensureSession();
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener(getAdminSessionEventName(), handleSessionEvent);
 
     return () => {
-      window.removeEventListener("focus", ensureToken);
-      window.removeEventListener("storage", ensureToken);
+      active = false;
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener(getAdminSessionEventName(), handleSessionEvent);
     };
   }, [navigate]);
 

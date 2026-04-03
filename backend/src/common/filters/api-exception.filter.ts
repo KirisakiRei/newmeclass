@@ -77,6 +77,65 @@ export class ApiExceptionFilter implements ExceptionFilter {
       };
     }
 
+    if (status === HttpStatus.UNAUTHORIZED && lowerMessage.includes('auth_provider_mismatch_google_only')) {
+      return {
+        code: 'AUTH_PROVIDER_MISMATCH_GOOGLE_ONLY',
+        detail: 'Akun ini terdaftar dengan Google. Silakan masuk menggunakan Google.',
+        messages,
+      };
+    }
+
+    if (
+      (status === HttpStatus.UNAUTHORIZED || status === HttpStatus.CONFLICT || status === HttpStatus.BAD_REQUEST)
+      && lowerMessage.includes('auth_provider_mismatch_manual_only')
+    ) {
+      return {
+        code: 'AUTH_PROVIDER_MISMATCH_MANUAL_ONLY',
+        detail: 'Email ini terdaftar dengan email dan password. Silakan masuk menggunakan metode tersebut.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.UNAUTHORIZED && lowerMessage.includes('auth_google_email_unverified')) {
+      return {
+        code: 'AUTH_GOOGLE_EMAIL_UNVERIFIED',
+        detail: 'Email Google Anda belum terverifikasi. Verifikasi email Google terlebih dahulu.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.UNAUTHORIZED && lowerMessage.includes('auth_oauth_state_invalid')) {
+      return {
+        code: 'AUTH_OAUTH_STATE_INVALID',
+        detail: 'Sesi login Google tidak valid atau sudah kedaluwarsa. Silakan coba lagi.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.UNAUTHORIZED && lowerMessage.includes('auth_refresh_invalid')) {
+      return {
+        code: 'AUTH_REFRESH_INVALID',
+        detail: 'Sesi login tidak dapat diperpanjang. Silakan masuk kembali.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.UNAUTHORIZED && lowerMessage.includes('invalid session')) {
+      return {
+        code: 'AUTH_SESSION_INVALID',
+        detail: 'Sesi login tidak valid. Silakan masuk kembali.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.UNAUTHORIZED && lowerMessage.includes('session expired')) {
+      return {
+        code: 'AUTH_SESSION_EXPIRED',
+        detail: 'Sesi login sudah berakhir. Silakan masuk kembali.',
+        messages,
+      };
+    }
+
     if (status === HttpStatus.UNAUTHORIZED && lowerMessage.includes('missing bearer token')) {
       return {
         code: 'AUTH_MISSING_TOKEN',
@@ -93,10 +152,66 @@ export class ApiExceptionFilter implements ExceptionFilter {
       };
     }
 
+    if (status === HttpStatus.UNAUTHORIZED && lowerMessage.includes('password_reset_token_invalid')) {
+      return {
+        code: 'PASSWORD_RESET_TOKEN_INVALID',
+        detail: 'Token reset password tidak valid atau sudah kedaluwarsa.',
+        messages,
+      };
+    }
+
+    if ((status === HttpStatus.BAD_REQUEST || status === HttpStatus.SERVICE_UNAVAILABLE) && lowerMessage.includes('mail_delivery_failed')) {
+      return {
+        code: 'MAIL_DELIVERY_FAILED',
+        detail: 'Email belum dapat dikirim saat ini. Silakan coba lagi beberapa saat lagi.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.BAD_REQUEST && lowerMessage.includes('auth_google_disabled')) {
+      return {
+        code: 'AUTH_GOOGLE_DISABLED',
+        detail: 'Login Google belum tersedia pada versi ini. Gunakan email dan password Anda.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.BAD_REQUEST && lowerMessage.includes('auth_password_reset_disabled')) {
+      return {
+        code: 'AUTH_PASSWORD_RESET_DISABLED',
+        detail: 'Fitur reset password sedang dinonaktifkan sementara.',
+        messages,
+      };
+    }
+
     if (status === HttpStatus.FORBIDDEN && lowerMessage.includes('premium access required')) {
       return {
         code: 'TEST_PREMIUM_ACCESS_REQUIRED',
         detail: 'Akses premium belum aktif. Selesaikan pembayaran terlebih dahulu.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.FORBIDDEN && lowerMessage.includes('auth_profile_incomplete')) {
+      return {
+        code: 'AUTH_PROFILE_INCOMPLETE',
+        detail: 'Lengkapi profil Google Anda terlebih dahulu sebelum melanjutkan.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.FORBIDDEN && lowerMessage.includes('auth_csrf_invalid')) {
+      return {
+        code: 'AUTH_CSRF_INVALID',
+        detail: 'Permintaan tidak lolos validasi keamanan. Muat ulang halaman lalu coba lagi.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.FORBIDDEN && lowerMessage.includes('auth_origin_invalid')) {
+      return {
+        code: 'AUTH_ORIGIN_INVALID',
+        detail: 'Permintaan berasal dari origin yang tidak diizinkan.',
         messages,
       };
     }

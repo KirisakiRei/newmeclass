@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../..
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useToast } from '../../hooks/use-toast';
-import { yayasanAPI } from '../../services/api';
+import { setSessionPresence, yayasanAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 
 const YayasanLogin = () => {
@@ -21,9 +21,25 @@ const YayasanLogin = () => {
   });
 
   useEffect(() => {
-    if (localStorage.getItem('yayasan_token')) {
-      navigate('/yayasan/dashboard', { replace: true });
-    }
+    let active = true;
+    const bootstrap = async () => {
+      try {
+        const response = await yayasanAPI.getSession();
+        if (!active) return;
+        const payload = response?.data || response;
+        if (!payload?.authenticated) {
+          return;
+        }
+        setSessionPresence('yayasan_token', true, payload?.viewer || null, payload?.session || null);
+        navigate('/yayasan/dashboard', { replace: true });
+      } catch {
+        // Stay on login page when no valid yayasan cookie exists.
+      }
+    };
+    void bootstrap();
+    return () => {
+      active = false;
+    };
   }, [navigate]);
 
   const handleSubmit = async (e) => {
@@ -32,14 +48,12 @@ const YayasanLogin = () => {
 
     try {
       const response = await yayasanAPI.login(formData);
-      
-      if (response.data.success) {
-        localStorage.setItem('yayasan_token', response.data.token);
-        localStorage.setItem('yayasan_data', JSON.stringify(response.data.yayasan));
-        
+      const payload = response?.data || response;
+      if (payload?.success) {
+        setSessionPresence('yayasan_token', true, payload?.yayasan || payload?.user || null, payload?.session || null);
         toast({
           title: 'Login Berhasil',
-          description: `Selamat datang, ${response.data.yayasan.name}!`
+          description: `Selamat datang, ${payload?.yayasan?.name || 'Yayasan'}!`
         });
         
         navigate('/yayasan/dashboard');
@@ -85,7 +99,12 @@ const YayasanLogin = () => {
             </div>
 
             <div>
-              <Label className="text-gray-400">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-gray-400">Password</Label>
+                <Link to="/yayasan/forgot-password" className="text-xs text-yellow-400 hover:text-yellow-300 hover:underline">
+                  Lupa password?
+                </Link>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <Input
@@ -121,13 +140,6 @@ const YayasanLogin = () => {
               )}
             </Button>
           </form>
-
-          <div className="mt-4 text-center">
-            <Link to="/forgot-password" className="text-yellow-400/80 text-sm hover:text-yellow-400 hover:underline">
-              Lupa Password
-            </Link>
-          </div>
-
           <div className="mt-4 text-center space-y-2">
             <p className="text-gray-400 text-sm">
               Belum punya akun yayasan{' '}
@@ -146,4 +158,3 @@ const YayasanLogin = () => {
 };
 
 export default YayasanLogin;
-

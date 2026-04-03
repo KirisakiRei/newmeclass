@@ -19,6 +19,18 @@ import { createEmptyPageState, extractPaginatedResponse } from '../../lib/pagina
 import { useAdminAccess } from '../../lib/admin-rbac';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const getCsrfToken = () => {
+  if (typeof document === 'undefined') return '';
+  const match = document.cookie.match(/(?:^|;\s*)nm_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+};
+const buildRequestConfig = (params = undefined) => ({
+  withCredentials: true,
+  params,
+  headers: {
+    ...(getCsrfToken() ? { 'X-CSRF-Token': getCsrfToken() } : {}),
+  },
+});
 
 const Users = () => {
   const { toast } = useToast();
@@ -33,9 +45,12 @@ const Users = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showBanDialog, setShowBanDialog] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
   const [banReason, setBanReason] = useState('');
   const [editForm, setEditForm] = useState({});
   const [openAccordion, setOpenAccordion] = useState(null);
+  const [resetTargetUser, setResetTargetUser] = useState(null);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [pagination, setPagination] = useState(createEmptyPageState(10));
@@ -52,7 +67,6 @@ const Users = () => {
 
   const loadUsers = async () => {
     try {
-      const token = localStorage.getItem('admin_token');
       const params = {};
       if (searchTerm) params.search = searchTerm;
       if (filterStatus === 'banned') params.isBanned = true;
@@ -61,10 +75,7 @@ const Users = () => {
       params.page = page;
       params.pageSize = pageSize;
       
-      const response = await axios.get(`${API_URL}/api/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params
-      });
+      const response = await axios.get(`${API_URL}/api/users`, buildRequestConfig(params));
       const nextPage = extractPaginatedResponse(response.data, pageSize);
       setUsers(nextPage.items || []);
       setPagination(nextPage);
@@ -81,10 +92,7 @@ const Users = () => {
 
   const loadStats = async () => {
     try {
-      const token = localStorage.getItem('admin_token');
-      const response = await axios.get(`${API_URL}/api/users/stats/summary`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`${API_URL}/api/users/stats/summary`, buildRequestConfig());
       setStats(response.data);
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -93,10 +101,7 @@ const Users = () => {
 
   const handleViewDetail = async (user) => {
     try {
-      const token = localStorage.getItem('admin_token');
-      const response = await axios.get(`${API_URL}/api/users/${user._id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`${API_URL}/api/users/${user._id}`, buildRequestConfig());
       setSelectedUser(response.data);
       setShowDetailDialog(true);
     } catch (error) {
@@ -145,11 +150,10 @@ const Users = () => {
   const confirmEdit = async () => {
     if (!canEditUser || !selectedUser?._id) return;
     try {
-      const token = localStorage.getItem('admin_token');
       await axios.put(
         `${API_URL}/api/users/${selectedUser._id}`,
         editForm,
-        { headers: { Authorization: `Bearer ${token}` } }
+        buildRequestConfig()
       );
 
       toast({
@@ -172,10 +176,7 @@ const Users = () => {
   const confirmDelete = async () => {
     if (!canDeleteUser || !selectedUser?._id) return;
     try {
-      const token = localStorage.getItem('admin_token');
-      await axios.delete(`${API_URL}/api/users/${selectedUser._id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.delete(`${API_URL}/api/users/${selectedUser._id}`, buildRequestConfig());
 
       toast({
         title: 'Berhasil!',
@@ -197,14 +198,11 @@ const Users = () => {
   const confirmBan = async () => {
     if (!canManageUser || !selectedUser?._id) return;
     try {
-      const token = localStorage.getItem('admin_token');
       const endpoint = selectedUserIsBanned ?
          `${API_URL}/api/users/${selectedUser._id}/unban`
         : `${API_URL}/api/users/${selectedUser._id}/ban?reason=${encodeURIComponent(banReason || 'Pelanggaran aturan')}`;
       
-      await axios.put(endpoint, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.put(endpoint, {}, buildRequestConfig());
 
       toast({
         title: 'Berhasil!',
@@ -225,14 +223,21 @@ const Users = () => {
 
   const handleResetPassword = async (user) => {
     if (!canManageUser) return;
-    if (!window.confirm(`Reset password untuk ${user.fullName || user.email}`)) return;
+    setResetTargetUser(user);
+    setShowResetDialog(true);
+  };
+
+  const confirmResetPassword = async () => {
+    if (!canManageUser || !resetTargetUser?._id) return;
+    setResetSubmitting(true);
     try {
-      const token = localStorage.getItem('admin_token');
       await axios.post(
-        `${API_URL}/api/users/${user._id}/reset-password`,
+        `${API_URL}/api/users/${resetTargetUser._id}/reset-password`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        buildRequestConfig()
       );
+      setShowResetDialog(false);
+      setResetTargetUser(null);
       toast({
         title: 'Berhasil',
         description: 'Link reset password telah dikirim ke email user'
@@ -243,6 +248,8 @@ const Users = () => {
         description: getApiErrorMessage(error, 'Gagal mengirim reset password'),
         variant: 'destructive'
       });
+    } finally {
+      setResetSubmitting(false);
     }
   };
 
@@ -712,6 +719,37 @@ const Users = () => {
           <div className="flex space-x-3 mt-4">
             <Button onClick={confirmDelete} variant="destructive">Hapus</Button>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="border-gray-600 text-gray-400">Batal</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showResetDialog} onOpenChange={(open) => {
+        setShowResetDialog(open);
+        if (!open) {
+          setResetTargetUser(null);
+        }
+      }}>
+        <DialogContent className="bg-[#2a2a2a] border-yellow-400/20 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Kirim Reset Password</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Sistem akan langsung mengirim email reset password ke akun ini. Password lama tetap aktif sampai pengguna menyelesaikan proses reset.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-yellow-400/20 bg-[#1a1a1a] p-4 text-sm text-gray-300">
+            <p className="text-white font-medium">{resetTargetUser?.fullName || '-'}</p>
+            <p className="mt-1 break-all text-gray-400">{resetTargetUser?.email || '-'}</p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" className="border-gray-600 text-gray-200" onClick={() => {
+              setShowResetDialog(false);
+              setResetTargetUser(null);
+            }}>
+              Batal
+            </Button>
+            <Button onClick={confirmResetPassword} disabled={resetSubmitting} className="bg-yellow-400 text-black hover:bg-yellow-500">
+              {resetSubmitting ? 'Mengirim...' : 'Kirim Email Reset'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -3,12 +3,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { authAPI } from '../services/api';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const { settings } = useTheme();
   const location = useLocation();
   const dropdownTimeout = useRef(null);
@@ -17,6 +19,23 @@ const Navbar = () => {
   useEffect(() => {
     setIsOpen(false);
     setServicesOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    let active = true;
+    const validateSession = async () => {
+      try {
+        const response = await authAPI.getSession();
+        const payload = response?.data || response;
+        if (active) setIsLoggedIn(Boolean(payload?.authenticated));
+      } catch {
+        if (active) setIsLoggedIn(false);
+      }
+    };
+    void validateSession();
+    return () => {
+      active = false;
+    };
   }, [location.pathname]);
 
   const navigation = [
@@ -39,8 +58,6 @@ const Navbar = () => {
     { name: 'Verifikasi Sertifikat', href: '/certificate-verify' }
   ];
   
-  const isLoggedIn = localStorage.getItem('user_token');
-
   const isActive = (path) => location.pathname === path;
 
   // Dropdown hover with delay to prevent flicker

@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
-import { mitraAPI } from '../../services/api';
+import { mitraAPI, setSessionPresence } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 
 const MitraLogin = () => {
@@ -17,9 +17,25 @@ const MitraLogin = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
 
   useEffect(() => {
-    if (localStorage.getItem('mitra_token')) {
-      navigate('/mitra/dashboard', { replace: true });
-    }
+    let active = true;
+    const bootstrap = async () => {
+      try {
+        const response = await mitraAPI.getSession();
+        if (!active) return;
+        const payload = response?.data || response;
+        if (!payload?.authenticated) {
+          return;
+        }
+        setSessionPresence('mitra_token', true, payload?.viewer || null, payload?.session || null);
+        navigate('/mitra/dashboard', { replace: true });
+      } catch {
+        // Stay on login screen when session is missing.
+      }
+    };
+    void bootstrap();
+    return () => {
+      active = false;
+    };
   }, [navigate]);
 
   const handleSubmit = async (e) => {
@@ -28,14 +44,13 @@ const MitraLogin = () => {
 
     try {
       const response = await mitraAPI.login(formData);
-
-      if (response.data.success) {
-        localStorage.setItem('mitra_token', response.data.token);
-        localStorage.setItem('mitra_data', JSON.stringify(response.data.mitra));
+      const payload = response?.data || response;
+      if (payload?.success) {
+        setSessionPresence('mitra_token', true, payload?.mitra || payload?.user || null, payload?.session || null);
 
         toast({
           title: 'Login Berhasil',
-          description: `Selamat datang, ${response.data.mitra.name}!`
+          description: `Selamat datang, ${payload?.mitra?.name || 'Mitra'}!`
         });
 
         navigate('/mitra/dashboard');
@@ -81,7 +96,12 @@ const MitraLogin = () => {
             </div>
 
             <div>
-              <label className="text-gray-400 text-sm" htmlFor="mitra-password">Password</label>
+              <div className="flex items-center justify-between">
+                <label className="text-gray-400 text-sm" htmlFor="mitra-password">Password</label>
+                <Link to="/mitra/forgot-password" className="text-xs text-yellow-400 hover:text-yellow-300 hover:underline">
+                  Lupa password?
+                </Link>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
                 <Input
@@ -121,13 +141,6 @@ const MitraLogin = () => {
               )}
             </Button>
           </form>
-
-          <div className="mt-4 text-center">
-            <Link to="/forgot-password" className="text-yellow-400/80 text-sm hover:text-yellow-400 hover:underline">
-              Lupa Password
-            </Link>
-          </div>
-
           <div className="mt-4 text-center space-y-2">
             <p className="text-gray-400 text-sm">
               Ingin bergabung sebagai mitra{' '}

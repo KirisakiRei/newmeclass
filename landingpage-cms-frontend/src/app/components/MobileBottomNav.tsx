@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { useCMS } from "./cms/CMSContext";
 import { resolveBackendAssetUrl } from "../../lib/public-url";
 import { authAPI } from "../../services/api";
-import { buildDashboardBridgeUrl, clearUserSession, getUserSessionEventName, hasUserSession } from "../../lib/session";
+import { buildDashboardBridgeUrl, clearUserSession, getUserSessionEventName, hasUserSession, setUserSession } from "../../lib/session";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 
 const resolveIcon = (href: string): LucideIcon => {
@@ -50,35 +50,52 @@ export function MobileBottomNav() {
 
   useEffect(() => {
     let active = true;
-    const validateSession = async () => {
-      if (!hasUserSession()) {
-        if (active) setIsLoggedIn(false);
-        return;
-      }
 
+    const syncFromMemory = () => {
+      if (!active) return;
+      setIsLoggedIn(hasUserSession());
+    };
+
+    const validateSession = async () => {
       try {
-        await authAPI.getProfile();
-        if (active) setIsLoggedIn(true);
+        const sessionState = await authAPI.getSession();
+        if (!active) return;
+        if (!sessionState?.authenticated) {
+          clearUserSession();
+          setIsLoggedIn(false);
+          return;
+        }
+        setUserSession(null, sessionState?.viewer || null);
+        setIsLoggedIn(true);
       } catch {
+        if (!active) return;
         clearUserSession();
-        if (active) setIsLoggedIn(false);
+        setIsLoggedIn(false);
       }
     };
-    const syncSessionState = () => {
+
+    const handleFocus = () => {
       void validateSession();
     };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void validateSession();
+      }
+    };
+    const handleSessionEvent = () => {
+      syncFromMemory();
+    };
 
+    syncFromMemory();
     void validateSession();
-    window.addEventListener("storage", syncSessionState);
-    window.addEventListener("focus", syncSessionState);
-    document.addEventListener("visibilitychange", syncSessionState);
-    window.addEventListener(getUserSessionEventName(), syncSessionState);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener(getUserSessionEventName(), handleSessionEvent);
     return () => {
       active = false;
-      window.removeEventListener("storage", syncSessionState);
-      window.removeEventListener("focus", syncSessionState);
-      document.removeEventListener("visibilitychange", syncSessionState);
-      window.removeEventListener(getUserSessionEventName(), syncSessionState);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener(getUserSessionEventName(), handleSessionEvent);
     };
   }, [location.pathname]);
 
@@ -86,10 +103,11 @@ export function MobileBottomNav() {
     if (!isLoggedIn || redirecting) return;
     setRedirecting(true);
     try {
-      const bridge = await authAPI.createBridgeTicket("/dashboard");
-      const ticket = bridge?.ticket || bridge?.token;
-      if (!ticket) throw new Error("Bridge ticket login tidak ditemukan");
-      window.location.href = buildDashboardBridgeUrl(ticket, "/dashboard");
+      const sessionState = await authAPI.getSession();
+      if (!sessionState?.authenticated) {
+        throw new Error("AUTH_SESSION_INVALID");
+      }
+      window.location.href = buildDashboardBridgeUrl("", "/dashboard");
     } catch {
       clearUserSession();
       window.location.href = loginLink.href;

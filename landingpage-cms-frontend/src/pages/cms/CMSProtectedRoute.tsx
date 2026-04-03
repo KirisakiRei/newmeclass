@@ -22,33 +22,18 @@ export function CMSProtectedRoute() {
     let active = true;
 
     const hydrate = async () => {
-      const token = localStorage.getItem("admin_token");
-      if (!token) {
-        if (active) {
-          setReason("unauthorized");
-          setStatus("unauthorized");
-        }
-        return;
-      }
-
       try {
-        const cachedRaw = localStorage.getItem("admin_data");
-        if (cachedRaw) {
-          const cached = JSON.parse(cachedRaw);
-          if (hasCmsPermission(cached)) {
-            if (active) setStatus("ready");
-            return;
-          }
+        const sessionState = await adminAuthAPI.getSession();
+        if (!sessionState?.authenticated) {
           clearAdminSession();
           if (active) {
-            setReason("forbidden");
+            setReason("unauthorized");
             setStatus("unauthorized");
           }
           return;
         }
-
-        const profile = await adminAuthAPI.getProfile();
-        setAdminSession(token, profile);
+        const profile = sessionState?.viewer || null;
+        setAdminSession(null, profile);
         if (!active) return;
         if (hasCmsPermission(profile)) {
           setStatus("ready");

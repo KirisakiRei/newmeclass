@@ -25,7 +25,6 @@ const PersonalityTest = () => {
   // Check if user has premium access (from localStorage or backend)
   const hasPremiumAccess = () => {
     // TODO: Check if user has paid for test
-    const userToken = localStorage.getItem('user_token');
     // For now, return false to show lock screen
     return false;
   };
@@ -334,4 +333,3 @@ const PersonalityTest = () => {
 };
 
 export default PersonalityTest;
-

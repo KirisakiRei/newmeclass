@@ -3,18 +3,17 @@ import { Role } from '@prisma/client';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { createHash, randomBytes } from 'crypto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.SUPERADMIN)
 @Controller('admin')
 export class AdminCompatController {
-  constructor(private readonly prisma: PrismaService) {}
-
-  private hash(value: string) {
-    return createHash('sha256').update(value).digest('hex');
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Get('yayasan')
   yayasanListLegacy() { return this.prisma.user.findMany({ where: { role: Role.YAYASAN } }); }
@@ -56,12 +55,7 @@ export class AdminCompatController {
 
   @Post('mitra/:id/reset-password')
   async resetMitraLegacy(@Param('id') id: string) {
-    const temporaryPassword = `Reset-${randomBytes(4).toString('hex')}`;
-    await this.prisma.user.update({
-      where: { id },
-      data: { passwordHash: this.hash(temporaryPassword) },
-    });
-    return { message: `Password reset for ${id}` };
+    return this.authService.requestPasswordResetByUserId(id, Role.MITRA);
   }
 
   @Get('mitra/withdrawals')

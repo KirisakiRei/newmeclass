@@ -8,7 +8,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useToast } from '../../hooks/use-toast';
 import { getApiErrorMessage } from '../../services/api-error';
-import { mitraAPI } from '../../services/api';
+import { mitraAPI, setSessionPresence } from '../../services/api';
 
 const MitraClaimInvite = () => {
   const navigate = useNavigate();
@@ -68,8 +68,8 @@ const MitraClaimInvite = () => {
         token,
         ...formData,
       });
-      localStorage.setItem('mitra_token', response.data.token);
-      localStorage.setItem('mitra_data', JSON.stringify(response.data.mitra));
+      const payload = response?.data || response;
+      setSessionPresence('mitra_token', true, payload?.mitra || payload?.user || null, payload?.session || null);
       toast({
         title: 'Akun Mitra Aktif',
         description: 'Selamat datang di dashboard mitra NEWME.',

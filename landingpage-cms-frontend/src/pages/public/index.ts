@@ -9,3 +9,7 @@ export { ArticlesPage, ArticleDetail as ArticleDetailPage } from "./ArticlesPage
 export { CertificateVerifyPage } from "./CertificateVerifyPage";
 export { PrivacyPolicyPage } from "./PrivacyPolicyPage";
 export { NotFound as NotFoundPage } from "./PlaceholderPage";
+export {
+  MitraAuthRedirectPage,
+  YayasanAuthRedirectPage,
+} from "./DashboardAuthRedirectPage";

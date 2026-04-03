@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { AuthAudience, Role } from '@prisma/client';
+import { AuthAudienceAccess } from 'src/common/auth/auth-audience.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -22,6 +23,7 @@ export class ReferralsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @Put('settings')
   @AdminPermission('referrals.edit')
@@ -30,6 +32,7 @@ export class ReferralsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
+  @AuthAudienceAccess(AuthAudience.USER)
   @Roles(Role.USER)
   @Get('me/wallet')
   myWallet(@CurrentUser() user: any) {
@@ -37,6 +40,7 @@ export class ReferralsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
+  @AuthAudienceAccess(AuthAudience.USER)
   @Roles(Role.USER)
   @Get('me/withdrawals')
   myWithdrawals(@CurrentUser() user: any) {
@@ -44,6 +48,7 @@ export class ReferralsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
+  @AuthAudienceAccess(AuthAudience.USER)
   @Roles(Role.USER)
   @Post('me/withdraw')
   requestWithdraw(@CurrentUser() user: any, @Body() body: CreateReferralWithdrawalDto) {
@@ -51,6 +56,7 @@ export class ReferralsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @Get('leaderboard')
   @AdminPermission('referrals.view')
@@ -59,6 +65,7 @@ export class ReferralsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @Get('transactions')
   @AdminPermission('referrals.view')
@@ -67,6 +74,7 @@ export class ReferralsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @Get('stats')
   @AdminPermission('referrals.view')
@@ -75,6 +83,7 @@ export class ReferralsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @Get('withdrawals')
   @AdminPermission('referrals.view')
@@ -88,6 +97,7 @@ export class ReferralsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @Put('withdrawals/:id/approve')
   @AdminPermission('referrals.edit')
@@ -96,6 +106,7 @@ export class ReferralsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @Put('withdrawals/:id/reject')
   @AdminPermission('referrals.edit')

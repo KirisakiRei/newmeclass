@@ -19,6 +19,7 @@ import StatsGrid from '../../components/ui/stats-grid';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import EmptyState from '../../components/ui/empty-state';
 import { getApiErrorMessage } from '../../services/api-error';
+import { sanitizeHtml } from '../../lib/safe-html';
 import SharedImageUploader from '../../components/admin/SharedImageUploader.tsx';
 import { resolveBackendAssetUrl, uploadAdminImage } from '../../lib/admin-media';
 import { useAdminAccess } from '../../lib/admin-rbac';
@@ -420,7 +421,7 @@ const Articles = () => {
                   {formData.excerpt && <p className="text-gray-400 italic mb-6 border-l-4 border-yellow-400/50 pl-4">{formData.excerpt}</p>}
                   <div
                     className="prose prose-invert prose-sm max-w-none text-gray-200 prose-headings:text-yellow-400 prose-a:text-yellow-400 prose-blockquote:border-yellow-400/50"
-                    dangerouslySetInnerHTML={{ __html: formData.content || '<p class="text-gray-500">Konten artikel akan tampil di sini...</p>' }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(formData.content || '<p class="text-gray-500">Konten artikel akan tampil di sini...</p>') }}
                   />
                 </div>
               </div>

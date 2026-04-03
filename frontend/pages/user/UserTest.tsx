@@ -8,7 +8,7 @@ import {
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
-import { authAPI, personalityTestsAPI, questionsAPI, settingsAPI, testResultsAPI, userPaymentsAPI } from '../../services/api';
+import { authAPI, clearAuthStorage, personalityTestsAPI, questionsAPI, setSessionPresence, settingsAPI, testResultsAPI, userPaymentsAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import { formatCurrency, getJenjang, getQuestionText } from '../../lib/utils';
 
@@ -214,15 +214,13 @@ const UserTest = () => {
 
   const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('user_token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
       const response = await authAPI.getProfile();
-      setUser(response.data);
-      await loadAllData(response.data._id || response.data.id, response.data);
+      const profile = response?.data || response;
+      setSessionPresence('user_token', true, profile, response?.data?.session || response?.session || null);
+      setUser(profile);
+      await loadAllData(profile._id || profile.id, profile);
     } catch (error) {
+      clearAuthStorage('user_token');
       navigate('/login');
     } finally {
       setLoading(false);

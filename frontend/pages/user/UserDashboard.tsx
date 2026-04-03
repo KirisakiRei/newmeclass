@@ -9,7 +9,7 @@ import { Input } from '../../components/ui/input';
 import ResponsiveTabs from '../../components/ui/responsive-tabs';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import { useToast } from '../../hooks/use-toast';
-import { authAPI, clearAuthStorage, personalAnalysisAPI, referralAPI, runningInfoAPI, userPaymentsAPI } from '../../services/api';
+import { authAPI, clearAuthStorage, personalAnalysisAPI, referralAPI, runningInfoAPI, setSessionPresence, userPaymentsAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import { buildFrontendUrl } from '../../lib/public-url';
 import { copyTextToClipboard } from '../../lib/clipboard';
@@ -162,10 +162,13 @@ export default function UserDashboard() {
   const [snapLoading, setSnapLoading] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState(false);
   const [launchingSnap, setLaunchingSnap] = useState(false);
+  const [snapPopupActive, setSnapPopupActive] = useState(false);
   const [snapLoadError, setSnapLoadError] = useState('');
   const [briefOpen, setBriefOpen] = useState(false);
   const [downloadingCertificate, setDownloadingCertificate] = useState(false);
   const paymentSyncInFlightRef = useRef(false);
+  const snapPopupActiveRef = useRef(false);
+  const activeSnapTokenRef = useRef('');
 
   useEffect(() => {
     void bootstrap();
@@ -204,6 +207,16 @@ export default function UserDashboard() {
     void syncPaymentStatusSilently(returnOrderId);
   }, [searchParams, user?.id, user?.paymentStatus]);
 
+  useEffect(() => {
+    if (!user || isApprovedPayment(user?.paymentStatus)) {
+      return;
+    }
+
+    void ensureMidtransSnapLoaded().catch(() => {
+      // Keep silent here; we surface load errors only when the user explicitly opens payment.
+    });
+  }, [user?.id, user?.paymentStatus]);
+
   const tabs = useMemo(() => {
     return [
       { id: 'dashboard', label: 'Dashboard', icon: User },
@@ -217,12 +230,9 @@ export default function UserDashboard() {
 
   const bootstrap = async () => {
     try {
-      const token = localStorage.getItem('user_token');
-      if (!token) {
-        navigate('/login', { replace: true });
-        return;
-      }
-      const profile = (await authAPI.getProfile()).data;
+      const profileResponse = await authAPI.getProfile();
+      const profile = profileResponse?.data || profileResponse;
+      setSessionPresence('user_token', true, profile, profileResponse?.data?.session || profileResponse?.session || null);
       setUser(profile);
       if (profile?.isYayasanLinked && activeTab === 'referral') {
         setActiveTab('dashboard');
@@ -236,8 +246,7 @@ export default function UserDashboard() {
         ...(profile?.isYayasanLinked ? [] : [loadReferralWallet()]),
       ]);
     } catch (error) {
-      localStorage.removeItem('user_token');
-      localStorage.removeItem('user_data');
+      clearAuthStorage('user_token');
       navigate('/login', { replace: true });
     } finally {
       setLoading(false);
@@ -245,7 +254,9 @@ export default function UserDashboard() {
   };
 
   const refreshProfile = async () => {
-    const profile = (await authAPI.getProfile()).data;
+    const profileResponse = await authAPI.getProfile();
+    const profile = profileResponse?.data || profileResponse;
+    setSessionPresence('user_token', true, profile, profileResponse?.data?.session || profileResponse?.session || null);
     setUser(profile);
     await loadPricing(profile);
     if (profile?.isYayasanLinked && activeTab === 'referral') {
@@ -390,6 +401,20 @@ export default function UserDashboard() {
 
   const triggerSnapPayment = async (payload = snapData) => {
     const token = payload?.snapToken;
+    const resetSnapPopupState = () => {
+      snapPopupActiveRef.current = false;
+      activeSnapTokenRef.current = '';
+      setSnapPopupActive(false);
+    };
+
+    if (snapPopupActiveRef.current && activeSnapTokenRef.current === token) {
+      toast({
+        title: 'Midtrans masih terbuka',
+        description: 'Selesaikan atau tutup popup pembayaran yang sedang aktif terlebih dahulu.',
+      });
+      return;
+    }
+
     if (!token) {
       if (payload?.paymentUrl) {
         const opened = openSnapFallbackWindow(payload.paymentUrl, { allowFallback: true });
@@ -413,27 +438,35 @@ export default function UserDashboard() {
     setSnapLoadError('');
     try {
       await ensureMidtransSnapLoaded();
+      snapPopupActiveRef.current = true;
+      activeSnapTokenRef.current = token;
+      setSnapPopupActive(true);
       window.snap?.pay(token, {
         onSuccess: async () => {
+          resetSnapPopupState();
           toast({ title: 'Pembayaran berhasil', description: 'Midtrans memberi sinyal sukses. Kami sedang sinkronkan akses premium Anda.' });
           await finalizeSuccessfulPayment({ showToast: false });
         },
         onPending: async (result) => {
+          resetSnapPopupState();
           toast({ title: 'Pembayaran sedang diproses', description: 'Transaksi Anda tercatat di Midtrans. Dashboard akan terus sinkron otomatis.' });
           if (result?.order_id) {
             await syncPaymentStatusSilently(result.order_id);
           }
         },
         onError: (result) => {
+          resetSnapPopupState();
           const message = result?.status_message || 'Midtrans belum bisa memproses transaksi ini.';
           setSnapLoadError(message);
           toast({ title: 'Pembayaran gagal dibuka', description: message, variant: 'destructive' });
         },
         onClose: () => {
+          resetSnapPopupState();
           toast({ title: 'Pembayaran belum selesai', description: 'Anda dapat membuka kembali Midtrans Snap kapan saja dari halaman pembayaran.' });
         },
       });
     } catch (error) {
+      resetSnapPopupState();
       const message = getApiErrorMessage(error, 'Midtrans Snap belum bisa dimuat di browser ini.');
       setSnapLoadError(message);
       toast({ title: 'Snap tidak tersedia', description: message, variant: 'destructive' });
@@ -529,6 +562,9 @@ export default function UserDashboard() {
     setSnapLoading(true);
     try {
       await userPaymentsAPI.cancelPayment(snapData.orderId);
+      snapPopupActiveRef.current = false;
+      activeSnapTokenRef.current = '';
+      setSnapPopupActive(false);
       setSnapData(null);
       toast({
         title: 'Transaksi dibatalkan',
@@ -570,12 +606,9 @@ export default function UserDashboard() {
     if (!targetUserId) return;
     setDownloadingCertificate(true);
     try {
-      const opened = window.open(`/certificate-download/${targetUserId}?download=1`, '_blank', 'noopener,noreferrer');
-      if (!opened) {
-        throw new Error('Popup blocked');
-      }
+      navigate(`/certificate-download/${targetUserId}?download=1&viewer=user`);
     } catch (error) {
-      toast({ title: 'Gagal membuka sertifikat', description: getApiErrorMessage(error, 'Izinkan pop-up browser untuk menyimpan sertifikat sebagai PDF.'), variant: 'destructive' });
+      toast({ title: 'Gagal membuka sertifikat', description: getApiErrorMessage(error, 'Halaman sertifikat belum bisa dibuka saat ini.'), variant: 'destructive' });
     } finally {
       setDownloadingCertificate(false);
     }
@@ -648,6 +681,37 @@ export default function UserDashboard() {
   const hasCompletedPremium = user?.paidTestStatus === 'completed';
   const hasCompletedFree = user?.freeTestStatus === 'completed';
   const showFreeTest = !user?.isYayasanLinked;
+  const paymentAmount = pricing.totalPrice || pricing.basePrice || 99000;
+  const hasPendingOrder = Boolean(snapData?.orderId);
+  const paymentUiState = hasPremiumAccess
+    ? (hasCompletedPremium ? 'paid_completed' : 'paid_ready')
+    : (isPendingPayment(user?.paymentStatus) || hasPendingOrder ? 'pending' : 'unpaid');
+  const paymentStatusLabel = hasPremiumAccess ? 'Lunas' : paymentUiState === 'pending' ? 'Menunggu' : 'Belum Bayar';
+  const paymentStatusClassName = hasPremiumAccess
+    ? 'text-emerald-400'
+    : paymentUiState === 'pending'
+      ? 'text-yellow-400'
+      : 'text-white';
+  const activeOrderId = snapData?.orderId || '';
+  const activePaymentUrl = snapData?.paymentUrl || '';
+  const resultDetailId = premiumResult?.resultId || premiumResult?.id || '';
+  const paymentStepper = [
+    {
+      label: 'Buka Invoice',
+      state: paymentUiState === 'unpaid' ? 'idle' : 'completed',
+    },
+    {
+      label: 'Bayar di Midtrans',
+      state: paymentUiState === 'pending' ? 'active' : paymentUiState === 'unpaid' ? 'idle' : 'completed',
+    },
+    {
+      label: 'Sinkron Otomatis',
+      state: paymentUiState === 'paid_ready' || paymentUiState === 'paid_completed' ? 'completed' : 'idle',
+    },
+  ];
+  const paymentSummaryNote = hasPremiumAccess
+    ? 'Pembayaran premium berhasil dan akses NEWME Anda sudah aktif.'
+    : 'Pembayaran diproses melalui Midtrans payment gateway. Status akan terupdate otomatis setelah pembayaran berhasil dikonfirmasi.';
   const premiumDisplayAnalysis = asObject(premiumResult?.displayAnalysis);
   const premiumAnalysis = asObject(premiumResult?.analysis);
   const premiumInsights = asObject(premiumAnalysis.insights);
@@ -1106,192 +1170,259 @@ export default function UserDashboard() {
           </div>
         )}
         {activeTab === 'payment' && (
-          <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-            <Card className="border-yellow-400/20 bg-[#2a2a2a]">
-              <CardHeader>
-                <CardTitle className="text-white">Ringkasan Pembayaran</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Pembayaran premium dibuka langsung melalui Midtrans Snap dari halaman ini.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-xl bg-[#1a1a1a] p-5">
-                  <p className="text-sm text-gray-400">Nominal pembayaran</p>
-                  <p className="mt-2 text-3xl font-black text-yellow-400">{fmt(pricing.totalPrice || pricing.basePrice || 99000)}</p>
-                  <p className="mt-2 text-sm text-gray-300">
-                    {user.isYayasanLinked
-                      ? 'Jalur yayasan langsung memakai akses premium penuh.'
-                      : 'Jalur individu bisa membuka premium kapan saja setelah pembayaran berhasil.'}
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <div className="rounded-xl bg-[#1a1a1a] p-4 text-sm">
-                    <p className="text-gray-400">Status saat ini</p>
-                    <p className={`mt-2 text-base font-semibold ${hasPremiumAccess ? 'text-green-400' : isPendingPayment(user.paymentStatus) ? 'text-yellow-400' : 'text-white'}`}>
-                      {hasPremiumAccess ? 'Pembayaran berhasil' : isPendingPayment(user.paymentStatus) ? 'Menunggu konfirmasi' : 'Belum dibayar'}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {hasPremiumAccess
-                        ? 'Akses premium sudah aktif.'
-                        : snapData?.orderId
-                          ? 'Sesi pembayaran sedang tersedia.'
-                          : 'Belum ada sesi pembayaran aktif.'}
-                    </p>
+          <div className="space-y-6">
+            <div className="rounded-[28px] border border-yellow-400/12 bg-[#232323] px-4 py-5 shadow-[0_22px_50px_rgba(0,0,0,0.24)] sm:px-6 lg:px-8">
+              <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-center md:gap-4">
+                {paymentStepper.map((step, index) => (
+                  <React.Fragment key={step.label}>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${
+                          step.state === 'completed'
+                            ? 'border-yellow-400 bg-yellow-400 text-black'
+                            : step.state === 'active'
+                              ? 'border-yellow-400 text-yellow-300'
+                              : 'border-yellow-400/20 text-gray-400'
+                        }`}
+                      >
+                        {step.state === 'completed' ? <CheckCircle className="h-4 w-4" /> : index + 1}
+                      </div>
+                      <span className={`text-sm font-medium sm:text-base ${step.state === 'idle' ? 'text-gray-400' : 'text-gray-100'}`}>
+                        {step.label}
+                      </span>
+                    </div>
+                    {index < paymentStepper.length - 1 ? (
+                      <div className="hidden h-px w-12 bg-gradient-to-r from-yellow-400/40 to-white/10 md:block lg:w-16" />
+                    ) : null}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-5 xl:grid-cols-[1.02fr_0.98fr]">
+              <Card className="border-yellow-400/25 bg-[#2d2d2d] shadow-[0_26px_60px_rgba(0,0,0,0.22)]">
+                <CardHeader className="pb-5">
+                  <CardTitle className="text-sm uppercase tracking-[0.22em] text-gray-300">Detail Tagihan</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-5 rounded-[24px] bg-[#232323] px-5 py-4 sm:px-6">
+                    <div className="flex items-center justify-between gap-4 border-b border-yellow-400/12 pb-4">
+                      <span className="text-sm uppercase tracking-[0.16em] text-gray-400">Nominal</span>
+                      <span className="text-2xl font-black text-white sm:text-4xl">{fmt(paymentAmount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 border-b border-yellow-400/12 pb-4">
+                      <span className="text-sm uppercase tracking-[0.16em] text-gray-400">Status</span>
+                      <span className={`text-lg font-semibold ${paymentStatusClassName}`}>{paymentStatusLabel}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm uppercase tracking-[0.16em] text-gray-400">Sinkronisasi</span>
+                      <span className="text-base font-semibold text-white sm:text-lg">Otomatis via Midtrans</span>
+                    </div>
                   </div>
-                  <div className="rounded-xl bg-[#1a1a1a] p-4 text-sm">
-                    <p className="text-gray-400">Order aktif</p>
-                    <p className="mt-2 break-all text-xs text-gray-300">{snapData?.orderId || 'Belum ada order aktif'}</p>
-                    <p className="mt-2 text-xs text-gray-500">
-                      Order ini akan dipakai untuk sinkronisasi otomatis setelah pembayaran selesai.
-                    </p>
+
+                  {activeOrderId ? (
+                    <div className="rounded-[22px] border border-yellow-400/12 bg-[#1e1e1e] px-5 py-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Order aktif</p>
+                      <p className="mt-3 break-all text-sm text-gray-200">{activeOrderId}</p>
+                    </div>
+                  ) : null}
+
+                  <div className="rounded-[22px] bg-[#141414] px-5 py-5 text-sm leading-7 text-gray-300">
+                    {paymentSummaryNote}
                   </div>
-                </div>
-                {!hasPremiumAccess && (
-                  <div className="rounded-xl border border-yellow-400/15 bg-yellow-400/5 p-4 text-sm text-gray-300">
-                    <p className="font-medium text-yellow-300">Catatan penting</p>
-                    <ul className="mt-2 space-y-2 text-gray-400">
-                      <li>Klik bayar dan Midtrans Snap akan langsung muncul tanpa popup tambahan dari NEWME.</li>
-                      <li>Jika Snap JS gagal dimuat, Anda masih bisa memakai link darurat ke halaman Midtrans.</li>
-                      <li>Setelah pembayaran berhasil, dashboard akan mencoba sinkron otomatis.</li>
-                    </ul>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            <div className="space-y-4">
-              <Card className="border-yellow-400/20 bg-[#2a2a2a]">
-              <CardHeader>
-                <CardTitle className="text-white">Tindakan Pembayaran</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Semua tindakan pembayaran utama tersedia langsung di halaman ini.
-                </CardDescription>
-              </CardHeader>
-                <CardContent className="space-y-4">
-                  {hasPremiumAccess ? (
-                    <div className="rounded-2xl border border-green-400/20 bg-green-400/10 p-6">
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-400/15">
-                          <CheckCircle className="h-6 w-6 text-green-400" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-lg font-semibold text-green-300">Pembayaran sudah terverifikasi</p>
-                          <p className="mt-2 text-sm text-gray-300">
-                            {hasCompletedPremium
-                              ? 'Tes premium sudah selesai. Anda bisa langsung membuka hasil lengkap dan sertifikat.'
-                              : 'Akses premium sudah aktif. Silakan lanjut ke tab test untuk mulai mengerjakan soal premium.'}
-                          </p>
-                          <div className="mt-4 flex flex-wrap gap-3">
-                            <Button className="bg-yellow-400 text-black hover:bg-yellow-500" onClick={() => setActiveTab(hasCompletedPremium ? 'results' : 'test')}>
-                              {hasCompletedPremium ? 'Lihat Hasil Premium' : 'Mulai Tes Premium'}
-                            </Button>
-                            {hasCompletedPremium && (
-                              <Button variant="outline" className="border-yellow-400/30 text-yellow-300" onClick={() => navigate(`/test-result/${premiumResult?.resultId || premiumResult?.id}`)}>
-                                Buka Halaman Hasil
-                              </Button>
-                            )}
-                          </div>
-                        </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-yellow-400/25 bg-[#151515] shadow-[0_26px_60px_rgba(0,0,0,0.26)]">
+                <CardHeader className="pb-5">
+                  <CardTitle className="text-sm uppercase tracking-[0.22em] text-yellow-400">Action Center</CardTitle>
+                  <CardDescription className="text-sm leading-6 text-gray-400">
+                    {paymentUiState === 'unpaid'
+                      ? 'Buka invoice premium Anda dan lanjutkan ke Midtrans untuk menyelesaikan pembayaran.'
+                      : paymentUiState === 'pending'
+                        ? 'Pembayaran Anda sedang diproses. Gunakan aksi di bawah untuk memeriksa atau melanjutkan transaksi.'
+                        : hasCompletedPremium
+                          ? 'Akses premium Anda sudah aktif dan hasil tes siap dibuka kapan saja.'
+                          : 'Akses premium Anda sudah aktif. Silakan lanjutkan ke tes premium.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div
+                    className={`rounded-[22px] border px-5 py-5 ${
+                      paymentUiState === 'pending'
+                        ? 'border-yellow-400/25 bg-[#2e2a1d]'
+                        : paymentUiState === 'unpaid'
+                          ? 'border-yellow-400/15 bg-[#242424]'
+                          : 'border-emerald-400/25 bg-emerald-400/10'
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+                          paymentUiState === 'pending'
+                            ? 'bg-yellow-400/15 text-yellow-300'
+                            : paymentUiState === 'unpaid'
+                              ? 'bg-yellow-400/10 text-yellow-300'
+                              : 'bg-emerald-400/15 text-emerald-400'
+                        }`}
+                      >
+                        {paymentUiState === 'pending' ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : paymentUiState === 'unpaid' ? (
+                          <FileText className="h-5 w-5" />
+                        ) : (
+                          <CheckCircle className="h-5 w-5" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xl font-semibold ${
+                          paymentUiState === 'pending'
+                            ? 'text-yellow-300'
+                            : paymentUiState === 'unpaid'
+                              ? 'text-white'
+                              : 'text-emerald-300'
+                        }`}>
+                          {paymentUiState === 'pending'
+                            ? 'Menunggu Konfirmasi'
+                            : paymentUiState === 'unpaid'
+                              ? 'Invoice Siap Dibuka'
+                              : 'Pembayaran Berhasil'}
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-gray-300">
+                          {paymentUiState === 'pending'
+                            ? 'Pembayaran Anda sedang diverifikasi dan dashboard akan mencoba sinkron otomatis.'
+                            : paymentUiState === 'unpaid'
+                              ? 'Klik tombol utama di bawah untuk membuka halaman pembayaran Midtrans.'
+                              : hasCompletedPremium
+                                ? 'Akses premium aktif dan hasil tes Anda sudah tersedia di dashboard.'
+                                : 'Akses premium Anda sudah aktif dan siap dipakai untuk memulai tes.'}
+                        </p>
                       </div>
                     </div>
-                  ) : (
+                  </div>
+
+                  {paymentUiState === 'unpaid' && (
+                    <Button
+                      className="h-14 w-full rounded-xl bg-yellow-400 text-base font-semibold text-black hover:bg-yellow-500"
+                      disabled={snapLoading || launchingSnap || snapPopupActive}
+                      onClick={() => void handleStartOrResumePayment()}
+                    >
+                      {snapLoading || launchingSnap ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+                      {snapPopupActive ? 'Midtrans Sedang Terbuka' : 'Bayar Sekarang via Midtrans'}
+                    </Button>
+                  )}
+
+                  {paymentUiState === 'pending' && (
                     <>
-                      <div className="grid gap-3 lg:grid-cols-2">
-                        <Button className="h-auto min-h-[52px] bg-yellow-400 text-black hover:bg-yellow-500" disabled={snapLoading || launchingSnap} onClick={() => void handleStartOrResumePayment()}>
-                          {snapLoading || launchingSnap ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
-                          {snapData?.orderId ? 'Buka Midtrans Snap' : 'Bayar Sekarang'}
+                      <Button
+                        className="h-14 w-full rounded-xl bg-yellow-400 text-base font-semibold text-black hover:bg-yellow-500"
+                        disabled={!activeOrderId || checkingPayment}
+                        onClick={() => void handleCheckPayment()}
+                      >
+                        {checkingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                        Cek Status Pembayaran
+                      </Button>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Button
+                          variant="outline"
+                          className="h-12 rounded-xl border-yellow-400/35 bg-transparent text-yellow-300 hover:bg-yellow-400/10 hover:text-yellow-200"
+                          disabled={!activeOrderId || launchingSnap || snapPopupActive}
+                          onClick={handleReloadSnap}
+                        >
+                          {launchingSnap ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+                          {snapPopupActive ? 'Midtrans Sedang Terbuka' : 'Buka Midtrans'}
                         </Button>
-                        <Button variant="outline" className="h-auto min-h-[52px] border-yellow-400/40 text-yellow-400" disabled={!snapData?.orderId || checkingPayment} onClick={() => void handleCheckPayment()}>
-                          {checkingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                          Cek Status Pembayaran
-                        </Button>
-                        <Button variant="outline" className="h-auto min-h-[52px] border-blue-400/30 text-blue-300" disabled={!snapData?.orderId || snapLoading} onClick={() => void handleChangePaymentMethod()}>
-                          {snapLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        <Button
+                          variant="outline"
+                          className="h-12 rounded-xl border-blue-400/35 bg-transparent text-blue-300 hover:bg-blue-400/10 hover:text-blue-200"
+                          disabled={!activeOrderId || snapLoading}
+                          onClick={() => void handleChangePaymentMethod()}
+                        >
+                          {snapLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                           Ganti Metode Pembayaran
                         </Button>
-                        <Button variant="outline" className="h-auto min-h-[52px] border-yellow-400/20 text-gray-200" disabled={!snapData?.orderId || launchingSnap} onClick={handleReloadSnap}>
-                          {launchingSnap ? 'Membuka Snap...' : 'Buka Ulang Snap'}
-                        </Button>
-                      </div>
-                      {snapLoadError ? (
-                        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
-                          {snapLoadError}
-                        </div>
-                      ) : null}
-                      <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="font-medium text-white">Perlu membuat sesi baru?</p>
-                            <p className="mt-1 text-sm text-gray-400">
-                              Batalkan transaksi pending bila Anda ingin memulai order baru dari awal.
-                            </p>
-                          </div>
-                          <Button variant="outline" className="border-red-500/40 text-red-200" disabled={!snapData?.orderId || snapLoading} onClick={() => void handleCancelPayment()}>
-                            {snapLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            Batalkan Transaksi
+                        {activePaymentUrl ? (
+                          <Button
+                            variant="outline"
+                            className="h-12 rounded-xl border-yellow-400/18 bg-transparent text-gray-100 hover:bg-white/5 hover:text-white"
+                            onClick={() => openSnapFallbackWindow(activePaymentUrl, { allowFallback: true })}
+                          >
+                            Link Darurat Midtrans
                           </Button>
-                        </div>
+                        ) : null}
+                        <Button
+                          variant="outline"
+                          className="h-12 rounded-xl border-red-500/35 bg-transparent text-red-200 hover:bg-red-500/10 hover:text-red-100"
+                          disabled={!activeOrderId || snapLoading}
+                          onClick={() => void handleCancelPayment()}
+                        >
+                          {snapLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                          Batalkan Transaksi
+                        </Button>
                       </div>
                     </>
                   )}
+
+                  {paymentUiState === 'paid_ready' && (
+                    <Button
+                      className="h-14 w-full rounded-xl bg-yellow-400 text-base font-semibold text-black hover:bg-yellow-500"
+                      onClick={() => setBriefOpen(true)}
+                    >
+                      <Play className="h-4 w-4" />
+                      Mulai Tes Premium
+                    </Button>
+                  )}
+
+                  {paymentUiState === 'paid_completed' && (
+                    <div className="space-y-3">
+                      <Button
+                        className="h-14 w-full rounded-xl bg-yellow-400 text-base font-semibold text-black hover:bg-yellow-500"
+                        onClick={() => setActiveTab('results')}
+                      >
+                        <Trophy className="h-4 w-4" />
+                        Lihat Hasil Tes
+                      </Button>
+                      {resultDetailId ? (
+                        <Button
+                          variant="outline"
+                          className="h-12 w-full rounded-xl border-yellow-400/30 bg-transparent text-yellow-300 hover:bg-yellow-400/10 hover:text-yellow-200"
+                          onClick={() => navigate(`/test-result/${resultDetailId}`)}
+                        >
+                          Buka Halaman Hasil Lengkap
+                        </Button>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {snapLoadError ? (
+                    <div className="rounded-[20px] border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm leading-6 text-red-200">
+                      <p className="font-medium text-red-100">Terjadi kendala pada sesi pembayaran.</p>
+                      <p className="mt-2">{snapLoadError}</p>
+                      {activePaymentUrl ? (
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          <Button
+                            variant="outline"
+                            className="border-yellow-400/30 bg-transparent text-yellow-300 hover:bg-yellow-400/10 hover:text-yellow-200"
+                            onClick={() => openSnapFallbackWindow(activePaymentUrl, { allowFallback: true })}
+                          >
+                            Buka Link Midtrans
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="border-red-400/30 bg-transparent text-red-200 hover:bg-red-500/10 hover:text-red-100"
+                            disabled={snapLoading}
+                            onClick={() => void handleRecoverSnap()}
+                          >
+                            {snapLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Pulihkan Sesi
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
-              <div className="grid gap-4 md:grid-cols-3">
-                <Card className="border-yellow-400/15 bg-[#2a2a2a]">
-                  <CardContent className="p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Langkah 1</p>
-                    <p className="mt-3 text-sm font-medium text-white">Buka pembayaran</p>
-                    <p className="mt-2 text-sm text-gray-400">
-                      Klik tombol bayar dan Midtrans Snap akan langsung terbuka.
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="border-yellow-400/15 bg-[#2a2a2a]">
-                  <CardContent className="p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Langkah 2</p>
-                    <p className="mt-3 text-sm font-medium text-white">Selesaikan transaksi</p>
-                    <p className="mt-2 text-sm text-gray-400">
-                      Pilih metode pembayaran yang diinginkan lalu selesaikan proses di Midtrans.
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="border-yellow-400/15 bg-[#2a2a2a]">
-                  <CardContent className="p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Langkah 3</p>
-                    <p className="mt-3 text-sm font-medium text-white">Dashboard sinkron otomatis</p>
-                    <p className="mt-2 text-sm text-gray-400">
-                      Jika sinkronisasi belum langsung terlihat, gunakan cek status pembayaran sebagai cadangan.
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-              {!hasPremiumAccess && snapData?.paymentUrl && (
-                <Card className="border-yellow-400/20 bg-[#2a2a2a]">
-                  <CardHeader>
-                    <CardTitle className="text-white">Sesi Pembayaran Aktif</CardTitle>
-                    <CardDescription className="text-gray-400">
-                      Sesi ini tetap bisa dibuka kembali langsung dari halaman ini, dengan link darurat bila browser bermasalah.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-400">Link Midtrans aktif</p>
-                      <p className="mt-2 break-all text-sm text-white">{snapData.paymentUrl}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      <Button className="bg-yellow-400 text-black hover:bg-yellow-500" disabled={launchingSnap} onClick={handleReloadSnap}>
-                        {launchingSnap ? 'Membuka Snap...' : 'Buka Snap'}
-                      </Button>
-                      <Button variant="outline" className="border-yellow-400/30 text-yellow-300" onClick={() => openSnapFallbackWindow(snapData.paymentUrl, { allowFallback: true })}>
-                        Link Darurat
-                      </Button>
-                      <Button variant="outline" className="border-red-400/30 text-red-300" disabled={snapLoading} onClick={() => void handleRecoverSnap()}>
-                        {snapLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Pulihkan Sesi
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </div>
         )}

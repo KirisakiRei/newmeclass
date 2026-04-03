@@ -18,7 +18,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
-import { authAPI, walletAPI } from '../../services/api';
+import { authAPI, clearAuthStorage, setSessionPresence, walletAPI } from '../../services/api';
 import { formatCurrency, getErrorMsg } from '../../lib/utils';
 import Pagination from '../../components/ui/pagination';
 import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
@@ -51,15 +51,13 @@ const Wallet = () => {
 
   const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('user_token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
       const response = await authAPI.getProfile();
-      setUser(response.data);
-      loadWalletData(response.data.id || response.data._id);
+      const profile = response?.data || response;
+      setSessionPresence('user_token', true, profile, response?.data?.session || response?.session || null);
+      setUser(profile);
+      loadWalletData(profile.id || profile._id);
     } catch (error) {
+      clearAuthStorage('user_token');
       navigate('/login');
     }
   };

@@ -84,9 +84,6 @@ export class SettingsController {
   }
 
   @Get('jenjang-config')
-  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
-  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
-  @AdminPermission('settings.manage')
   getJenjangConfig() {
     return this.settingsService.getJenjangConfig();
   }

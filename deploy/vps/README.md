@@ -47,7 +47,6 @@ copy .env.example .env
   - `DATABASE_URL`
   - `DIRECT_URL`
   - `JWT_ACCESS_SECRET`
-  - `JWT_REFRESH_SECRET`
   - `SEED_SUPERADMIN_PASSWORD`
 
 3. Jika ingin akses lokal dari browser, nilai aman awal bisa seperti ini:

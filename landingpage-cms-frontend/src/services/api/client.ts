@@ -11,6 +11,8 @@ const API_BASE_URL = String(import.meta.env.VITE_BACKEND_URL || '')
 
 export const BACKEND_BASE_URL = API_BASE_URL;
 export const API_URL = API_BASE_URL ? `${API_BASE_URL}/api` : '/api';
+const DEDUPED_SESSION_PATHS = new Set(['/auth/session', '/admin/session']);
+const inflightRequests = new Map<string, Promise<unknown>>();
 
 const extractPayload = (payload: any) => (
   payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')
@@ -22,21 +24,38 @@ const extractMessage = (payload: any, fallback = 'Terjadi kesalahan') => (
   String(payload?.message || payload?.error || fallback).trim()
 );
 
+const getCsrfToken = () => {
+  if (typeof document === 'undefined') return '';
+  const match = document.cookie.match(/(?:^|;\s*)nm_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+};
+
 export const request = async <T = any>(path: string, options: RequestOptions = {}): Promise<T> => {
+  const method = String(options.method || 'GET').toUpperCase();
+  const requestKey = method === 'GET' && DEDUPED_SESSION_PATHS.has(path)
+    ? `${method}:${path}`
+    : '';
+
+  if (requestKey && inflightRequests.has(requestKey)) {
+    return inflightRequests.get(requestKey) as Promise<T>;
+  }
+
+  const executeRequest = async (): Promise<T> => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
   };
 
-  const token = options.tokenKey ? localStorage.getItem(options.tokenKey) : null;
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  const csrfToken = getCsrfToken();
+  if (csrfToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    headers['X-CSRF-Token'] = csrfToken;
   }
 
   const response = await fetch(`${API_URL}${path}`, {
-    method: options.method || 'GET',
+    method,
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    credentials: 'include',
   });
 
   const rawText = await response.text();
@@ -56,6 +75,19 @@ export const request = async <T = any>(path: string, options: RequestOptions = {
   }
 
   return payload as T;
+  };
+
+  const requestPromise = executeRequest().finally(() => {
+    if (requestKey) {
+      inflightRequests.delete(requestKey);
+    }
+  });
+
+  if (requestKey) {
+    inflightRequests.set(requestKey, requestPromise);
+  }
+
+  return requestPromise;
 };
 
 export const upload = async <T = any>(
@@ -64,15 +96,16 @@ export const upload = async <T = any>(
   tokenKey: 'admin_token' | 'user_token' = 'admin_token',
 ): Promise<T> => {
   const headers: Record<string, string> = {};
-  const token = localStorage.getItem(tokenKey);
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
   }
 
   const response = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     headers,
     body: formData,
+    credentials: 'include',
   });
 
   const rawText = await response.text();

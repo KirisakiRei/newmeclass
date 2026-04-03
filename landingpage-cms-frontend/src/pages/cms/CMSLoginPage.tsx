@@ -83,6 +83,34 @@ export function CMSLoginPage() {
     }
   }, [deniedReason]);
 
+  useEffect(() => {
+    let active = true;
+    const bootstrap = async () => {
+      try {
+        const sessionState = await adminAuthAPI.getSession();
+        if (!sessionState?.authenticated) {
+          clearAdminSession();
+          return;
+        }
+        const admin = sessionState?.viewer || null;
+        if (!active || !admin) return;
+        if (!hasCmsPermission(admin?.permissionKeys || [])) {
+          clearAdminSession();
+          return;
+        }
+        setAdminSession(null, admin);
+        navigate(next, { replace: true });
+      } catch {
+        // Stay on login page when no valid CMS admin session exists.
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      active = false;
+    };
+  }, [navigate, next]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -92,9 +120,8 @@ export function CMSLoginPage() {
         username: form.username,
         password: form.password,
       });
-      const token = response?.token || response?.access_token;
       const admin = response?.admin || response?.user || null;
-      if (!token || !admin) {
+      if (!admin) {
         throw new Error("Data login admin tidak lengkap");
       }
       if (!hasCmsPermission(admin?.permissionKeys || [])) {
@@ -102,7 +129,7 @@ export function CMSLoginPage() {
         (permissionError as Error & { status?: number }).status = 403;
         throw permissionError;
       }
-      setAdminSession(token, admin);
+      setAdminSession(null, admin);
       navigate(next, { replace: true });
     } catch (err) {
       const feedback = resolveCmsLoginFeedback(err);

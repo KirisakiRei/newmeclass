@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../..
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useToast } from '../../hooks/use-toast';
-import { yayasanAPI } from '../../services/api';
+import { setSessionPresence, yayasanAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 
 const YayasanRegister = () => {
@@ -34,13 +34,30 @@ const YayasanRegister = () => {
   );
 
   useEffect(() => {
-    if (localStorage.getItem('yayasan_token')) {
-      navigate('/yayasan/dashboard', { replace: true });
-      return;
-    }
-    if (mitraReferralCode) {
-      setFormData((prev) => ({ ...prev, referralCode: mitraReferralCode }));
-    }
+    let active = true;
+    const bootstrap = async () => {
+      try {
+        const response = await yayasanAPI.getSession();
+        if (!active) return;
+        const payload = response?.data || response;
+        if (!payload?.authenticated) {
+          if (active && mitraReferralCode) {
+            setFormData((prev) => ({ ...prev, referralCode: mitraReferralCode }));
+          }
+          return;
+        }
+        setSessionPresence('yayasan_token', true, payload?.viewer || null, payload?.session || null);
+        navigate('/yayasan/dashboard', { replace: true });
+      } catch {
+        if (active && mitraReferralCode) {
+          setFormData((prev) => ({ ...prev, referralCode: mitraReferralCode }));
+        }
+      }
+    };
+    void bootstrap();
+    return () => {
+      active = false;
+    };
   }, [mitraReferralCode, navigate]);
 
   useEffect(() => {
@@ -91,14 +108,13 @@ const YayasanRegister = () => {
         ...formData,
         referralCode: formData.referralCode || null,
       });
-      
-      if (response.data.success) {
-        localStorage.setItem('yayasan_token', response.data.token);
-        localStorage.setItem('yayasan_data', JSON.stringify(response.data.yayasan));
+      const payload = response?.data || response;
+      if (payload?.success) {
+        setSessionPresence('yayasan_token', true, payload?.yayasan || payload?.user || null, payload?.session || null);
         
         toast({
           title: 'Pendaftaran Berhasil!',
-          description: `Kode Referral Anda: ${response.data.yayasan.referralCode}`
+          description: `Kode Referral Anda: ${payload?.yayasan?.referralCode}`
         });
         
         navigate('/yayasan/dashboard');

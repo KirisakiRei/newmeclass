@@ -1,10 +1,10 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { ArrowRight, Calendar, CheckCircle2, ChevronDown, Eye, EyeOff, Loader2, Lock, Mail, MapPin, Phone, User } from "lucide-react";
 import { Button } from "../../app/components/ui/button";
 import { authAPI, landingAPI } from "../../services/api";
-import { setUserSession } from "../../lib/session";
+import { buildDashboardBridgeUrl, setUserSession } from "../../lib/session";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 
 type LocationOption = { id: string; name: string };
@@ -101,6 +101,7 @@ function SelectInput({
 const toSelectOptions = (items: LocationOption[]) => items.map((item) => ({ value: item.id, label: item.name }));
 
 export function RegisterPage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const referralCode = String(searchParams.get("ref") || "").trim();
   const [showPass, setShowPass] = useState(false);
@@ -135,6 +136,28 @@ export function RegisterPage() {
     password: "",
     confirm: "",
   });
+
+  useEffect(() => {
+    let active = true;
+    const bootstrap = async () => {
+      try {
+        const sessionState = await authAPI.getSession();
+        if (!sessionState?.authenticated) {
+          return;
+        }
+        if (!active) return;
+        setUserSession(null, sessionState?.viewer || null);
+        navigate("/dashboard", { replace: true });
+      } catch {
+        // Stay on register page when no valid session exists.
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      active = false;
+    };
+  }, [navigate]);
 
   const selectedProvince = useMemo(() => provinceOptions.find((item) => item.id === form.provinceId) || null, [form.provinceId, provinceOptions]);
   const selectedCity = useMemo(() => cityOptions.find((item) => item.id === form.cityId) || null, [cityOptions, form.cityId]);
@@ -251,10 +274,8 @@ export function RegisterPage() {
         referralOther: form.source === "lainnya" ? form.sourceOther : null,
         referralCode: referralCode || null,
       });
-      const token = response?.token || response?.access_token;
-      if (!token) throw new Error("Token registrasi tidak ditemukan");
-      setUserSession(token, response?.user || null);
-      window.location.href = "/";
+      setUserSession(null, response?.user || null);
+      window.location.href = buildDashboardBridgeUrl("", "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal membuat akun");
     } finally {

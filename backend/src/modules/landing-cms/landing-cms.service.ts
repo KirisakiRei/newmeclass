@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   createEmptyLandingAggregate,
@@ -47,8 +47,33 @@ const normalizeObject = <T extends Record<string, any>>(shape: T, value: unknown
 @Injectable()
 export class LandingCmsService {
   private migratePromise: Promise<void> | null = null;
+  private readonly logger = new Logger(LandingCmsService.name);
+  private readonly locationCacheTtlMs = 1000 * 60 * 60 * 24;
+  private readonly locationRequestTimeoutMs = 10000;
+  private readonly locationCache = new Map<string, { data: Array<{ id: string; name: string }>; fetchedAt: number }>();
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private getLocationCacheKey(kind: 'provinces' | 'cities' | 'districts' | 'villages', parentId?: string) {
+    return `${kind}:${String(parentId || '').trim()}`;
+  }
+
+  private readLocationCache(kind: 'provinces' | 'cities' | 'districts' | 'villages', parentId?: string, allowStale = false) {
+    const cacheEntry = this.locationCache.get(this.getLocationCacheKey(kind, parentId));
+    if (!cacheEntry) return null;
+    const isFresh = (Date.now() - cacheEntry.fetchedAt) < this.locationCacheTtlMs;
+    if (!allowStale && !isFresh) {
+      return null;
+    }
+    return cacheEntry.data;
+  }
+
+  private writeLocationCache(kind: 'provinces' | 'cities' | 'districts' | 'villages', parentId: string | undefined, data: Array<{ id: string; name: string }>) {
+    this.locationCache.set(this.getLocationCacheKey(kind, parentId), {
+      data,
+      fetchedAt: Date.now(),
+    });
+  }
 
   private async readSettingValue(key: string) {
     const row = await this.prisma.setting.findUnique({ where: { key } });
@@ -568,6 +593,11 @@ export class LandingCmsService {
       throw new BadRequestException('Parameter parent id wajib diisi');
     }
 
+    const freshCache = this.readLocationCache(kind, normalizedParentId);
+    if (freshCache) {
+      return freshCache;
+    }
+
     const urlMap = {
       provinces: 'https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json',
       cities: `https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${normalizedParentId}.json`,
@@ -575,12 +605,35 @@ export class LandingCmsService {
       villages: `https://www.emsifa.com/api-wilayah-indonesia/api/villages/${normalizedParentId}.json`,
     } as const;
 
-    const response = await fetch(urlMap[kind]);
-    if (!response.ok) {
-      throw new BadRequestException(`Gagal mengambil data lokasi ${kind}`);
-    }
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.locationRequestTimeoutMs);
+      let response: Response;
+      try {
+        response = await fetch(urlMap[kind], {
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
-    const data = await response.json();
-    return Array.isArray(data) ? data : [];
+      if (!response.ok) {
+        throw new Error(`Upstream lokasi ${kind} merespons ${response.status}`);
+      }
+
+      const data = await response.json();
+      const rows = Array.isArray(data) ? data : [];
+      this.writeLocationCache(kind, normalizedParentId, rows);
+      return rows;
+    } catch (error) {
+      const staleCache = this.readLocationCache(kind, normalizedParentId, true);
+      if (staleCache) {
+        this.logger.warn(`Menggunakan cache stale untuk lokasi ${kind} (${normalizedParentId || 'root'}) karena upstream gagal.`);
+        return staleCache;
+      }
+
+      this.logger.error(`Gagal mengambil data lokasi ${kind} (${normalizedParentId || 'root'}): ${error instanceof Error ? error.message : String(error)}`);
+      throw new ServiceUnavailableException(`Data lokasi ${kind} sedang tidak tersedia`);
+    }
   }
 }

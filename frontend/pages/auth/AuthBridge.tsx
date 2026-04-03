@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { authAPI, clearAuthStorage } from '../../services/api';
+import { authAPI, clearAuthStorage, setSessionPresence } from '../../services/api';
 import { buildPublicWebUrl } from '../../lib/app-urls';
 
 const bridgeExchangeByTicket = new Map();
@@ -43,16 +43,9 @@ const AuthBridge = () => {
       try {
         const payload = await getBridgeExchangePayload(ticket);
         if (!active) return;
-        const accessToken = payload?.token || payload?.access_token;
         const user = payload?.user || null;
         const resolvedTarget = String(payload?.target || target || '/dashboard').trim() || '/dashboard';
-        if (!accessToken) {
-          throw new Error('Bridge token tidak ditemukan');
-        }
-        localStorage.setItem('user_token', accessToken);
-        if (user) {
-          localStorage.setItem('user_data', JSON.stringify(user));
-        }
+        setSessionPresence('user_token', true, user, payload?.session || null);
         navigate(resolvedTarget.startsWith('/') ? resolvedTarget : `/${resolvedTarget}`, { replace: true });
       } catch (err) {
         clearAuthStorage('user_token');

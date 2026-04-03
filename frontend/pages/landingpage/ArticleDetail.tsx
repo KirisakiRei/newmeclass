@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import axios from 'axios';
 import { formatDate } from '../../lib/utils';
+import { sanitizeHtml } from '../../lib/safe-html';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -15,6 +16,7 @@ const ArticleDetail = () => {
   const [article, setArticle] = useState(null);
   const [relatedArticles, setRelatedArticles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const safeArticleContent = sanitizeHtml(article?.content || '');
 
   useEffect(() => {
     loadArticle();
@@ -180,7 +182,7 @@ const ArticleDetail = () => {
           <CardContent className="p-8">
             <div 
               className="prose prose-invert prose-yellow max-w-none"
-              dangerouslySetInnerHTML={{ __html: article.content }}
+              dangerouslySetInnerHTML={{ __html: safeArticleContent }}
               style={{
                 color: '#e5e5e5',
                 fontSize: '1.1rem',

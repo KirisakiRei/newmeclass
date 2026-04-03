@@ -17,6 +17,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
+import { AuthService } from '../auth/auth.service';
 import { DisbursementsService } from '../disbursements/disbursements.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApproveYayasanDto } from './dto/approve-yayasan.dto';
@@ -46,6 +47,7 @@ export class MitraController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly disbursementsService: DisbursementsService,
+    private readonly authService: AuthService,
   ) {}
 
   private hash(value: string) {
@@ -1183,9 +1185,7 @@ export class MitraController {
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('mitra.manage')
   async resetPassword(@Param('id') id: string) {
-    const nextPassword = `Reset-${randomBytes(4).toString('hex')}`;
-    await this.prisma.user.update({ where: { id }, data: { passwordHash: this.hash(nextPassword) } });
-    return { message: 'Password reset success. Temporary password generated and stored securely.' };
+    return this.authService.requestPasswordResetByUserId(id, Role.MITRA);
   }
 
   @Get('admin/withdrawals')

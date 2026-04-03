@@ -20,6 +20,7 @@ import TestimonialSlider from '../../components/TestimonialSlider';
 import BenefitsSection from '../../components/BenefitsSection';
 import ActivitiesSection from '../../components/ActivitiesSection';
 import VisiMisiSection from '../../components/VisiMisiSection';
+import { authAPI } from '../../services/api';
 import axios from 'axios';
 import { DEFAULT_SITE_SETTINGS, normalizeSiteSettings } from '../../lib/site-settings';
 import { mergeWithDefaultSections } from '../../lib/website-sections';
@@ -36,8 +37,7 @@ const Home = () => {
   const [pageSections, setPageSections] = useState([]);
 
   useEffect(() => {
-    // Synchronous check — no network needed
-    checkLoginStatus();
+    void checkLoginStatus();
     // Parallel fetch — all 4 API calls fire at once instead of sequentially
     Promise.allSettled([
       loadBanners(),
@@ -111,12 +111,21 @@ const Home = () => {
     }
   };
 
-  const checkLoginStatus = () => {
-    const token = localStorage.getItem('user_token');
-    const user = localStorage.getItem('user_data');
-    if (token && user) {
+  const checkLoginStatus = async () => {
+    try {
+      const response = await authAPI.getSession();
+      const profile = response?.data?.viewer || response?.viewer || null;
+      const authenticated = Boolean(response?.data?.authenticated ?? response?.authenticated);
+      if (!authenticated) {
+        setIsLoggedIn(false);
+        setUserData(null);
+        return;
+      }
       setIsLoggedIn(true);
-      setUserData(JSON.parse(user));
+      setUserData(profile);
+    } catch {
+      setIsLoggedIn(false);
+      setUserData(null);
     }
   };
 

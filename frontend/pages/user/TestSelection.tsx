@@ -5,14 +5,14 @@ import { Brain, Lock, CheckCircle, AlertTriangle, Crown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { useToast } from '../../hooks/use-toast';
-import { testAccessAPI } from '../../services/api';
+import { authAPI, testAccessAPI } from '../../services/api';
 
 const TestSelection = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [testAccess, setTestAccess] = useState(null);
   const [loading, setLoading] = useState(true);
-  const isLoggedIn = localStorage.getItem('user_token');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const testCategories = [
     {
@@ -46,12 +46,33 @@ const TestSelection = () => {
   ];
 
   useEffect(() => {
-    if (isLoggedIn) {
-      checkTestAccess();
-    } else {
-      setLoading(false);
-    }
-  }, [isLoggedIn]);
+    let active = true;
+    const bootstrap = async () => {
+      try {
+        const response = await authAPI.getSession();
+        const payload = response?.data || response;
+        if (!payload?.authenticated) {
+          if (active) {
+            setIsLoggedIn(false);
+            setLoading(false);
+          }
+          return;
+        }
+        if (!active) return;
+        setIsLoggedIn(true);
+        await checkTestAccess();
+      } catch {
+        if (active) {
+          setIsLoggedIn(false);
+          setLoading(false);
+        }
+      }
+    };
+    void bootstrap();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const checkTestAccess = async () => {
     try {
@@ -257,5 +278,3 @@ const TestSelection = () => {
 };
 
 export default TestSelection;
-
-

@@ -1,4 +1,4 @@
-import { request } from './client';
+import { API_URL, request } from './client';
 
 export const authAPI = {
   register: (data: Record<string, unknown>) =>
@@ -11,10 +11,14 @@ export const authAPI = {
       method: 'POST',
       body: data,
     }),
+  getSession: () => request('/auth/session', { tokenKey: 'user_token' }),
+  refresh: () =>
+    request('/auth/refresh', {
+      method: 'POST',
+    }),
   logout: () =>
     request('/auth/logout', {
       method: 'POST',
-      tokenKey: 'user_token',
     }),
   forgotPassword: (email: string) =>
     request('/auth/forgot-password', {
@@ -26,13 +30,19 @@ export const authAPI = {
       method: 'POST',
       body: { token, password },
     }),
-  createBridgeTicket: (target = '/dashboard') =>
-    request('/auth/bridge-ticket', {
-      method: 'POST',
-      body: { target },
-      tokenKey: 'user_token',
-    }),
   getProfile: () => request('/auth/me', { tokenKey: 'user_token' }),
+  completeGoogleProfile: (data: Record<string, unknown>) =>
+    request('/auth/google/complete-profile', {
+      method: 'POST',
+      body: data,
+    }),
+  buildGoogleStartUrl: (options: { intent?: 'login' | 'register'; target?: string; ref?: string } = {}) => {
+    const url = new URL(`${API_URL}/auth/google/start`);
+    if (options.intent) url.searchParams.set('intent', options.intent);
+    if (options.target) url.searchParams.set('target', options.target);
+    if (options.ref) url.searchParams.set('ref', options.ref);
+    return url.toString();
+  },
 };
 
 export const adminAuthAPI = {
@@ -41,5 +51,14 @@ export const adminAuthAPI = {
       method: 'POST',
       body: data,
     }),
+  refresh: () =>
+    request('/admin/refresh', {
+      method: 'POST',
+    }),
+  logout: () =>
+    request('/admin/logout', {
+      method: 'POST',
+    }),
+  getSession: () => request('/admin/session', { tokenKey: 'admin_token' }),
   getProfile: () => request('/admin/me', { tokenKey: 'admin_token' }),
 };

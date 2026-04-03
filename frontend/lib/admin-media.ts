@@ -3,6 +3,12 @@ import axios from 'axios';
 
 const BACKEND_URL = String(process.env.REACT_APP_BACKEND_URL || '').trim().replace(/\/+$/, '');
 
+const getCsrfToken = () => {
+  if (typeof document === 'undefined') return '';
+  const match = document.cookie.match(/(?:^|;\s*)nm_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+};
+
 export const MEDIA_CATEGORIES = [
   { value: '', label: 'Semua' },
   { value: 'hero-slides', label: 'Hero Slides' },
@@ -74,11 +80,11 @@ export const uploadAdminImage = async (
   if (folder) formData.append('folder', folder);
   if (prefix) formData.append('prefix', prefix);
 
-  const token = localStorage.getItem('admin_token');
   const response = await axios.post(`${BACKEND_URL}/api/upload/image`, formData, {
+    withCredentials: true,
     headers: {
       'Content-Type': 'multipart/form-data',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(getCsrfToken() ? { 'X-CSRF-Token': getCsrfToken() } : {}),
     },
   });
 

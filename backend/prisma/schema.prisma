@@ -121,14 +121,29 @@ enum AccessType {
   PREMIUM
 }
 
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum AuthAudience {
+  USER
+  ADMIN
+  YAYASAN
+  MITRA
+}
+
 model User {
   id               String           @id @default(cuid())
   email            String           @unique
   username         String?          @unique
   phone            String?          @unique
-  passwordHash     String
+  passwordHash     String?
   fullName         String
   role             Role             @default(USER)
+  primaryAuthProvider AuthProvider  @default(LOCAL)
+  avatarUrl        String?
+  onboardingCompletedAt DateTime?
   adminRoleId      String?
   adminRole        AdminRole?       @relation(fields: [adminRoleId], references: [id])
   status           AccountStatus    @default(ACTIVE)
@@ -142,6 +157,7 @@ model User {
   updatedAt        DateTime         @updatedAt
   profile          UserProfile?
   sessions         AuthSession[]
+  authIdentities   AuthIdentity[]
   bridgeTickets    AuthBridgeTicket[]
   resetTokens      PasswordResetToken[]
   wallet           Wallet?
@@ -162,6 +178,7 @@ model User {
   @@index([role, status, createdAt])
   @@index([adminRoleId])
   @@index([username, role])
+  @@index([primaryAuthProvider, role])
 }
 
 model AdminRole {
@@ -302,14 +319,37 @@ model AuthSession {
   id              String    @id @default(cuid())
   userId           String
   user             User      @relation(fields: [userId], references: [id])
+  audience        AuthAudience
   refreshTokenHash String
   ipAddress        String?
   userAgent        String?
+  lastActivityAt   DateTime  @default(now())
+  absoluteExpiresAt DateTime
   expiresAt        DateTime
   revokedAt        DateTime?
   createdAt        DateTime  @default(now())
 
-  @@index([userId, expiresAt])
+  @@index([userId, audience, expiresAt])
+  @@index([audience, expiresAt])
+}
+
+model AuthIdentity {
+  id                  String       @id @default(cuid())
+  userId              String
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider            AuthProvider
+  providerUserId      String
+  providerEmail       String?
+  providerEmailVerified Boolean    @default(false)
+  avatarUrl           String?
+  rawProfile          Json?
+  lastLoginAt         DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@unique([provider, providerUserId])
+  @@index([userId, provider])
+  @@index([providerEmail, provider])
 }
 
 model AuthBridgeTicket {

@@ -28,7 +28,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { useToast } from '../../hooks/use-toast';
-import { authAPI, mitraAPI } from '../../services/api';
+import { authAPI, clearAuthStorage, mitraAPI, setSessionPresence } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import { formatCurrency } from '../../lib/utils';
@@ -80,6 +80,7 @@ export default function MitraDashboard() {
   const [requestTarget, setRequestTarget] = useState(null);
   const [requestForm, setRequestForm] = useState({ requestedYayasanShare: 50000, reason: '' });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [profileForm, setProfileForm] = useState({ fullName: '', email: '', phone: '', address: '' });
 
   useEffect(() => { checkAuth(); }, []);
@@ -91,21 +92,19 @@ export default function MitraDashboard() {
 
   const checkAuth = async () => {
     try {
-      if (!localStorage.getItem('mitra_token')) {
-        navigate('/mitra/login');
-        return;
-      }
       const res = await mitraAPI.getProfile();
-      setMitra(res.data);
+      const profile = res?.data || res;
+      setSessionPresence('mitra_token', true, profile, res?.data?.session || res?.session || null);
+      setMitra(profile);
       setProfileForm({
-        fullName: res.data.fullName || res.data.name || '',
-        email: res.data.email || '',
-        phone: res.data.phone || '',
-        address: res.data.address || '',
+        fullName: profile.fullName || profile.name || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        address: profile.address || '',
       });
       await loadAll();
     } catch {
-      localStorage.removeItem('mitra_token');
+      clearAuthStorage('mitra_token');
       navigate('/mitra/login');
     } finally {
       setLoading(false);
@@ -138,10 +137,18 @@ export default function MitraDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('mitra_token');
-    localStorage.removeItem('mitra_data');
-    navigate('/mitra/login');
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await mitraAPI.logout();
+    } catch {
+      // Continue clearing local state even if the backend session is already gone.
+    } finally {
+      clearAuthStorage('mitra_token');
+      navigate('/mitra/login', { replace: true });
+      setLoggingOut(false);
+    }
   };
 
   const handleCopyInvite = async () => {
@@ -226,13 +233,15 @@ export default function MitraDashboard() {
   const handleProfileSave = async () => {
     setSavingProfile(true);
     try {
-      const response = await authAPI.updateProfile({
+      const response = await mitraAPI.updateProfile({
         fullName: profileForm.fullName,
         email: profileForm.email,
         phone: profileForm.phone,
         address: profileForm.address,
       });
-      setMitra(response.data);
+      const profile = response?.data || response;
+      setSessionPresence('mitra_token', true, profile, null);
+      setMitra(profile);
       toast({ title: 'Berhasil', description: 'Profil mitra berhasil diperbarui' });
     } catch (error) {
       toast({ title: 'Error', description: getApiErrorMessage(error, 'Gagal menyimpan profil'), variant: 'destructive' });
@@ -273,8 +282,8 @@ export default function MitraDashboard() {
               <p className="text-gray-400 text-xs">{mitra.email}</p>
             </div>
           </div>
-          <Button onClick={handleLogout} variant="outline" className="border-yellow-400 text-yellow-400 hover:bg-yellow-400/10">
-            <LogOut className="w-4 h-4 mr-2" /> Logout
+          <Button onClick={() => void handleLogout()} disabled={loggingOut} variant="outline" className="border-yellow-400 text-yellow-400 hover:bg-yellow-400/10">
+            <LogOut className="w-4 h-4 mr-2" /> {loggingOut ? 'Logout...' : 'Logout'}
           </Button>
         </div>
       </header>

@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Param, Put, Query, UseGuards } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { AuthAudience, Role } from '@prisma/client';
+import { AuthAudienceAccess } from 'src/common/auth/auth-audience.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -87,6 +88,7 @@ export class LandingCmsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('cms_access.manage')
   @Get('cms/summary')
@@ -95,6 +97,7 @@ export class LandingCmsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('cms_access.manage')
   @Get('cms/state')
@@ -103,6 +106,7 @@ export class LandingCmsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('cms_access.manage')
   @Get('cms/:domainKey')
@@ -114,6 +118,7 @@ export class LandingCmsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('cms_access.manage')
   @Put('cms/:domainKey')

@@ -1,46 +1,102 @@
 const DASHBOARD_URL = String(import.meta.env.VITE_DASHBOARD_URL || '')
   .trim()
   .replace(/\/+$/, '');
-const USER_TOKEN_KEY = 'user_token';
 const USER_SESSION_EVENT = 'newme-user-session-changed';
+const ADMIN_SESSION_EVENT = 'newme-admin-session-changed';
+const AUTH_CHANNEL_NAME = 'newme-auth-channel';
+const LEGACY_LOCAL_STORAGE_KEYS = ['user_data', 'admin_data'];
+
+let authChannel: BroadcastChannel | null = null;
+let userSessionCache: unknown = null;
+let adminSessionCache: unknown = null;
+let userSessionActive = false;
+let adminSessionActive = false;
+
+const getChannel = () => {
+  if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null;
+  if (!authChannel) {
+    authChannel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+    authChannel.onmessage = (event) => {
+      const payload = event?.data || {};
+      if (payload?.eventName === USER_SESSION_EVENT && payload?.action === 'cleared') {
+        userSessionCache = null;
+        userSessionActive = false;
+      }
+      if (payload?.eventName === USER_SESSION_EVENT && payload?.action === 'updated') {
+        userSessionActive = true;
+      }
+      if (payload?.eventName === ADMIN_SESSION_EVENT && payload?.action === 'cleared') {
+        adminSessionCache = null;
+        adminSessionActive = false;
+      }
+      if (payload?.eventName === ADMIN_SESSION_EVENT && payload?.action === 'updated') {
+        adminSessionActive = true;
+      }
+      window.dispatchEvent(new CustomEvent(payload?.eventName || AUTH_CHANNEL_NAME, { detail: payload }));
+    };
+  }
+  return authChannel;
+};
+
+const emitEvent = (eventName: string, payload: Record<string, unknown>) => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(eventName, { detail: payload }));
+  }
+  getChannel()?.postMessage({ eventName, ...payload });
+};
+
+const purgeLegacyLocalStorage = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    LEGACY_LOCAL_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+    sessionStorage.removeItem('newme_user_session');
+    sessionStorage.removeItem('newme_admin_session');
+  } catch {}
+};
+purgeLegacyLocalStorage();
+getChannel();
 
 export const getDashboardBaseUrl = () => DASHBOARD_URL || 'http://localhost:5173';
-export const hasUserSession = () => typeof window !== 'undefined' && Boolean(localStorage.getItem(USER_TOKEN_KEY));
-export const emitUserSessionChanged = () => {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new Event(USER_SESSION_EVENT));
-};
+export const hasUserSession = () => Boolean(userSessionActive);
+export const hasAdminSession = () => Boolean(adminSessionActive);
 export const getUserSessionEventName = () => USER_SESSION_EVENT;
+export const getAdminSessionEventName = () => ADMIN_SESSION_EVENT;
+export const getUserSession = <T = unknown,>() => userSessionCache as T | null;
+export const getAdminSession = <T = unknown,>() => adminSessionCache as T | null;
 
-export const setUserSession = (token: string, user?: unknown) => {
-  localStorage.setItem(USER_TOKEN_KEY, token);
+export const setUserSession = (_token?: string | null, user?: unknown) => {
+  purgeLegacyLocalStorage();
+  userSessionActive = true;
   if (user) {
-    localStorage.setItem('user_data', JSON.stringify(user));
+    userSessionCache = user;
   }
-  emitUserSessionChanged();
+  emitEvent(USER_SESSION_EVENT, { type: 'user', action: 'updated' });
 };
 
 export const clearUserSession = () => {
-  localStorage.removeItem(USER_TOKEN_KEY);
-  localStorage.removeItem('user_data');
-  emitUserSessionChanged();
+  if (!userSessionActive && !userSessionCache) return;
+  userSessionCache = null;
+  userSessionActive = false;
+  emitEvent(USER_SESSION_EVENT, { type: 'user', action: 'cleared' });
 };
 
-export const setAdminSession = (token: string, admin?: unknown) => {
-  localStorage.setItem('admin_token', token);
+export const setAdminSession = (_token?: string | null, admin?: unknown) => {
+  purgeLegacyLocalStorage();
+  adminSessionActive = true;
   if (admin) {
-    localStorage.setItem('admin_data', JSON.stringify(admin));
+    adminSessionCache = admin;
   }
+  emitEvent(ADMIN_SESSION_EVENT, { type: 'admin', action: 'updated' });
 };
 
 export const clearAdminSession = () => {
-  localStorage.removeItem('admin_token');
-  localStorage.removeItem('admin_data');
+  if (!adminSessionActive && !adminSessionCache) return;
+  adminSessionCache = null;
+  adminSessionActive = false;
+  emitEvent(ADMIN_SESSION_EVENT, { type: 'admin', action: 'cleared' });
 };
 
-export const buildDashboardBridgeUrl = (ticket: string, targetPath = '/dashboard') => {
-  const url = new URL('/auth/bridge', `${getDashboardBaseUrl()}/`);
-  url.searchParams.set('ticket', ticket);
-  url.searchParams.set('target', targetPath);
+export const buildDashboardBridgeUrl = (_ticket = '', targetPath = '/dashboard') => {
+  const url = new URL(targetPath.startsWith('/') ? targetPath : `/${targetPath}`, `${getDashboardBaseUrl()}/`);
   return url.toString();
 };

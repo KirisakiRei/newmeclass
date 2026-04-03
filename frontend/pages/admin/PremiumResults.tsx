@@ -16,6 +16,18 @@ import Pagination from '../../components/ui/pagination';
 import { createEmptyPageState, extractPaginatedResponse } from '../../lib/paginated-response';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const getCsrfToken = () => {
+  if (typeof document === 'undefined') return '';
+  const match = document.cookie.match(/(?:^|;\s*)nm_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+};
+const buildRequestConfig = (params = undefined) => ({
+  withCredentials: true,
+  params,
+  headers: {
+    ...(getCsrfToken() ? { 'X-CSRF-Token': getCsrfToken() } : {}),
+  },
+});
 const asArray = (value) => (Array.isArray(value) ? value : []);
 const asObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
 const extractPayload = (value) => (value && typeof value === 'object' && 'data' in value ? value.data : value);
@@ -44,15 +56,14 @@ const PremiumResults = () => {
 
   const loadResults = async () => {
     try {
-      const token = localStorage.getItem('admin_token');
-      const response = await axios.get(`${API_URL}/api/test-results/admin/premium-results`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: {
+      const response = await axios.get(
+        `${API_URL}/api/test-results/admin/premium-results`,
+        buildRequestConfig({
           page,
           pageSize,
           search: searchTerm || undefined,
-        },
-      });
+        }),
+      );
       const nextPage = extractPaginatedResponse(response.data, pageSize);
       setResults(nextPage.items || []);
       setPagination(nextPage);
@@ -69,10 +80,7 @@ const PremiumResults = () => {
 
   const loadStats = async () => {
     try {
-      const token = localStorage.getItem('admin_token');
-      const response = await axios.get(`${API_URL}/api/test-results/admin/stats`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`${API_URL}/api/test-results/admin/stats`, buildRequestConfig());
       setStats(extractPayload(response.data));
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -82,10 +90,10 @@ const PremiumResults = () => {
   const handleViewDetail = async (result) => {
     setDetailLoading(true);
     try {
-      const token = localStorage.getItem('admin_token');
-      const response = await axios.get(`${API_URL}/api/test-results/admin/premium-results/${result.userId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(
+        `${API_URL}/api/test-results/admin/premium-results/${result.userId}`,
+        buildRequestConfig(),
+      );
       setSelectedResult(extractPayload(response.data));
       setShowDetailDialog(true);
     } catch (error) {

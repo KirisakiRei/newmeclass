@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MessageCircle, Facebook, Instagram, Download, Lock } from 'lucide-react';
 import ResultCertificate from '../../components/certificates/ResultCertificate';
 import { authAPI, testResultsAPI } from '../../services/api';
@@ -89,6 +89,7 @@ function ElementBar({ name, percentage, showPercentage = true }) {
 // ── Main Component ───────────────────────────────────────────
 export default function TestResult() {
   const { resultId, id: idParam } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = resultId || idParam;
   const isEmbedded = searchParams.get('embed') === '1';
@@ -216,10 +217,7 @@ export default function TestResult() {
                     alert('Sertifikat belum tersedia untuk hasil ini.');
                     return;
                   }
-                  const opened = window.open(`/certificate-download/${targetUserId}?download=1`, '_blank', 'noopener,noreferrer');
-                  if (!opened) {
-                    alert('Izinkan pop-up browser untuk mengunduh sertifikat.');
-                  }
+                  navigate(`/certificate-download/${targetUserId}?download=1&viewer=user`);
                 }}
                 className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition flex items-center gap-2"
                 data-testid="btn-print"
@@ -278,16 +276,35 @@ export default function TestResult() {
 
       {/* ═══════ SERTIFIKAT ═══════ */}
       <div ref={printRef} className="max-w-6xl mx-auto">
-        <ResultCertificate
-          result={result}
-          resultId={result.resultId || result.id}
-          certificateNumber={result.resultId || result.id}
-          identityLabel="Member ID"
-          identityValue={result.memberCode || result.publicId || result.userId}
-          issuedAt={result.completedAt || result.createdAt}
-          certType={result.userRole === 'YAYASAN' || result?.certType === 'yayasan' ? 'yayasan' : 'individu'}
-          lockPremiumSections={result.testType === 'free'}
-        />
+        {result.testType === 'paid' && result.userId ? (
+          <div className="overflow-hidden rounded-xl border border-yellow-400/20 bg-white shadow-xl">
+            <iframe
+              title="Preview Sertifikat"
+              src={`/certificate-download/${result.userId}?embed=1&viewer=user`}
+              className="block w-full border-0"
+              style={{ aspectRatio: '297 / 210' }}
+            />
+          </div>
+        ) : (
+          <ResultCertificate
+            result={result}
+            resultId={result.resultId || result.id}
+            certificateNumber={result.resultId || result.id}
+            identityLabel="Member ID"
+            identityValue={result.memberCode || result.publicId || result.userId}
+            issuedAt={result.completedAt || result.createdAt}
+            certType={
+              result?.template?.certType === 'yayasan'
+              || result?.certType === 'yayasan'
+              || result?.isYayasanLinked === true
+              || Boolean(result?.yayasanId || result?.yayasanName || result?.yayasanReferralCode)
+              || String(result?.userRole || result?.user?.role || '').trim().toUpperCase() === 'YAYASAN'
+                ? 'yayasan'
+                : 'individu'
+            }
+            lockPremiumSections
+          />
+        )}
       </div>
 
       <div className="max-w-4xl mx-auto mt-6 bg-white shadow-2xl rounded-xl overflow-hidden border-2 border-yellow-400">

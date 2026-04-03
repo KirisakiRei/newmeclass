@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
-import { adminAPI } from '../../services/api';
+import { adminAPI, setSessionPresence } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 
 const AdminLogin = () => {
@@ -20,9 +20,25 @@ const AdminLogin = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (localStorage.getItem('admin_token')) {
-      navigate('/admin/dashboard', { replace: true });
-    }
+    let active = true;
+    const bootstrap = async () => {
+      try {
+        const response = await adminAPI.getSession();
+        if (!active) return;
+        const payload = response?.data || response;
+        if (!payload?.authenticated) {
+          return;
+        }
+        setSessionPresence('admin_token', true, payload?.viewer || null, payload?.session || null);
+        navigate('/admin/dashboard', { replace: true });
+      } catch {
+        // Ignore invalid or missing admin session on login screen.
+      }
+    };
+    void bootstrap();
+    return () => {
+      active = false;
+    };
   }, [navigate]);
 
   const handleInputChange = (e) => {
@@ -38,14 +54,13 @@ const AdminLogin = () => {
 
     try {
       const response = await adminAPI.login(formData);
-      
-      // Store token and user info
-      localStorage.setItem('admin_token', response.data.access_token);
-      localStorage.setItem('admin_user', JSON.stringify(response.data.user));
+      const payload = response?.data || response;
+      const adminUser = payload?.user || payload?.admin || null;
+      setSessionPresence('admin_token', true, adminUser, payload?.session || null);
 
       toast({
         title: 'Login Berhasil!',
-        description: `Selamat datang, ${response.data.user.username}`,
+        description: `Selamat datang, ${adminUser?.username || adminUser?.fullName || 'Admin'}`,
       });
 
       // Navigate to dashboard

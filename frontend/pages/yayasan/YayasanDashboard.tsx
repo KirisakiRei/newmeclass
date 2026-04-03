@@ -9,7 +9,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { useToast } from '../../hooks/use-toast';
-import { authAPI, yayasanAPI } from '../../services/api';
+import { authAPI, clearAuthStorage, setSessionPresence, yayasanAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import { formatCurrency } from '../../lib/utils';
@@ -51,6 +51,7 @@ export default function YayasanDashboard() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [downloadingUserId, setDownloadingUserId] = useState('');
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', bankName: '', bankAccount: '', accountName: '' });
   const [withdrawing, setWithdrawing] = useState(false);
@@ -79,11 +80,9 @@ export default function YayasanDashboard() {
 
   const bootstrap = async () => {
     try {
-      if (!localStorage.getItem('yayasan_token')) {
-        navigate('/yayasan/login', { replace: true });
-        return;
-      }
-      const profile = (await yayasanAPI.getProfile()).data;
+      const profileResponse = await yayasanAPI.getProfile();
+      const profile = profileResponse?.data || profileResponse;
+      setSessionPresence('yayasan_token', true, profile, profileResponse?.data?.session || profileResponse?.session || null);
       setYayasan(profile);
       setProfileForm({
         name: profile.name || '',
@@ -95,7 +94,7 @@ export default function YayasanDashboard() {
       });
       await loadDashboardData(profile);
     } catch {
-      localStorage.removeItem('yayasan_token');
+      clearAuthStorage('yayasan_token');
       navigate('/yayasan/login', { replace: true });
     } finally {
       setLoading(false);
@@ -130,10 +129,18 @@ export default function YayasanDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('yayasan_token');
-    localStorage.removeItem('yayasan_data');
-    navigate('/yayasan/login');
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await yayasanAPI.logout();
+    } catch {
+      // Even if the backend session has already expired, we still clear local state.
+    } finally {
+      clearAuthStorage('yayasan_token');
+      navigate('/yayasan/login', { replace: true });
+      setLoggingOut(false);
+    }
   };
 
   const handleCopyReferral = async () => {
@@ -163,12 +170,9 @@ export default function YayasanDashboard() {
   const handleDownloadCertificate = async (userId) => {
     setDownloadingUserId(userId);
     try {
-      const opened = window.open(`/certificate-download/${userId}?download=1`, '_blank', 'noopener,noreferrer');
-      if (!opened) {
-        throw new Error('Popup blocked');
-      }
+      navigate(`/certificate-download/${userId}?download=1&viewer=yayasan`);
     } catch (error) {
-      toast({ title: 'Gagal membuka sertifikat', description: getApiErrorMessage(error, 'Izinkan pop-up browser untuk menyimpan sertifikat sebagai PDF.'), variant: 'destructive' });
+      toast({ title: 'Gagal membuka sertifikat', description: getApiErrorMessage(error, 'Halaman sertifikat belum bisa dibuka saat ini.'), variant: 'destructive' });
     } finally {
       setDownloadingUserId('');
     }
@@ -178,7 +182,7 @@ export default function YayasanDashboard() {
     event.preventDefault();
     setSavingProfile(true);
     try {
-      const response = await authAPI.updateProfile({
+      const response = await yayasanAPI.updateProfile({
         fullName: profileForm.name,
         email: profileForm.email,
         phone: profileForm.phone,
@@ -188,14 +192,16 @@ export default function YayasanDashboard() {
         description: profileForm.description,
         yayasanLogoUrl: profileForm.yayasanLogoUrl,
       });
-      setYayasan(response.data);
+      const profile = response?.data || response;
+      setSessionPresence('yayasan_token', true, profile, null);
+      setYayasan(profile);
       setProfileForm({
-        name: response.data.name || '',
-        email: response.data.email || '',
-        phone: response.data.phone || '',
-        address: response.data.address || '',
-        description: response.data.description || '',
-        yayasanLogoUrl: response.data.yayasanLogoUrl || '',
+        name: profile.name || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        address: profile.address || '',
+        description: profile.description || '',
+        yayasanLogoUrl: profile.yayasanLogoUrl || '',
       });
       toast({ title: 'Profil diperbarui', description: 'Informasi yayasan berhasil disimpan.' });
     } catch (error) {
@@ -266,7 +272,7 @@ export default function YayasanDashboard() {
               </div>
             </div>
           </div>
-          <Button onClick={handleLogout} variant="outline" className="border-red-400/50 text-red-400 hover:bg-red-400/10"><LogOut className="mr-2 h-4 w-4" />Logout</Button>
+          <Button onClick={() => void handleLogout()} disabled={loggingOut} variant="outline" className="border-red-400/50 text-red-400 hover:bg-red-400/10"><LogOut className="mr-2 h-4 w-4" />{loggingOut ? 'Logout...' : 'Logout'}</Button>
         </div>
         <ResponsiveTabs tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
         {activeTab === 'dashboard' && (

@@ -1,7 +1,8 @@
 // @ts-nocheck
 import React, { createContext, useContext, useMemo } from 'react';
 
-const ADMIN_STORAGE_KEY = 'admin_user';
+const ADMIN_STORAGE_KEY = 'admin_data';
+let adminUserCache = null;
 
 const PAGE_ACTIONS = {
   dashboard: ['view'],
@@ -140,27 +141,19 @@ export const normalizeAdminRole = (role) => {
 };
 
 export const getStoredAdminUser = () => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(ADMIN_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return adminUserCache;
 };
 
 export const setStoredAdminUser = (adminUser) => {
-  if (typeof window === 'undefined') return;
   if (!adminUser) {
-    localStorage.removeItem(ADMIN_STORAGE_KEY);
+    adminUserCache = null;
     return;
   }
-  localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(adminUser));
+  adminUserCache = adminUser;
 };
 
 export const clearStoredAdminUser = () => {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(ADMIN_STORAGE_KEY);
+  adminUserCache = null;
 };
 
 export const getViewPermissionKey = (permissionKey) => {

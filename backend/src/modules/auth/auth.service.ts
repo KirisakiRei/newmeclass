@@ -1,37 +1,49 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { AccountStatus, DisbursementStatus, MitraInviteStatus, PaymentOpsAlertStatus, PaymentStatus, Role, YayasanApprovalStatus } from '@prisma/client';
+import { AccountStatus, AuthAudience, AuthProvider, DisbursementStatus, MitraInviteStatus, PaymentOpsAlertStatus, PaymentStatus, Role, YayasanApprovalStatus } from '@prisma/client';
+import axios from 'axios';
 import { createHash, randomBytes, randomInt } from 'crypto';
-import { buildDashboardFrontendUrl, getPublicFrontendBaseUrl } from 'src/common/frontend-urls';
+import {
+  getAccessTokenExpiresIn as resolveAccessTokenExpiresIn,
+  getAccessTokenTtlMs as resolveAccessTokenTtlMs,
+  getRefreshTokenTtlMs as resolveRefreshTokenTtlMs,
+  getSessionIdleTimeoutMs as resolveSessionIdleTimeoutMs,
+  getSessionWarningThresholdMs as resolveSessionWarningThresholdMs,
+} from 'src/common/auth/auth-session.config';
+import { buildDashboardFrontendUrl, buildPublicFrontendUrl, getDashboardFrontendBaseUrl, getPublicFrontendBaseUrl } from 'src/common/frontend-urls';
+import { resolveAudienceFromRole } from 'src/common/auth/auth-cookie.utils';
 import { mapUserForClient } from 'src/common/mappers/client-shapes';
 import { buildPaginatedResult, resolvePagination } from 'src/common/pagination';
 import { DEVELOPER_ROOT_ROLE_SLUG } from '../admin-rbac/admin-permission-catalog';
 import { AdminRbacService } from '../admin-rbac/admin-rbac.service';
+import { MailService } from '../mail/mail.service';
+import { buildPasswordResetEmailTemplate } from '../mail/templates/password-reset.template';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ClaimMitraInviteDto } from './dto/claim-mitra-invite.dto';
+import { CompleteGoogleProfileDto } from './dto/complete-google-profile.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
-const USER_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
-const STAFF_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
-const USER_WARNING_THRESHOLD_MS = 3 * 60 * 1000;
-const STAFF_WARNING_THRESHOLD_MS = 2 * 60 * 1000;
-const USER_ACCESS_TOKEN_TTL = '20m';
-const STAFF_ACCESS_TOKEN_TTL = '15m';
 const ADMIN_LOGIN_LOCK_THRESHOLD = Number(process.env.ADMIN_LOGIN_LOCK_THRESHOLD || 3);
 const ADMIN_LOGIN_LOCK_WINDOW_MS = Number(process.env.ADMIN_LOGIN_LOCK_WINDOW_MINUTES || 15) * 60 * 1000;
 const MITRA_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MITRA_PLACEHOLDER_EMAIL_DOMAIN = 'pending-mitra.newme.local';
 const BRIDGE_TICKET_TTL_MS = Number(process.env.AUTH_BRIDGE_TICKET_TTL_SECONDS || 120) * 1000;
+const GOOGLE_STATE_TTL_MS = 10 * 60 * 1000;
+const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
 
 type AuditInput = {
   actorUserId?: string | null;
@@ -44,18 +56,48 @@ type AuditInput = {
 
 type SessionMetadata = {
   id: string;
+  audience?: AuthAudience;
   idleTimeoutMs: number;
   warningThresholdMs: number;
   expiresAt: Date;
   serverTime: Date;
 };
 
+type SessionViewer = {
+  id: string;
+  role: Role;
+  displayName: string;
+  email: string | null;
+  avatarUrl: string | null;
+  authProvider: string;
+  onboardingCompleted: boolean;
+  permissionKeys: string[];
+};
+
+type AuthCookiePayload = {
+  audience: AuthAudience;
+  accessToken: string;
+  refreshToken: string;
+  accessMaxAgeMs: number;
+  refreshMaxAgeMs: number;
+  csrfToken: string;
+};
+
+type GoogleOauthContext = {
+  intent: 'login' | 'register';
+  target: string;
+  referralCode?: string | null;
+};
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly adminRbacService: AdminRbacService,
+    private readonly mailService: MailService,
   ) {}
 
   private isStaffRole(role: Role) {
@@ -90,15 +132,23 @@ export class AuthService {
   }
 
   private getIdleTimeoutMs(role: Role) {
-    return role === Role.USER ? USER_IDLE_TIMEOUT_MS : STAFF_IDLE_TIMEOUT_MS;
+    return resolveSessionIdleTimeoutMs(role);
   }
 
   private getWarningThresholdMs(role: Role) {
-    return role === Role.USER ? USER_WARNING_THRESHOLD_MS : STAFF_WARNING_THRESHOLD_MS;
+    return resolveSessionWarningThresholdMs(role);
   }
 
   private getAccessTokenExpiresIn(role: Role) {
-    return role === Role.USER ? USER_ACCESS_TOKEN_TTL : STAFF_ACCESS_TOKEN_TTL;
+    return resolveAccessTokenExpiresIn(role);
+  }
+
+  private getAccessTokenTtlMs(role: Role) {
+    return resolveAccessTokenTtlMs(role);
+  }
+
+  private getRefreshTokenTtlMs() {
+    return resolveRefreshTokenTtlMs();
   }
 
   private normalizeBridgeTarget(target?: string | null) {
@@ -124,9 +174,9 @@ export class AuthService {
     throw new BadRequestException('Bridge target is not allowed');
   }
 
-  private createAccessToken(user: { id: string; role: Role; email: string }, sessionId: string) {
+  private createAccessToken(user: { id: string; role: Role; email: string }, sessionId: string, audience: AuthAudience) {
     return this.jwtService.sign(
-      { sub: user.id, role: user.role, email: user.email, sid: sessionId },
+      { sub: user.id, role: user.role, email: user.email, sid: sessionId, aud: audience },
       {
         secret: process.env.JWT_ACCESS_SECRET,
         expiresIn: this.getAccessTokenExpiresIn(user.role),
@@ -134,9 +184,10 @@ export class AuthService {
     );
   }
 
-  private buildSessionMetadata(user: { role: Role }, session: { id: string; expiresAt: Date }): SessionMetadata {
+  private buildSessionMetadata(user: { role: Role }, session: { id: string; expiresAt: Date; audience?: AuthAudience | null }): SessionMetadata {
     return {
       id: session.id,
+      audience: session.audience || undefined,
       idleTimeoutMs: this.getIdleTimeoutMs(user.role),
       warningThresholdMs: this.getWarningThresholdMs(user.role),
       expiresAt: session.expiresAt,
@@ -144,32 +195,55 @@ export class AuthService {
     };
   }
 
+  private buildSessionViewer(mappedUser: any): SessionViewer | null {
+    if (!mappedUser) return null;
+
+    return {
+      id: mappedUser.id,
+      role: mappedUser.role,
+      displayName: mappedUser.fullName || mappedUser.name || mappedUser.username || mappedUser.email || 'User',
+      email: mappedUser.email || null,
+      avatarUrl: mappedUser.avatarUrl || null,
+      authProvider: mappedUser.authProvider || AuthProvider.LOCAL,
+      onboardingCompleted: Boolean(mappedUser.onboardingCompleted),
+      permissionKeys: Array.isArray(mappedUser.permissionKeys) ? mappedUser.permissionKeys : [],
+    };
+  }
+
   private async createAuthSessionWithClient(
     client: any,
     user: { id: string; role: Role },
     meta: { ipAddress?: string | null; userAgent?: string | null } = {},
+    audience = resolveAudienceFromRole(user.role),
   ) {
     const expiresAt = new Date(Date.now() + this.getIdleTimeoutMs(user.role));
-    const refreshTokenHash = this.hashValue(randomBytes(32).toString('hex'));
-    return client.authSession.create({
+    const absoluteExpiresAt = new Date(Date.now() + this.getRefreshTokenTtlMs());
+    const refreshToken = randomBytes(48).toString('hex');
+    const refreshTokenHash = this.hashValue(refreshToken);
+    const session = await client.authSession.create({
       data: {
         userId: user.id,
+        audience,
         refreshTokenHash,
         ipAddress: meta.ipAddress || null,
         userAgent: meta.userAgent || null,
+        lastActivityAt: new Date(),
+        absoluteExpiresAt,
         expiresAt,
       },
     });
+    return { session, refreshToken };
   }
 
   private async createAuthSession(
     user: { id: string; role: Role },
     meta: { ipAddress?: string | null; userAgent?: string | null } = {},
+    audience = resolveAudienceFromRole(user.role),
   ) {
-    return this.createAuthSessionWithClient(this.prisma, user, meta);
+    return this.createAuthSessionWithClient(this.prisma, user, meta, audience);
   }
 
-  private async getValidSessionOrThrow(userId: string, sessionId?: string | null) {
+  private async getValidSessionOrThrow(userId: string, sessionId?: string | null, audience?: AuthAudience | null) {
     const normalizedSessionId = String(sessionId || '').trim();
     if (!normalizedSessionId) {
       throw new UnauthorizedException('Invalid session');
@@ -180,21 +254,24 @@ export class AuthService {
         id: normalizedSessionId,
         userId,
         revokedAt: null,
+        ...(audience ? { audience } : {}),
       },
     });
 
-    if (!session || session.expiresAt.getTime() <= Date.now()) {
+    if (!session || session.expiresAt.getTime() <= Date.now() || session.absoluteExpiresAt.getTime() <= Date.now()) {
       throw new UnauthorizedException('Session expired');
     }
 
     return session;
   }
 
-  private async extendSession(sessionId: string, role: Role) {
+  private async extendSession(sessionId: string, role: Role, refreshToken: string) {
     return this.prisma.authSession.update({
       where: { id: sessionId },
       data: {
+        refreshTokenHash: this.hashValue(refreshToken),
         expiresAt: new Date(Date.now() + this.getIdleTimeoutMs(role)),
+        lastActivityAt: new Date(),
         revokedAt: null,
       },
     });
@@ -212,6 +289,158 @@ export class AuthService {
     return String(email || '').trim().toLowerCase();
   }
 
+  private maskEmail(email?: string | null) {
+    const normalized = this.normalizeEmail(String(email || ''));
+    const [localPart, domain] = normalized.split('@');
+    if (!localPart || !domain) {
+      return 'unknown-recipient';
+    }
+
+    const visibleLocal = localPart.length <= 2
+      ? `${localPart[0] || '*'}*`
+      : `${localPart.slice(0, 2)}***`;
+
+    return `${visibleLocal}@${domain}`;
+  }
+
+  private normalizeGoogleIntent(value?: string | null): 'login' | 'register' {
+    return String(value || '').trim().toLowerCase() === 'register' ? 'register' : 'login';
+  }
+
+  private buildProviderMismatchError(provider: AuthProvider) {
+    if (provider === AuthProvider.GOOGLE) {
+      throw new UnauthorizedException('AUTH_PROVIDER_MISMATCH_GOOGLE_ONLY');
+    }
+    throw new UnauthorizedException('AUTH_PROVIDER_MISMATCH_MANUAL_ONLY');
+  }
+
+  private assertGoogleIdentityAllowed(user: any) {
+    if (!user) return;
+    if (user.primaryAuthProvider && user.primaryAuthProvider !== AuthProvider.GOOGLE) {
+      throw new ConflictException('AUTH_PROVIDER_MISMATCH_MANUAL_ONLY');
+    }
+  }
+
+  private encodeGoogleOauthContext(context: GoogleOauthContext) {
+    return Buffer.from(JSON.stringify(context), 'utf-8').toString('base64url');
+  }
+
+  decodeGoogleOauthContext(value?: string | null): GoogleOauthContext {
+    try {
+      const raw = Buffer.from(String(value || ''), 'base64url').toString('utf-8');
+      const parsed = JSON.parse(raw);
+      return {
+        intent: this.normalizeGoogleIntent(parsed?.intent),
+        target: this.normalizeBridgeTarget(parsed?.target),
+        referralCode: String(parsed?.referralCode || '').trim() || null,
+      };
+    } catch {
+      throw new UnauthorizedException('AUTH_OAUTH_STATE_INVALID');
+    }
+  }
+
+  buildGoogleOauthStartUrl(input: { intent?: string | null; target?: string | null; referralCode?: string | null }) {
+    this.assertGoogleOauthEnabled();
+    const clientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+    const callbackUrl = String(process.env.GOOGLE_CALLBACK_URL || '').trim();
+    if (!clientId || !callbackUrl) {
+      throw new BadRequestException('Google OAuth is not configured');
+    }
+
+    const state = randomBytes(32).toString('hex');
+    const nonce = randomBytes(24).toString('hex');
+    const context: GoogleOauthContext = {
+      intent: this.normalizeGoogleIntent(input.intent),
+      target: this.normalizeBridgeTarget(input.target),
+      referralCode: this.normalizeReferralCode(input.referralCode),
+    };
+
+    const url = new URL(GOOGLE_AUTH_URL);
+    url.searchParams.set('client_id', clientId);
+    url.searchParams.set('redirect_uri', callbackUrl);
+    url.searchParams.set('response_type', 'code');
+    url.searchParams.set('scope', 'openid email profile');
+    url.searchParams.set('state', state);
+    url.searchParams.set('nonce', nonce);
+    url.searchParams.set('prompt', 'select_account');
+
+    return {
+      state,
+      context: this.encodeGoogleOauthContext(context),
+      maxAgeMs: GOOGLE_STATE_TTL_MS,
+      redirectUrl: url.toString(),
+    };
+  }
+
+  private buildGoogleFrontendRedirect(path: string, params?: Record<string, string | null | undefined>) {
+    return buildPublicFrontendUrl(path, params);
+  }
+
+  private async fetchGoogleUserProfile(code: string) {
+    this.assertGoogleOauthEnabled();
+    const clientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+    const clientSecret = String(process.env.GOOGLE_CLIENT_SECRET || '').trim();
+    const callbackUrl = String(process.env.GOOGLE_CALLBACK_URL || '').trim();
+    if (!clientId || !clientSecret || !callbackUrl) {
+      throw new BadRequestException('Google OAuth is not configured');
+    }
+
+    const tokenResponse = await axios.post(
+      GOOGLE_TOKEN_URL,
+      new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: callbackUrl,
+        grant_type: 'authorization_code',
+      }).toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      },
+    );
+
+    const accessToken = String(tokenResponse.data?.access_token || '').trim();
+    if (!accessToken) {
+      throw new UnauthorizedException('AUTH_OAUTH_STATE_INVALID');
+    }
+
+    const profileResponse = await axios.get(GOOGLE_USERINFO_URL, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const profile = profileResponse.data || {};
+    if (!profile?.email_verified) {
+      throw new UnauthorizedException('AUTH_GOOGLE_EMAIL_UNVERIFIED');
+    }
+
+    return {
+      providerUserId: String(profile.sub || '').trim(),
+      email: this.normalizeEmail(String(profile.email || '')),
+      fullName: String(profile.name || profile.given_name || 'Google User').trim() || 'Google User',
+      avatarUrl: String(profile.picture || '').trim() || null,
+      rawProfile: profile,
+    };
+  }
+
+  private createAuthCookiePayload(
+    user: { id: string; role: Role; email: string },
+    session: { id: string; expiresAt: Date; audience: AuthAudience },
+    refreshToken: string,
+  ): AuthCookiePayload {
+    return {
+      audience: session.audience,
+      accessToken: this.createAccessToken(user, session.id, session.audience),
+      refreshToken,
+      accessMaxAgeMs: this.getAccessTokenTtlMs(user.role),
+      refreshMaxAgeMs: this.getRefreshTokenTtlMs(),
+      csrfToken: randomBytes(24).toString('hex'),
+    };
+  }
+
   private normalizeAdminLoginIdentifier(identifier?: string | null) {
     const normalized = String(identifier || '').trim();
     if (!normalized) return '';
@@ -226,6 +455,26 @@ export class AuthService {
   private normalizeReferralCode(code?: string | null) {
     const value = String(code || '').trim().toUpperCase();
     return value || null;
+  }
+
+  private isGoogleOauthEnabled() {
+    return String(process.env.AUTH_ENABLE_GOOGLE || 'false').trim().toLowerCase() === 'true';
+  }
+
+  private isPasswordResetEnabled() {
+    return String(process.env.AUTH_ENABLE_PASSWORD_RESET || 'true').trim().toLowerCase() !== 'false';
+  }
+
+  private assertGoogleOauthEnabled() {
+    if (!this.isGoogleOauthEnabled()) {
+      throw new BadRequestException('AUTH_GOOGLE_DISABLED');
+    }
+  }
+
+  private assertPasswordResetEnabled() {
+    if (!this.isPasswordResetEnabled()) {
+      throw new BadRequestException('AUTH_PASSWORD_RESET_DISABLED');
+    }
   }
 
   private parseBirthDate(value?: string | null) {
@@ -269,6 +518,142 @@ export class AuthService {
 
   private buildPendingMitraEmail(publicCode: string) {
     return `mitra-${String(publicCode || '').trim().toLowerCase()}@${MITRA_PLACEHOLDER_EMAIL_DOMAIN}`;
+  }
+
+  private buildPasswordResetUrl(role: Role, token: string) {
+    if (role === Role.USER) {
+      return buildPublicFrontendUrl(`/reset-password/${token}`);
+    }
+    if (role === Role.MITRA) {
+      return buildDashboardFrontendUrl(`/mitra/reset-password/${token}`);
+    }
+    if (role === Role.YAYASAN) {
+      return buildDashboardFrontendUrl(`/yayasan/reset-password/${token}`);
+    }
+    return buildDashboardFrontendUrl(`/reset-password/${token}`);
+  }
+
+  private async issuePasswordResetToken(userId: string) {
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 30);
+    const token = randomBytes(24).toString('hex');
+
+    await this.prisma.passwordResetToken.updateMany({
+      where: {
+        userId,
+        usedAt: null,
+      },
+      data: {
+        usedAt: new Date(),
+      },
+    });
+
+    const row = await this.prisma.passwordResetToken.create({
+      data: {
+        userId,
+        tokenHash: this.hashValue(token),
+        expiresAt,
+      },
+    });
+
+    return { token, row };
+  }
+
+  private async sendPasswordResetEmail(user: { id: string; role: Role; email: string | null; fullName?: string | null }) {
+    this.assertPasswordResetEnabled();
+
+    const email = this.normalizeEmail(String(user.email || ''));
+    if (!email) {
+      return false;
+    }
+
+    const { token, row } = await this.issuePasswordResetToken(user.id);
+    const resetUrl = this.buildPasswordResetUrl(user.role, token);
+    const template = buildPasswordResetEmailTemplate({
+      recipientName: String(user.fullName || email || 'Pelanggan NEWME').trim(),
+      resetUrl,
+      expiresMinutes: 30,
+    });
+
+    try {
+      await this.mailService.sendMail({
+        to: email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+      return true;
+    } catch (error) {
+      await this.prisma.passwordResetToken.updateMany({
+        where: {
+          id: row.id,
+          usedAt: null,
+        },
+        data: {
+          usedAt: new Date(),
+        },
+      });
+      this.logger.error(
+        `Failed to send password reset email to ${this.maskEmail(email)}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new HttpException('MAIL_DELIVERY_FAILED', HttpStatus.SERVICE_UNAVAILABLE);
+    }
+  }
+
+  private async requestPasswordResetByEmail(email: string, role?: Role) {
+    this.assertPasswordResetEnabled();
+
+    const normalizedEmail = this.normalizeEmail(email);
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: normalizedEmail,
+        ...(role ? { role } : {}),
+      },
+      select: {
+        id: true,
+        role: true,
+        email: true,
+        fullName: true,
+        primaryAuthProvider: true,
+      },
+    });
+
+    if (!user || user.primaryAuthProvider !== AuthProvider.LOCAL) {
+      return { message: 'Jika email terdaftar, link reset telah dikirim.' };
+    }
+
+    await this.sendPasswordResetEmail(user);
+    return { message: 'Jika email terdaftar, link reset telah dikirim.' };
+  }
+
+  async requestPasswordResetByUserId(userId: string, expectedRole?: Role) {
+    this.assertPasswordResetEnabled();
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        email: true,
+        fullName: true,
+        primaryAuthProvider: true,
+      },
+    });
+
+    if (!user || (expectedRole && user.role !== expectedRole)) {
+      throw new UnauthorizedException('Invalid user');
+    }
+
+    if (user.primaryAuthProvider !== AuthProvider.LOCAL) {
+      throw new BadRequestException('AUTH_PROVIDER_MISMATCH_GOOGLE_ONLY');
+    }
+
+    if (!String(user.email || '').trim()) {
+      throw new BadRequestException('User email is required for password reset');
+    }
+
+    await this.sendPasswordResetEmail(user);
+    return { message: 'Link reset password telah dikirim ke email pengguna.' };
   }
 
   private buildMitraInviteResponse(invite: any, plainToken?: string | null) {
@@ -696,6 +1081,11 @@ export class AuthService {
       publicId: user.myReferralCode || null,
       businessId: user.myReferralCode || null,
       memberCode: user.myReferralCode || null,
+      authProvider: user.primaryAuthProvider || AuthProvider.LOCAL,
+      hasPassword: Boolean(user.passwordHash),
+      avatarUrl: user.avatarUrl || null,
+      onboardingCompleted: Boolean(user.onboardingCompletedAt),
+      onboardingCompletedAt: user.onboardingCompletedAt || null,
       adminRoleId: adminAccess?.adminRole?.id || user.adminRoleId || null,
       adminRole: adminAccess?.adminRole || null,
       permissionKeys: adminAccess?.permissionKeys || [],
@@ -781,6 +1171,75 @@ export class AuthService {
     }
 
     return result;
+  }
+
+  private buildAuthSuccessResponse(
+    user: { id: string; role: Role; email: string },
+    session: { id: string; expiresAt: Date; audience: AuthAudience },
+    refreshToken: string,
+    mappedUser: any,
+    extra: Record<string, any> = {},
+  ) {
+    return {
+      success: true,
+      session: this.buildSessionMetadata(user, session),
+      user: mappedUser,
+      cookies: this.createAuthCookiePayload(user, session, refreshToken),
+      ...extra,
+    };
+  }
+
+  private async findSessionByRefreshToken(refreshToken: string, audience: AuthAudience) {
+    const normalized = String(refreshToken || '').trim();
+    if (!normalized) {
+      throw new UnauthorizedException('AUTH_REFRESH_INVALID');
+    }
+
+    const session = await this.prisma.authSession.findFirst({
+      where: {
+        audience,
+        refreshTokenHash: this.hashValue(normalized),
+        revokedAt: null,
+      },
+      include: {
+        user: {
+          include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
+        },
+      },
+    });
+
+    if (
+      !session
+      || session.expiresAt.getTime() <= Date.now()
+      || session.absoluteExpiresAt.getTime() <= Date.now()
+    ) {
+      throw new UnauthorizedException('AUTH_REFRESH_INVALID');
+    }
+
+    return session;
+  }
+
+  async refreshSessionByRefreshToken(audience: AuthAudience, refreshToken: string) {
+    const sessionRow = await this.findSessionByRefreshToken(refreshToken, audience);
+    const user = sessionRow.user;
+    if (!user) {
+      throw new UnauthorizedException('AUTH_REFRESH_INVALID');
+    }
+
+    const nextRefreshToken = randomBytes(48).toString('hex');
+    const session = await this.extendSession(sessionRow.id, user.role, nextRefreshToken);
+    const mappedUser = await this.mapUserWithComputedStats(user);
+    return this.buildAuthSuccessResponse(
+      user,
+      { id: session.id, expiresAt: session.expiresAt, audience: session.audience },
+      nextRefreshToken,
+      mappedUser,
+      {
+        ...(audience === AuthAudience.ADMIN ? { admin: mappedUser } : {}),
+        ...(audience === AuthAudience.YAYASAN ? { yayasan: mappedUser } : {}),
+        ...(audience === AuthAudience.MITRA ? { mitra: mappedUser } : {}),
+      },
+    );
   }
 
   async register(
@@ -886,21 +1345,20 @@ export class AuthService {
       include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
     });
 
-    const session = await this.createAuthSession(user, auditMeta);
-    const token = this.createAccessToken(user, session.id);
+    const { session, refreshToken } = await this.createAuthSession(user, auditMeta, resolveAudienceFromRole(targetRole));
     const mappedUser = await this.mapUserWithComputedStats(user);
-
-    return {
-      success: true,
-      token,
-      access_token: token,
-      session: this.buildSessionMetadata(user, session),
-      user: mappedUser,
-      admin: this.isAdminPanelRole(targetRole) ? mappedUser : undefined,
-      yayasan: targetRole === Role.YAYASAN ? mappedUser : undefined,
-      mitra: undefined,
-      message: 'Registrasi berhasil',
-    };
+    return this.buildAuthSuccessResponse(
+      user,
+      { id: session.id, expiresAt: session.expiresAt, audience: session.audience },
+      refreshToken,
+      mappedUser,
+      {
+        admin: this.isAdminPanelRole(targetRole) ? mappedUser : undefined,
+        yayasan: targetRole === Role.YAYASAN ? mappedUser : undefined,
+        mitra: undefined,
+        message: 'Registrasi berhasil',
+      },
+    );
   }
 
   async login(
@@ -933,6 +1391,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (user.primaryAuthProvider === AuthProvider.GOOGLE || !user.passwordHash) {
+      this.buildProviderMismatchError(AuthProvider.GOOGLE);
+    }
+
     const passHash = this.hashValue(body.password || '');
     if (passHash !== user.passwordHash) {
       if (role === Role.ADMIN) {
@@ -954,8 +1416,7 @@ export class AuthService {
       }
     }
 
-    const session = await this.createAuthSession(user, auditMeta);
-    const token = this.createAccessToken(user, session.id);
+    const { session, refreshToken } = await this.createAuthSession(user, auditMeta, resolveAudienceFromRole(user.role));
     const mappedUser = await this.mapUserWithComputedStats(user);
 
     if (role === Role.ADMIN) {
@@ -970,25 +1431,25 @@ export class AuthService {
     }
 
     if (adminShape) {
-      return {
-        success: true,
-        token,
-        access_token: token,
-        session: this.buildSessionMetadata(user, session),
-        user: mappedUser,
-      admin: mappedUser,
-      };
+      return this.buildAuthSuccessResponse(
+        user,
+        { id: session.id, expiresAt: session.expiresAt, audience: session.audience },
+        refreshToken,
+        mappedUser,
+        { admin: mappedUser },
+      );
     }
 
-    return {
-      success: true,
-      token,
-      access_token: token,
-      session: this.buildSessionMetadata(user, session),
-      user: mappedUser,
-      yayasan: role === Role.YAYASAN ? mappedUser : undefined,
-      mitra: role === Role.MITRA ? mappedUser : undefined,
-    };
+    return this.buildAuthSuccessResponse(
+      user,
+      { id: session.id, expiresAt: session.expiresAt, audience: session.audience },
+      refreshToken,
+      mappedUser,
+      {
+        yayasan: role === Role.YAYASAN ? mappedUser : undefined,
+        mitra: role === Role.MITRA ? mappedUser : undefined,
+      },
+    );
   }
 
   async loginAdmin(
@@ -1027,6 +1488,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (user.primaryAuthProvider === AuthProvider.GOOGLE || !user.passwordHash) {
+      this.buildProviderMismatchError(AuthProvider.GOOGLE);
+    }
+
     const passHash = this.hashValue(body.password || '');
     if (passHash !== user.passwordHash) {
       await this.createAuditLog({
@@ -1045,8 +1510,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const session = await this.createAuthSession(user, auditMeta);
-    const token = this.createAccessToken(user, session.id);
+    const { session, refreshToken } = await this.createAuthSession(user, auditMeta, AuthAudience.ADMIN);
     const mappedUser = await this.mapUserWithComputedStats(user);
 
     await this.createAuditLog({
@@ -1062,17 +1526,16 @@ export class AuthService {
       ipAddress: auditMeta.ipAddress || null,
     });
 
-    return {
-      success: true,
-      token,
-      access_token: token,
-      session: this.buildSessionMetadata(user, session),
-      user: mappedUser,
-      admin: mappedUser,
-    };
+    return this.buildAuthSuccessResponse(
+      user,
+      { id: session.id, expiresAt: session.expiresAt, audience: session.audience },
+      refreshToken,
+      mappedUser,
+      { admin: mappedUser },
+    );
   }
 
-  async getProfile(userId: string, sessionId?: string | null) {
+  async getProfile(userId: string, sessionId?: string | null, audience?: AuthAudience | null) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
@@ -1083,7 +1546,7 @@ export class AuthService {
 
     let sessionMeta: SessionMetadata | null = null;
     if (sessionId) {
-      const session = await this.getValidSessionOrThrow(userId, sessionId);
+      const session = await this.getValidSessionOrThrow(userId, sessionId, audience || undefined);
       sessionMeta = this.buildSessionMetadata(user, session);
     }
 
@@ -1093,7 +1556,58 @@ export class AuthService {
     };
   }
 
-  async refreshSession(userId: string, sessionId?: string | null) {
+  async getSessionState(userId: string, sessionId?: string | null, audience?: AuthAudience | null) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid user');
+    }
+
+    const session = await this.getValidSessionOrThrow(userId, sessionId, audience || undefined);
+    const mappedUser = await this.mapUserWithComputedStats(user);
+
+    return {
+      authenticated: true,
+      viewer: this.buildSessionViewer(mappedUser),
+      session: this.buildSessionMetadata(user, session),
+    };
+  }
+
+  async getSessionStateFromAccessToken(accessToken?: string | null, audience?: AuthAudience | null) {
+    const token = String(accessToken || '').trim();
+    const fallback = {
+      authenticated: false,
+      viewer: null,
+      session: null,
+    };
+
+    if (!token || !audience) {
+      return fallback;
+    }
+
+    try {
+      const payload = this.jwtService.verify(token, {
+        secret: process.env.JWT_ACCESS_SECRET,
+      }) as { sub?: string; sid?: string; aud?: string };
+
+      const userId = String(payload?.sub || '').trim();
+      const sessionId = String(payload?.sid || '').trim();
+      const tokenAudience = String(payload?.aud || '').trim();
+
+      if (!userId || !sessionId || (tokenAudience && tokenAudience !== audience)) {
+        return fallback;
+      }
+
+      return this.getSessionState(userId, sessionId, audience);
+    } catch {
+      return fallback;
+    }
+  }
+
+  async refreshSession(userId: string, sessionId?: string | null, audience?: AuthAudience | null) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, role: true, email: true },
@@ -1103,24 +1617,26 @@ export class AuthService {
       throw new UnauthorizedException('Invalid user');
     }
 
-    const existingSession = await this.getValidSessionOrThrow(userId, sessionId);
-    const session = await this.extendSession(existingSession.id, user.role);
-    const token = this.createAccessToken(user, session.id);
+    const existingSession = await this.getValidSessionOrThrow(userId, sessionId, audience || undefined);
+    const nextRefreshToken = randomBytes(48).toString('hex');
+    const session = await this.extendSession(existingSession.id, user.role, nextRefreshToken);
     return {
       success: true,
-      token,
-      access_token: token,
       session: this.buildSessionMetadata(user, session),
+      cookies: this.createAuthCookiePayload(
+        user,
+        { id: session.id, expiresAt: session.expiresAt, audience: session.audience },
+        nextRefreshToken,
+      ),
     };
   }
 
-  async logout(userId: string, sessionId?: string | null) {
-    await this.getValidSessionOrThrow(userId, sessionId);
+  async logout(userId: string, sessionId?: string | null, audience?: AuthAudience | null) {
+    await this.getValidSessionOrThrow(userId, sessionId, audience || undefined);
     const revokedAt = new Date();
-    await this.prisma.authSession.updateMany({
+    await this.prisma.authSession.update({
       where: {
-        userId,
-        revokedAt: null,
+        id: String(sessionId || '').trim(),
       },
       data: {
         revokedAt,
@@ -1131,6 +1647,277 @@ export class AuthService {
     return {
       success: true,
       message: 'Logout berhasil.',
+    };
+  }
+
+  async handleGoogleCallback(input: {
+    code?: string | null;
+    state?: string | null;
+    error?: string | null;
+    expectedState?: string | null;
+    encodedContext?: string | null;
+    auditMeta?: { ipAddress?: string | null; userAgent?: string | null };
+  }) {
+    this.assertGoogleOauthEnabled();
+    const auditMeta = input.auditMeta || {};
+    const context = this.decodeGoogleOauthContext(input.encodedContext);
+    const loginRedirect = this.buildGoogleFrontendRedirect('/login', {
+      oauth: 'google',
+      error: 'oauth_failed',
+    });
+
+    if (input.error) {
+      return {
+        redirectUrl: this.buildGoogleFrontendRedirect('/login', {
+          oauth: 'google',
+          error: 'oauth_cancelled',
+        }),
+      };
+    }
+
+    if (!input.code || !input.state || String(input.state).trim() !== String(input.expectedState || '').trim()) {
+      return {
+        redirectUrl: this.buildGoogleFrontendRedirect('/login', {
+          oauth: 'google',
+          error: 'oauth_state_invalid',
+        }),
+      };
+    }
+
+    try {
+      const googleProfile = await this.fetchGoogleUserProfile(String(input.code || '').trim());
+      const identity = await this.prisma.authIdentity.findUnique({
+        where: {
+          provider_providerUserId: {
+            provider: AuthProvider.GOOGLE,
+            providerUserId: googleProfile.providerUserId,
+          },
+        },
+        include: {
+          user: {
+            include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
+          },
+        },
+      });
+
+      let user = identity?.user || null;
+      if (!user) {
+        const existingUser = await this.prisma.user.findUnique({
+          where: { email: googleProfile.email },
+          include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
+        });
+        if (existingUser) {
+          if (existingUser.primaryAuthProvider !== AuthProvider.GOOGLE) {
+            throw new ConflictException('AUTH_PROVIDER_MISMATCH_MANUAL_ONLY');
+          }
+          await this.prisma.authIdentity.create({
+            data: {
+              userId: existingUser.id,
+              provider: AuthProvider.GOOGLE,
+              providerUserId: googleProfile.providerUserId,
+              providerEmail: googleProfile.email,
+              providerEmailVerified: true,
+              avatarUrl: googleProfile.avatarUrl,
+              rawProfile: googleProfile.rawProfile,
+              lastLoginAt: new Date(),
+            },
+          });
+          user = await this.prisma.user.update({
+            where: { id: existingUser.id },
+            data: {
+              avatarUrl: googleProfile.avatarUrl,
+              emailVerifiedAt: existingUser.emailVerifiedAt || new Date(),
+            },
+            include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
+          });
+        }
+        if (!user) {
+          const referral = await this.resolveReferralContext(Role.USER, context.referralCode);
+          const publicCode = await this.generateUniqueBusinessCode(Role.USER);
+          user = await this.prisma.user.create({
+            data: {
+              email: googleProfile.email,
+              fullName: googleProfile.fullName,
+              passwordHash: null,
+              phone: null,
+              role: Role.USER,
+              primaryAuthProvider: AuthProvider.GOOGLE,
+              avatarUrl: googleProfile.avatarUrl,
+              onboardingCompletedAt: null,
+              status: AccountStatus.ACTIVE,
+              emailVerifiedAt: new Date(),
+              myReferralCode: publicCode,
+              referredByCode: referral.referredByCode,
+              wallet: { create: { availableBalance: 0, reserveBalance: 0 } },
+              profile: {
+                create: {
+                  extra: {
+                    publicCode,
+                    referralSource: 'google_oauth',
+                    ...referral.profileExtra,
+                  },
+                },
+              },
+              authIdentities: {
+                create: {
+                  provider: AuthProvider.GOOGLE,
+                  providerUserId: googleProfile.providerUserId,
+                  providerEmail: googleProfile.email,
+                  providerEmailVerified: true,
+                  avatarUrl: googleProfile.avatarUrl,
+                  rawProfile: googleProfile.rawProfile,
+                  lastLoginAt: new Date(),
+                },
+              },
+            },
+            include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
+          });
+        }
+      } else {
+        if (user.primaryAuthProvider !== AuthProvider.GOOGLE) {
+          throw new ConflictException('AUTH_PROVIDER_MISMATCH_MANUAL_ONLY');
+        }
+        await this.prisma.authIdentity.update({
+          where: {
+            provider_providerUserId: {
+              provider: AuthProvider.GOOGLE,
+              providerUserId: googleProfile.providerUserId,
+            },
+          },
+          data: {
+            providerEmail: googleProfile.email,
+            providerEmailVerified: true,
+            avatarUrl: googleProfile.avatarUrl,
+            rawProfile: googleProfile.rawProfile,
+            lastLoginAt: new Date(),
+          },
+        });
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            fullName: user.fullName || googleProfile.fullName,
+            avatarUrl: googleProfile.avatarUrl,
+            emailVerifiedAt: user.emailVerifiedAt || new Date(),
+          },
+          include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
+        });
+      }
+
+      const { session, refreshToken } = await this.createAuthSession(user, auditMeta, AuthAudience.USER);
+      const mappedUser = await this.mapUserWithComputedStats(user);
+      const next = mappedUser?.onboardingCompleted ? 'dashboard' : 'complete-profile';
+
+      return {
+        cookies: this.createAuthCookiePayload(
+          user,
+          { id: session.id, expiresAt: session.expiresAt, audience: session.audience },
+          refreshToken,
+        ),
+        redirectUrl: this.buildGoogleFrontendRedirect('/auth/google/callback', {
+          oauth: 'google',
+          status: 'success',
+          next,
+          target: next === 'dashboard' ? context.target : '/auth/google/complete-profile',
+        }),
+      };
+    } catch (error) {
+      const normalized = error instanceof Error ? error.message : '';
+      if (normalized === 'AUTH_GOOGLE_EMAIL_UNVERIFIED') {
+        return {
+          redirectUrl: this.buildGoogleFrontendRedirect('/login', {
+            oauth: 'google',
+            error: 'google_email_unverified',
+          }),
+        };
+      }
+      if (normalized === 'AUTH_PROVIDER_MISMATCH_MANUAL_ONLY') {
+        return {
+          redirectUrl: this.buildGoogleFrontendRedirect('/login', {
+            oauth: 'google',
+            error: 'provider_mismatch_manual_exists',
+          }),
+        };
+      }
+      return { redirectUrl: loginRedirect };
+    }
+  }
+
+  async completeGoogleProfile(userId: string, body: CompleteGoogleProfileDto) {
+    this.assertGoogleOauthEnabled();
+    const existing = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
+    });
+    if (!existing || existing.role !== Role.USER) {
+      throw new UnauthorizedException('Invalid user');
+    }
+    if (existing.primaryAuthProvider !== AuthProvider.GOOGLE) {
+      throw new BadRequestException('AUTH_PROVIDER_MISMATCH_MANUAL_ONLY');
+    }
+
+    const nextPhone = this.normalizePhone(body.phone);
+    if (!nextPhone) {
+      throw new BadRequestException('Phone or WhatsApp already registered');
+    }
+
+    const phoneUsed = await this.prisma.user.findFirst({
+      where: { phone: nextPhone, id: { not: userId } },
+      select: { id: true },
+    });
+    if (phoneUsed) {
+      throw new ConflictException('Phone or WhatsApp already registered');
+    }
+
+    const birthDate = this.parseBirthDate(body.birthDate);
+    const existingExtra =
+      existing.profile?.extra && typeof existing.profile.extra === 'object'
+        ? (existing.profile.extra as Record<string, any>)
+        : {};
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        phone: nextPhone,
+        onboardingCompletedAt: new Date(),
+        profile: {
+          upsert: {
+            create: {
+              birthDate,
+              province: body.province,
+              city: body.city,
+              district: body.district,
+              village: body.village || null,
+              extra: {
+                ...existingExtra,
+                address: body.address,
+                referralSource: body.referralSource,
+                referralOther: body.referralOther || null,
+              },
+            },
+            update: {
+              birthDate,
+              province: body.province,
+              city: body.city,
+              district: body.district,
+              village: body.village || null,
+              extra: {
+                ...existingExtra,
+                address: body.address,
+                referralSource: body.referralSource,
+                referralOther: body.referralOther || null,
+              },
+            },
+          },
+        },
+      },
+      include: { profile: true, wallet: true, yayasanProfile: true, mitraProfile: true },
+    });
+
+    const mappedUser = await this.mapUserWithComputedStats(updated);
+    return {
+      success: true,
+      user: mappedUser,
+      message: 'Profil Google berhasil dilengkapi.',
     };
   }
 
@@ -1252,25 +2039,24 @@ export class AuthService {
         throw new UnauthorizedException('Bridge ticket has already been used');
       }
 
-      const session = await this.createAuthSessionWithClient(tx, user, auditMeta);
+      const { session, refreshToken } = await this.createAuthSessionWithClient(tx, user, auditMeta, AuthAudience.USER);
       return {
         user,
         session,
+        refreshToken,
         targetPath: this.normalizeBridgeTarget(current.targetPath),
       };
     });
 
     const mappedUser = await this.mapUserWithComputedStats(payload.user);
-    const accessToken = this.createAccessToken(payload.user, payload.session.id);
 
-    return {
-      success: true,
-      token: accessToken,
-      access_token: accessToken,
-      session: this.buildSessionMetadata(payload.user, payload.session),
-      user: mappedUser,
-      target: payload.targetPath,
-    };
+    return this.buildAuthSuccessResponse(
+      payload.user,
+      { id: payload.session.id, expiresAt: payload.session.expiresAt, audience: payload.session.audience },
+      payload.refreshToken,
+      mappedUser,
+      { target: payload.targetPath },
+    );
   }
 
   async updateProfile(userId: string, body: UpdateProfileDto) {
@@ -1378,6 +2164,14 @@ export class AuthService {
   }
 
   async changePassword(userId: string, body: ChangePasswordDto) {
+    const existing = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { primaryAuthProvider: true },
+    });
+    if (existing?.primaryAuthProvider === AuthProvider.GOOGLE) {
+      throw new BadRequestException('AUTH_PROVIDER_MISMATCH_GOOGLE_ONLY');
+    }
+
     await this.prisma.user.update({
       where: { id: userId },
       data: { passwordHash: this.hashValue(body.newPassword || body.password || 'ChangeMe123!') },
@@ -1584,52 +2378,50 @@ export class AuthService {
       return updatedUser;
     });
 
-    const session = await this.createAuthSession(user, auditMeta);
+    const { session, refreshToken } = await this.createAuthSession(user, auditMeta, AuthAudience.MITRA);
     const mappedUser = await this.mapUserWithComputedStats(user);
-    const accessToken = this.createAccessToken(user, session.id);
-
-    return {
-      success: true,
-      token: accessToken,
-      access_token: accessToken,
-      session: this.buildSessionMetadata(user, session),
-      user: mappedUser,
-      mitra: mappedUser,
-      message: 'Akun mitra berhasil diaktifkan.',
-    };
+    return this.buildAuthSuccessResponse(
+      user,
+      { id: session.id, expiresAt: session.expiresAt, audience: session.audience },
+      refreshToken,
+      mappedUser,
+      {
+        mitra: mappedUser,
+        message: 'Akun mitra berhasil diaktifkan.',
+      },
+    );
   }
 
-  async forgotPassword(email: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: this.normalizeEmail(email) },
-    });
-    if (!user) {
-      return { message: 'Jika email terdaftar, link reset telah dikirim.' };
-    }
-
-    const token = randomBytes(24).toString('hex');
-    await this.prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: this.hashValue(token),
-        expiresAt: new Date(Date.now() + 1000 * 60 * 30),
-      },
-    });
-
-    return { message: 'Reset token generated', token };
+  async forgotPassword(email: string, role: Role = Role.USER) {
+    return this.requestPasswordResetByEmail(email, role);
   }
 
   async resetPassword(token: string, password: string) {
     const tokenHash = this.hashValue(token || '');
     const row = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
     if (!row || row.usedAt || row.expiresAt < new Date()) {
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException('PASSWORD_RESET_TOKEN_INVALID');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: row.userId },
+      select: { primaryAuthProvider: true },
+    });
+    if (user?.primaryAuthProvider === AuthProvider.GOOGLE) {
+      throw new BadRequestException('AUTH_PROVIDER_MISMATCH_GOOGLE_ONLY');
     }
 
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: row.userId },
         data: { passwordHash: this.hashValue(password || 'ChangeMe123!') },
+      }),
+      this.prisma.passwordResetToken.updateMany({
+        where: {
+          userId: row.userId,
+          usedAt: null,
+        },
+        data: { usedAt: new Date() },
       }),
       this.prisma.passwordResetToken.update({
         where: { id: row.id },

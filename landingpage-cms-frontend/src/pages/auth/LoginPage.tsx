@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../../app/components/ui/button";
 import { authAPI } from "../../services/api";
-import { buildDashboardBridgeUrl, setUserSession } from "../../lib/session";
+import { buildDashboardBridgeUrl, clearUserSession, setUserSession } from "../../lib/session";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 
 type LoginFeedback = {
@@ -61,29 +61,45 @@ const resolveUserLoginFeedback = (error: unknown): LoginFeedback => {
 };
 
 export function LoginPage() {
+  const navigate = useNavigate();
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const bootstrap = async () => {
+      try {
+        const sessionState = await authAPI.getSession();
+        if (!sessionState?.authenticated) {
+          clearUserSession();
+          return;
+        }
+        if (!active) return;
+        setUserSession(null, sessionState?.viewer || null);
+        navigate("/dashboard", { replace: true });
+      } catch {
+        // Stay on login page when no valid session exists.
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      active = false;
+    };
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setLoading(true);
+      clearUserSession();
       const response = await authAPI.login({
         email: form.email,
         password: form.password,
       });
-      const token = response?.token || response?.access_token;
-      if (!token) {
-        throw new Error("Token login tidak ditemukan");
-      }
-      setUserSession(token, response?.user || null);
-      const bridge = await authAPI.createBridgeTicket("/dashboard");
-      const ticket = String(bridge?.ticket || "").trim();
-      if (!ticket) {
-        throw new Error("Bridge ticket login tidak ditemukan");
-      }
-      window.location.href = buildDashboardBridgeUrl(ticket, "/dashboard");
+      setUserSession(null, response?.user || null);
+      window.location.href = buildDashboardBridgeUrl("", "/dashboard");
     } catch (err) {
       const feedback = resolveUserLoginFeedback(err);
       toast.error(feedback.title, {
@@ -215,10 +231,7 @@ export function LoginPage() {
             <div>
               <div className="mb-1.5 flex items-center justify-between">
                 <label className="text-sm text-zinc-400">Password</label>
-                <Link
-                  to="/forgot-password"
-                  className="text-xs text-zinc-500 transition-colors hover:text-yellow-500"
-                >
+                <Link to="/forgot-password" className="text-[11px] text-yellow-500 transition-colors hover:text-yellow-400">
                   Lupa password?
                 </Link>
               </div>
@@ -251,30 +264,6 @@ export function LoginPage() {
             >
               {loading ? "Memproses..." : <>Masuk <ArrowRight className="ml-1 h-4 w-4" /></>}
             </Button>
-
-            {/* Divider */}
-            <div className="relative flex items-center gap-3 py-1">
-              <div className="h-px flex-1 bg-white/10" />
-              <span className="text-xs text-zinc-600">atau masuk dengan</span>
-              <div className="h-px flex-1 bg-white/10" />
-            </div>
-
-            {/* Google OAuth (mock) */}
-            <button
-              type="button"
-              onClick={() => {
-                window.location.href = "/contact";
-              }}
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] py-3 text-sm text-zinc-300 transition-colors hover:border-white/20 hover:bg-white/[0.06]"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24">
-                <path fill="#EA4335" d="M5.26620003,9.76452941 C6.19878754,6.93863203 8.85444915,4.90909091 12,4.90909091 C13.6909091,4.90909091 15.2181818,5.50909091 16.4181818,6.49090909 L19.9090909,3 C17.7818182,1.14545455 15.0545455,0 12,0 C7.27006974,0 3.1977497,2.69829785 1.23999023,6.65002441 L5.26620003,9.76452941 Z" />
-                <path fill="#34A853" d="M16.0407269,18.0125889 C14.9509167,18.7163016 13.5660892,19.0909091 12,19.0909091 C8.86648613,19.0909091 6.21911939,17.076871 5.27698177,14.2678769 L1.23746264,17.3349879 C3.19279051,21.2936293 7.26500293,24 12,24 C14.9328362,24 17.7353462,22.9573905 19.834192,20.9995801 L16.0407269,18.0125889 Z" />
-                <path fill="#4A90E2" d="M19.834192,20.9995801 C22.0291676,18.9520994 23.4545455,15.903663 23.4545455,12 C23.4545455,11.2909091 23.3454545,10.5272727 23.1818182,9.81818182 L12,9.81818182 L12,14.4545455 L18.4363636,14.4545455 C18.1187732,16.013626 17.2662994,17.2212117 16.0407269,18.0125889 L19.834192,20.9995801 Z" />
-                <path fill="#FBBC05" d="M5.27698177,14.2678769 C5.03832634,13.556323 4.90909091,12.7937589 4.90909091,12 C4.90909091,11.2182781 5.03443647,10.4668121 5.26620003,9.76452941 L1.23999023,6.65002441 C0.43658717,8.26043162 0,10.0753848 0,12 C0,13.9195484 0.444780743,15.7301709 1.23746264,17.3349879 L5.27698177,14.2678769 Z" />
-              </svg>
-              Butuh bantuan login?
-            </button>
           </form>
 
           <p className="mt-8 text-center text-xs text-zinc-600">

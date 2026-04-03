@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
@@ -76,6 +76,8 @@ export default function AdminMitra() {
   const [showCapacityDialog, setShowCapacityDialog] = useState(false);
   const [capacitySubmitting, setCapacitySubmitting] = useState(false);
   const [capacityForm, setCapacityForm] = useState(INITIAL_CAPACITY_FORM);
+  const [resetTargetMitra, setResetTargetMitra] = useState(null);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
 
   useEffect(() => {
     void loadMitra();
@@ -198,16 +200,24 @@ export default function AdminMitra() {
 
   const handleResetPassword = async (mitra) => {
     if (!canManageMitra) return;
-    if (!window.confirm(`Reset password untuk ${mitra.name}?`)) return;
+    setResetTargetMitra(mitra);
+  };
+
+  const confirmResetPassword = async () => {
+    if (!canManageMitra || !resetTargetMitra?._id) return;
+    setResetSubmitting(true);
     try {
-      await mitraAPI.resetPassword(mitra._id);
-      toast({ title: 'Reset password berhasil', description: 'Password sementara baru sudah dibuat di backend.' });
+      await mitraAPI.sendResetPasswordEmail(resetTargetMitra._id);
+      setResetTargetMitra(null);
+      toast({ title: 'Reset password berhasil', description: 'Link reset password telah dikirim ke email mitra.' });
     } catch (error) {
       toast({
         title: 'Gagal reset password',
         description: getApiErrorMessage(error, 'Tidak dapat mereset password mitra.'),
         variant: 'destructive',
       });
+    } finally {
+      setResetSubmitting(false);
     }
   };
 
@@ -442,6 +452,33 @@ export default function AdminMitra() {
               {creating ? 'Membuat akun...' : 'Buat Akun Mitra'}
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(resetTargetMitra)} onOpenChange={(open) => {
+        if (!open) {
+          setResetTargetMitra(null);
+        }
+      }}>
+        <DialogContent className="border-yellow-400/20 bg-[#2a2a2a] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Kirim Reset Password Mitra</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Email reset password akan langsung dikirim ke akun mitra ini. Password lama tetap berlaku sampai proses reset selesai.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-yellow-400/20 bg-[#1a1a1a] p-4 text-sm text-gray-300">
+            <p className="font-medium text-white">{resetTargetMitra?.name || resetTargetMitra?.fullName || '-'}</p>
+            <p className="mt-1 break-all text-gray-400">{resetTargetMitra?.email || 'Email belum tersedia'}</p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" className="border-gray-600 text-gray-200" onClick={() => setResetTargetMitra(null)}>
+              Batal
+            </Button>
+            <Button onClick={confirmResetPassword} disabled={resetSubmitting} className="bg-yellow-400 text-black hover:bg-yellow-500">
+              {resetSubmitting ? 'Mengirim...' : 'Kirim Email Reset'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

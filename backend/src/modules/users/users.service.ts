@@ -4,13 +4,17 @@ import { createHash } from 'crypto';
 import { mapUserForClient, toClientPaymentStatus } from 'src/common/mappers/client-shapes';
 import { buildPaginatedResult, resolvePagination } from 'src/common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 import { UsersQueryDto } from './dto/users-query.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authService: AuthService,
+  ) {}
 
   private hash(value: string) {
     return createHash('sha256').update(value).digest('hex');
@@ -207,16 +211,15 @@ export class UsersService {
   }
 
   async resetPassword(id: string, body: ResetUserPasswordDto) {
-    const result = await this.prisma.user.updateMany({
+    void body;
+    const user = await this.prisma.user.findFirst({
       where: { id, role: Role.USER },
-      data: { passwordHash: this.hash(body?.newPassword || 'Reset123!') },
+      select: { id: true },
     });
-
-    if (!result.count) {
+    if (!user) {
       throw new NotFoundException('User tidak ditemukan');
     }
-
-    return { message: 'Password reset success. Temporary password has been applied.' };
+    return this.authService.requestPasswordResetByUserId(id, Role.USER);
   }
 
   async remove(id: string) {

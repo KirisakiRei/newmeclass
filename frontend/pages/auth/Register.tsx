@@ -6,12 +6,10 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { useToast } from '../../hooks/use-toast';
-import { authAPI, clearAuthStorage, settingsAPI, userPaymentsAPI } from '../../services/api';
+import { authAPI, clearAuthStorage, locationAPI, setSessionPresence, settingsAPI, userPaymentsAPI } from '../../services/api';
 import { getApiErrorMessage } from '../../services/api-error';
 import { DEFAULT_SITE_SETTINGS } from '../../lib/site-settings';
 
-// Indonesian Location API
-const LOCATION_API = 'https://www.emsifa.com/api-wilayah-indonesia/api';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 const Register = () => {
@@ -64,13 +62,31 @@ const Register = () => {
 
   // Load provinces and settings on mount
   useEffect(() => {
-    if (localStorage.getItem('user_token')) {
-      navigate('/dashboard', { replace: true });
-      return;
-    }
-    loadProvinces();
-    loadSettings();
-    syncReferralContext(searchParams.get('ref') || '');
+    let active = true;
+    const bootstrap = async () => {
+      try {
+        const response = await authAPI.getSession();
+        if (!active) return;
+        const payload = response?.data || response;
+        if (!payload?.authenticated) {
+          loadProvinces();
+          loadSettings();
+          syncReferralContext(searchParams.get('ref') || '');
+          return;
+        }
+        setSessionPresence('user_token', true, payload?.viewer || null, payload?.session || null);
+        navigate('/dashboard', { replace: true });
+      } catch {
+        if (!active) return;
+        loadProvinces();
+        loadSettings();
+        syncReferralContext(searchParams.get('ref') || '');
+      }
+    };
+    void bootstrap();
+    return () => {
+      active = false;
+    };
   }, [navigate, searchParams]);
 
   const syncReferralContext = async (referralCode) => {
@@ -123,14 +139,13 @@ const Register = () => {
   const loadProvinces = async () => {
     setLoadingLocation(prev => ({ ...prev, provinces: true }));
     try {
-      const response = await fetch(`${LOCATION_API}/provinces.json`);
-      const data = await response.json();
-      setProvinces(data);
+      const response = await locationAPI.getProvinces();
+      setProvinces(Array.isArray(response?.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to load provinces:', error);
       toast({
         title: 'Peringatan',
-        description: 'Gagal memuat data provinsi. Anda bisa mengisi manual.',
+        description: 'Gagal memuat data provinsi. Silakan coba muat ulang halaman.',
         variant: 'default'
       });
     } finally {
@@ -145,11 +160,11 @@ const Register = () => {
     }
     setLoadingLocation(prev => ({ ...prev, cities: true }));
     try {
-      const response = await fetch(`${LOCATION_API}/regencies/${provinceId}.json`);
-      const data = await response.json();
-      setCities(data);
+      const response = await locationAPI.getCities(provinceId);
+      setCities(Array.isArray(response?.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to load cities:', error);
+      setCities([]);
     } finally {
       setLoadingLocation(prev => ({ ...prev, cities: false }));
     }
@@ -162,11 +177,11 @@ const Register = () => {
     }
     setLoadingLocation(prev => ({ ...prev, districts: true }));
     try {
-      const response = await fetch(`${LOCATION_API}/districts/${cityId}.json`);
-      const data = await response.json();
-      setDistricts(data);
+      const response = await locationAPI.getDistricts(cityId);
+      setDistricts(Array.isArray(response?.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to load districts:', error);
+      setDistricts([]);
     } finally {
       setLoadingLocation(prev => ({ ...prev, districts: false }));
     }
@@ -179,11 +194,11 @@ const Register = () => {
     }
     setLoadingLocation(prev => ({ ...prev, villages: true }));
     try {
-      const response = await fetch(`${LOCATION_API}/villages/${districtId}.json`);
-      const data = await response.json();
-      setVillages(data);
+      const response = await locationAPI.getVillages(districtId);
+      setVillages(Array.isArray(response?.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to load villages:', error);
+      setVillages([]);
     } finally {
       setLoadingLocation(prev => ({ ...prev, villages: false }));
     }
@@ -306,15 +321,14 @@ const Register = () => {
       };
 
       const response = await authAPI.register(payload);
-      
-      if (response.data.success) {
+      const payloadResponse = response?.data || response;
+      if (payloadResponse?.success) {
         clearAuthStorage('user_token');
-        localStorage.setItem('user_token', response.data.token || response.data.access_token);
-        localStorage.setItem('user_data', JSON.stringify(response.data.user));
+        setSessionPresence('user_token', true, payloadResponse?.user || null, payloadResponse?.session || null);
         
         toast({
           title: 'Pendaftaran Berhasil',
-          description: response.data.message
+          description: payloadResponse?.message
         });
         
         navigate('/dashboard');

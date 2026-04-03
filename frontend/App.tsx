@@ -20,7 +20,10 @@ import {
   clearAuthStorage,
   getLastSessionActivity,
   getSessionPolicy,
+  getSessionEventName,
+  hasSessionPresence,
   recordSessionActivity,
+  resolveTokenKeyForPath,
   touchSessionForTokenKey,
 } from './services/api';
 import { buildPublicWebUrl } from './lib/app-urls';
@@ -64,8 +67,12 @@ const AdminPriceChangeRequests = lazy(() => import('./pages/admin/AdminPriceChan
 // Yayasan & Mitra pages
 const YayasanDashboard = lazy(() => import('./pages/yayasan/YayasanDashboard'));
 const YayasanLogin = lazy(() => import('./pages/yayasan/YayasanLogin'));
+const YayasanForgotPassword = lazy(() => import('./pages/yayasan/YayasanForgotPassword'));
+const YayasanResetPassword = lazy(() => import('./pages/yayasan/YayasanResetPassword'));
 const YayasanRegister = lazy(() => import('./pages/yayasan/YayasanRegister'));
 const MitraLogin = lazy(() => import('./pages/mitra/MitraLogin'));
+const MitraForgotPassword = lazy(() => import('./pages/mitra/MitraForgotPassword'));
+const MitraResetPassword = lazy(() => import('./pages/mitra/MitraResetPassword'));
 const MitraRegister = lazy(() => import('./pages/mitra/MitraRegister'));
 const MitraClaimInvite = lazy(() => import('./pages/mitra/MitraClaimInvite'));
 const MitraDashboard = lazy(() => import('./pages/mitra/MitraDashboard'));
@@ -125,14 +132,6 @@ const DashboardNotFound = () => (
   </div>
 );
 
-const resolveTokenKeyForPath = (pathname) => {
-  if (pathname.startsWith('/admin')) return 'admin_token';
-  if (pathname.startsWith('/yayasan')) return 'yayasan_token';
-  if (pathname.startsWith('/mitra')) return 'mitra_token';
-  if (typeof window !== 'undefined' && localStorage.getItem('user_token')) return 'user_token';
-  return null;
-};
-
 const SessionManager = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -152,7 +151,7 @@ const SessionManager = () => {
   }, [navigate, policy, tokenKey]);
 
   const heartbeatSession = useCallback(async () => {
-    if (!tokenKey || !policy || !localStorage.getItem(tokenKey)) return;
+    if (!tokenKey || !policy || !hasSessionPresence(tokenKey)) return;
     const now = Date.now();
     if ((now - heartbeatRef.current) < 60 * 1000) return;
     heartbeatRef.current = now;
@@ -164,13 +163,13 @@ const SessionManager = () => {
   }, [forceLogout, policy, tokenKey]);
 
   const markActivity = useCallback(() => {
-    if (!tokenKey || !policy || !localStorage.getItem(tokenKey)) return;
+    if (!tokenKey || !policy || !hasSessionPresence(tokenKey)) return;
     recordSessionActivity(tokenKey);
     void heartbeatSession();
   }, [heartbeatSession, policy, tokenKey]);
 
   useEffect(() => {
-    if (!tokenKey || !policy || !localStorage.getItem(tokenKey)) {
+    if (!tokenKey || !policy || !hasSessionPresence(tokenKey)) {
       setWarningOpen(false);
       return;
     }
@@ -189,10 +188,12 @@ const SessionManager = () => {
     const events = ['click', 'keydown', 'mousedown', 'touchstart'];
     events.forEach((eventName) => window.addEventListener(eventName, markActivity, { passive: true }));
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener(getSessionEventName(), onVisibility);
 
     return () => {
       events.forEach((eventName) => window.removeEventListener(eventName, markActivity));
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener(getSessionEventName(), onVisibility);
     };
   }, [markActivity, policy, tokenKey]);
 
@@ -200,8 +201,7 @@ const SessionManager = () => {
     if (!tokenKey || !policy) return undefined;
 
     const interval = window.setInterval(() => {
-      const token = localStorage.getItem(tokenKey);
-      if (!token) {
+      if (!hasSessionPresence(tokenKey)) {
         setWarningOpen(false);
         return;
       }
@@ -235,7 +235,7 @@ const SessionManager = () => {
     }
   };
 
-  if (!tokenKey || !policy || !localStorage.getItem(tokenKey)) {
+  if (!tokenKey || !policy) {
     return null;
   }
 
@@ -319,6 +319,8 @@ const AppContent = () => {
         {/* Yayasan routes */}
         <Route path="/yayasan" element={<Navigate to="/yayasan/login" replace />} />
         <Route path="/yayasan/login" element={<YayasanLogin />} />
+        <Route path="/yayasan/forgot-password" element={<YayasanForgotPassword />} />
+        <Route path="/yayasan/reset-password/:token" element={<YayasanResetPassword />} />
         <Route path="/yayasan/register" element={<YayasanRegister />} />
         <Route
           path="/yayasan/dashboard"
@@ -334,6 +336,8 @@ const AppContent = () => {
         {/* Mitra routes */}
         <Route path="/mitra" element={<Navigate to="/mitra/login" replace />} />
         <Route path="/mitra/login" element={<MitraLogin />} />
+        <Route path="/mitra/forgot-password" element={<MitraForgotPassword />} />
+        <Route path="/mitra/reset-password/:token" element={<MitraResetPassword />} />
         <Route path="/mitra/register" element={<MitraRegister />} />
         <Route path="/mitra/claim" element={<MitraClaimInvite />} />
         <Route
