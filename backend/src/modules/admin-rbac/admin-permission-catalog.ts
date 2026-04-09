@@ -96,6 +96,15 @@ const PAGE_CONFIGS: PermissionPageConfig[] = [
     actions: ['view', 'create', 'edit', 'delete', 'manage'],
   },
   {
+    groupKey: 'dashboard_settings',
+    groupLabel: 'Dashboard & Pengaturan',
+    groupOrder: 1,
+    pageKey: 'activity_logs',
+    pageLabel: 'Log Aktivitas',
+    pageOrder: 5,
+    actions: ['view'],
+  },
+  {
     groupKey: 'content_management',
     groupLabel: 'Manajemen Konten',
     groupOrder: 2,

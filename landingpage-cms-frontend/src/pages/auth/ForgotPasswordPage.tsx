@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { motion } from "motion/react";
 import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { authAPI } from "../../services/api";
+import { getApiErrorMessage } from "../../services/api-error";
 import { Button } from "../../app/components/ui/button";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 
@@ -21,7 +22,7 @@ export function ForgotPasswordPage() {
       await authAPI.forgotPassword(email);
       setSuccess("Jika email terdaftar, kami telah mengirimkan link reset password ke inbox Anda.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Belum bisa mengirim email reset password");
+      setError(getApiErrorMessage(err, "Belum bisa mengirim email reset password."));
     } finally {
       setLoading(false);
     }

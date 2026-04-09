@@ -3,6 +3,7 @@
 .dev-artifacts/
 
 /.env
+/.env.production
 /.env.local
 
 

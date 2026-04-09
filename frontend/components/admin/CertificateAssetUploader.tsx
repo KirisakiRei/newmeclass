@@ -26,6 +26,12 @@ const OUTPUT_PRESETS = {
   signature: { width: 1200, height: 420 },
   productionBadge: { width: 720, height: 720 },
 };
+const FIT_MODE_BY_ASSET = {
+  background: 'cover',
+  logo: 'contain',
+  signature: 'contain',
+  productionBadge: 'contain',
+};
 
 const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -79,6 +85,10 @@ export default function CertificateAssetUploader({
 
   const outputSize = useMemo(
     () => OUTPUT_PRESETS[assetType] || OUTPUT_PRESETS.logo,
+    [assetType],
+  );
+  const fitMode = useMemo(
+    () => FIT_MODE_BY_ASSET[assetType] || 'contain',
     [assetType],
   );
 
@@ -147,18 +157,23 @@ export default function CertificateAssetUploader({
       }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const preserveTransparency = assetType !== 'background' && editorFile.type !== 'image/jpeg';
+      if (!preserveTransparency) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
       const radians = (rotation * Math.PI) / 180;
       const rotationTurns = Math.abs(Math.round(rotation / 90)) % 2;
       const sourceWidth = rotationTurns === 1 ? image.height : image.width;
       const sourceHeight = rotationTurns === 1 ? image.width : image.height;
-      const coverScale = Math.max(canvas.width / sourceWidth, canvas.height / sourceHeight);
-      const drawScale = coverScale * zoom;
+      const baseScale = fitMode === 'cover'
+        ? Math.max(canvas.width / sourceWidth, canvas.height / sourceHeight)
+        : Math.min(canvas.width / sourceWidth, canvas.height / sourceHeight);
+      const drawScale = baseScale * zoom;
 
       ctx.save();
-      ctx.translate(canvas.width / 2 + offsetX * 3, canvas.height / 2 + offsetY * 3);
+      ctx.translate(canvas.width / 2 + offsetX * 2, canvas.height / 2 + offsetY * 2);
       ctx.rotate(radians);
       ctx.drawImage(
         image,
@@ -169,7 +184,9 @@ export default function CertificateAssetUploader({
       );
       ctx.restore();
 
-      const blobType = editorFile.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+      const blobType = !preserveTransparency && editorFile.type === 'image/jpeg'
+        ? 'image/jpeg'
+        : 'image/png';
       const blob = await blobFromCanvas(canvas, blobType, 0.94);
       const editedFile = new File([blob], normalizeFileName(assetType, editorFile), { type: blobType });
       const nextUrl = await onUpload(assetType, editedFile);
@@ -273,21 +290,21 @@ export default function CertificateAssetUploader({
           <DialogHeader>
             <DialogTitle>Edit Gambar</DialogTitle>
             <DialogDescription className="text-gray-400">
-              Atur crop dan rotasi gambar sebelum dipakai pada preview sertifikat.
+              Atur posisi gambar sebelum dipakai pada sertifikat. PNG transparan akan tetap transparan.
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
             <div className="rounded-2xl border border-yellow-400/20 bg-[#0f0f0f] p-4">
               <div
-                className="relative mx-auto overflow-hidden rounded-[28px] bg-[#d9d9d9]"
+                className={`relative mx-auto overflow-hidden rounded-[28px] ${assetType === 'background' ? 'bg-[#d9d9d9]' : 'bg-[linear-gradient(45deg,#1b1b1b_25%,#242424_25%,#242424_50%,#1b1b1b_50%,#1b1b1b_75%,#242424_75%,#242424_100%)] bg-[length:20px_20px]'}`}
                 style={{ aspectRatio, maxHeight: '420px' }}
               >
                 {editorSource ? (
                   <img
                     src={editorSource}
                     alt="Editor"
-                    className="absolute inset-0 h-full w-full select-none object-cover"
+                    className={`absolute inset-0 h-full w-full select-none ${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`}
                     style={{
                       transform: `translate(${offsetX}px, ${offsetY}px) scale(${zoom}) rotate(${rotation}deg)`,
                       transformOrigin: 'center center',
@@ -303,7 +320,7 @@ export default function CertificateAssetUploader({
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-yellow-400">Zoom</p>
                 <input
                   type="range"
-                  min="1"
+                  min={fitMode === 'cover' ? '1' : '0.6'}
                   max="2.6"
                   step="0.01"
                   value={zoom}

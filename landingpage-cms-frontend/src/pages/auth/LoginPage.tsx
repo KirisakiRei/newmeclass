@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router";
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../../app/components/ui/button";
+import { getApiErrorCode, getApiErrorMessage, getApiErrorStatus } from "../../services/api-error";
 import { authAPI } from "../../services/api";
 import { buildDashboardBridgeUrl, clearUserSession, setUserSession } from "../../lib/session";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
@@ -14,17 +15,9 @@ type LoginFeedback = {
 };
 
 const resolveUserLoginFeedback = (error: unknown): LoginFeedback => {
-  const status = Number(
-    (error as { status?: number })?.status
-    || (error as { payload?: { statusCode?: number } })?.payload?.statusCode
-    || 0,
-  );
-  const message = String(
-    (error as { message?: string })?.message
-    || (error as { payload?: { message?: string; error?: string } })?.payload?.message
-    || (error as { payload?: { message?: string; error?: string } })?.payload?.error
-    || "",
-  ).trim();
+  const status = getApiErrorStatus(error);
+  const code = getApiErrorCode(error);
+  const message = getApiErrorMessage(error, "").trim();
 
   if (status === 429) {
     return {
@@ -33,10 +26,24 @@ const resolveUserLoginFeedback = (error: unknown): LoginFeedback => {
     };
   }
 
-  if (status === 401 || /invalid credentials|email atau password|unauthorized/i.test(message)) {
+  if (code === "AUTH_INVALID_CREDENTIALS" || status === 401 || /invalid credentials|email atau password|unauthorized/i.test(message)) {
     return {
       title: "Email atau password belum sesuai",
       description: "Periksa kembali email dan password Anda, lalu coba masuk lagi.",
+    };
+  }
+
+  if (code === "AUTH_PROVIDER_MISMATCH_GOOGLE_ONLY") {
+    return {
+      title: "Akun terhubung ke Google",
+      description: "Silakan masuk menggunakan tombol Login dengan Google untuk email ini.",
+    };
+  }
+
+  if (code === "AUTH_PROVIDER_MISMATCH_MANUAL_ONLY") {
+    return {
+      title: "Gunakan email dan password",
+      description: "Akun ini tidak menggunakan login Google. Silakan masuk dengan email dan password.",
     };
   }
 

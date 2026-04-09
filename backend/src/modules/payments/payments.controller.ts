@@ -5,9 +5,11 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { AdminActivityLogService } from '../admin-activity/admin-activity.service';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
 import { MIN_PREMIUM_PRICE } from '../../common/settings/finance-settings';
+import { PrismaService } from '../prisma/prisma.service';
 import { PaymentsService } from './payments.service';
 import { PaymentsOpsService } from './payments-ops.service';
 import { UploadProofDto } from './dto/upload-proof.dto';
@@ -18,6 +20,8 @@ export class PaymentsController {
   constructor(
     private readonly service: PaymentsService,
     private readonly paymentsOpsService: PaymentsOpsService,
+    private readonly prisma: PrismaService,
+    private readonly adminActivityLogService: AdminActivityLogService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -51,8 +55,34 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('payments.manage')
-  approve(@Param('id') id: string, @Body() body: ApproveProofDto) {
-    return this.service.approveManualProof(id, body.status || 'approved', body.rejectionReason);
+  async approve(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string, @Body() body: ApproveProofDto) {
+    const before = await this.prisma.manualPaymentProof.findUnique({ where: { id } });
+    const updated = await this.service.approveManualProof(id, body.status || 'approved', body.rejectionReason);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_PAYMENT_PROOF_REVIEWED',
+      category: 'approval',
+      targetType: 'payment_proof',
+      targetId: id,
+      targetLabel: before?.paymentOrderId || id,
+      summary: `Bukti pembayaran ${id} direview dengan status ${body.status || 'approved'}.`,
+      before: before ? {
+        status: before.status,
+        amount: before.amount,
+      } : null,
+      after: updated ? {
+        status: updated.status,
+        amount: updated.amount,
+      } : {
+        status: body.status || 'approved',
+      },
+      meta: {
+        decision: body.status || 'approved',
+        reason: body.rejectionReason || null,
+      },
+      ipAddress: req?.ip,
+    });
+    return updated;
   }
 
   @Get('registration/:registrationId')
@@ -116,16 +146,47 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('payment_ops.manage')
-  acknowledgeAlert(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.paymentsOpsService.acknowledgeAlert(id, user?.sub || user?.username || 'system');
+  async acknowledgeAlert(@Param('id') id: string, @CurrentUser() user: any, @Req() req: any) {
+    const updated = await this.paymentsOpsService.acknowledgeAlert(id, user?.sub || user?.username || 'system');
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_PAYMENT_OPS_ALERT_ACKNOWLEDGED',
+      category: 'finance',
+      targetType: 'payment_ops_alert',
+      targetId: id,
+      targetLabel: updated?.title || id,
+      summary: `Alert payment ops ${updated?.title || id} diakui.`,
+      after: {
+        status: updated?.status,
+        title: updated?.title,
+        severity: updated?.severity,
+      },
+      ipAddress: req?.ip,
+    });
+    return updated;
   }
 
   @Post('ops/webhooks/:id/replay')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('payment_ops.manage')
-  replayWebhook(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.paymentsOpsService.replayWebhook(id, user?.sub || user?.username || 'system');
+  async replayWebhook(@Param('id') id: string, @CurrentUser() user: any, @Req() req: any) {
+    const result = await this.paymentsOpsService.replayWebhook(id, user?.sub || user?.username || 'system');
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_PAYMENT_OPS_WEBHOOK_REPLAYED',
+      category: 'finance',
+      targetType: 'payment_ops_webhook',
+      targetId: id,
+      targetLabel: result?.orderId || id,
+      summary: `Webhook payment ops ${id} direplay.`,
+      meta: {
+        orderId: result?.orderId || null,
+        jobId: result?.jobId || null,
+      },
+      ipAddress: req?.ip,
+    });
+    return result;
   }
 
   @Post('midtrans/webhook')

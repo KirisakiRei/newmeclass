@@ -271,6 +271,7 @@ export default function OfficialCertificateRenderer({
   personalityData = null,
   recipientName = 'NAMA PENERIMA',
   certificateNumber = 'NEWME-000000',
+  qrCodeDataUrl = '',
   identityLabel = 'ID',
   identityValue = '',
   issuedAt = null,
@@ -291,7 +292,6 @@ export default function OfficialCertificateRenderer({
   const secondaryLogoUrl = isYayasan ? (resolvedTemplate.secondaryLogoUrl || resolvedTemplate.logoUrl || null) : null;
   const backgroundTextureUrl = resolvedTemplate.backgroundTextureUrl || resolvedTemplate.backgroundUrl || null;
   const productionBadgeUrl = resolvedTemplate.productionBadgeUrl || null;
-  const signatureUrl = resolvedTemplate.signatureUrl || null;
   const signerName = resolvedTemplate.signerName || 'LIS SUDIBYO, ST';
   const signerTitle = resolvedTemplate.signerTitle || 'Chairman, R & B Development';
   const titleText = resolvedTemplate.titleText || 'SERTIFIKAT';
@@ -302,8 +302,8 @@ export default function OfficialCertificateRenderer({
   const baseBackground = isYayasan
     ? 'radial-gradient(circle at top, rgba(255,255,255,0.99), rgba(250,246,236,0.98) 28%, rgba(255,255,255,0.98) 62%, rgba(246,238,219,0.92) 100%)'
     : 'radial-gradient(circle at top, rgba(255,255,255,0.98), rgba(244,244,244,0.92) 40%, rgba(255,255,255,0.98) 100%)';
-  const participantName = String(recipientName || 'NAMA PESERTA').trim() || 'NAMA PESERTA';
-  const displayIdentityValue = String(identityValue || certificateNumber || 'NMC-2026-XXXXX').trim() || 'NMC-2026-XXXXX';
+  const participantName = (String(recipientName || 'NAMA PESERTA').trim() || 'NAMA PESERTA').toUpperCase();
+  const displayIdentityValue = String(identityValue || certificateNumber || 'NMC-2026-U000000').trim() || 'NMC-2026-U000000';
   const productionBadge = productionBadgeUrl ? (
     <img src={productionBadgeUrl} alt="Production Badge" className="h-12 w-12 rounded-full object-cover" />
   ) : (
@@ -314,12 +314,14 @@ export default function OfficialCertificateRenderer({
 
   return (
     <div
-      className={`relative mx-auto w-[1120px] min-w-[1120px] overflow-hidden bg-white shadow-2xl print:h-[210mm] print:w-[297mm] print:min-w-0 print:shadow-none ${className}`}
+      className={`relative mx-auto w-[1120px] min-w-[1120px] overflow-hidden bg-white shadow-2xl print:h-[210mm] print:max-h-[210mm] print:w-[297mm] print:max-w-[297mm] print:min-w-0 print:shadow-none ${className}`}
       style={{
         aspectRatio: '297 / 210',
         fontFamily: 'var(--font-certificate-body)',
         color: '#2E2E2E',
         background: baseBackground,
+        breakInside: 'avoid',
+        pageBreakInside: 'avoid',
       }}
       data-testid="official-certificate-renderer"
     >
@@ -351,7 +353,7 @@ export default function OfficialCertificateRenderer({
       <div className="pointer-events-none absolute bottom-0 right-0 h-24 w-16 bg-[#D4A017]" style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)', opacity: 0.9 }} />
 
       <DotCluster className="pointer-events-none absolute left-[190px] top-[18px]" rows={3} cols={6} />
-      <DotCluster className="pointer-events-none absolute bottom-[16px] left-[585px]" rows={3} cols={4} />
+      <DotCluster className="pointer-events-none absolute bottom-[16px] left-[500px]" rows={3} cols={4} />
       <DotCluster className="pointer-events-none absolute bottom-[72px] right-[14px]" rows={3} cols={2} />
       {isYayasan ? <DotCluster className="pointer-events-none absolute right-[170px] top-[22px]" rows={2} cols={4} /> : null}
 
@@ -606,23 +608,35 @@ export default function OfficialCertificateRenderer({
               )}
             </div>
 
-            <div className="mt-auto flex items-end gap-3 pl-5 pt-4">
-              <img src={brandLogoUrl} alt="NEWME Logo" className="h-[56px] w-[56px] object-contain" />
-              <FauxQr />
-              <div className="pb-1">
-                {signatureUrl ? (
-                  <img src={signatureUrl} alt="Tanda tangan" className="mb-1 h-[44px] max-w-[160px] object-contain object-left" />
-                ) : null}
-                <div className="border-b-2 border-[#2F2F2F] pb-1 text-[16px] font-semibold uppercase tracking-[0.02em] text-[#2C2C2C]">
-                  {signerName}
+            <div className="mt-auto pl-5 pt-4">
+              <div className="flex items-end gap-3">
+                <img src={brandLogoUrl} alt="NEWME Logo" className="mb-[46px] h-[56px] w-[56px] object-contain" />
+                <div className="pb-1">
+                  <div className="mb-2">
+                    {qrCodeDataUrl ? (
+                      <div className="inline-flex rounded-[10px] border border-[#2F2F2F]/15 bg-white p-[6px] shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
+                        <img
+                          src={qrCodeDataUrl}
+                          alt={`QR verifikasi ${certificateNumber}`}
+                          className="h-[84px] w-[84px] object-contain"
+                          style={{ imageRendering: 'pixelated' }}
+                        />
+                      </div>
+                    ) : (
+                      <FauxQr />
+                    )}
+                  </div>
+                  <div className="w-[170px] border-b-2 border-[#2F2F2F] pb-1 text-[16px] font-semibold uppercase tracking-[0.02em] text-[#2C2C2C]">
+                    {signerName}
+                  </div>
+                  <p
+                    className="mt-1 text-[13px] font-semibold text-[#D4A017]"
+                    style={{ fontFamily: 'var(--font-certificate-display)' }}
+                  >
+                    {signerTitle}
+                  </p>
+                  <p className="mt-1.5 text-[10px] tracking-[0.04em] text-[#5A5A5A]">Diterbitkan {issueDate}</p>
                 </div>
-                <p
-                  className="mt-1 text-[13px] font-semibold text-[#D4A017]"
-                  style={{ fontFamily: 'var(--font-certificate-display)' }}
-                >
-                  {signerTitle}
-                </p>
-                <p className="mt-1.5 text-[10px] tracking-[0.04em] text-[#5A5A5A]">Diterbitkan {issueDate}</p>
               </div>
             </div>
 

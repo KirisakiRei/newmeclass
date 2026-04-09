@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { toast } from "sonner";
 import { Button } from "../../app/components/ui/button";
 import { adminAuthAPI } from "../../services/api";
-import { clearAdminSession, setAdminSession } from "../../lib/session";
+import { clearAdminSession, clearRecentAdminLogout, hasRecentAdminLogout, setAdminSession } from "../../lib/session";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 import { SeoHead } from "../../app/components/SeoHead";
 
@@ -85,6 +85,12 @@ export function CMSLoginPage() {
 
   useEffect(() => {
     let active = true;
+    if (hasRecentAdminLogout()) {
+      return () => {
+        active = false;
+      };
+    }
+
     const bootstrap = async () => {
       try {
         const sessionState = await adminAuthAPI.getSession();
@@ -130,6 +136,7 @@ export function CMSLoginPage() {
         throw permissionError;
       }
       setAdminSession(null, admin);
+      clearRecentAdminLogout();
       navigate(next, { replace: true });
     } catch (err) {
       const feedback = resolveCmsLoginFeedback(err);

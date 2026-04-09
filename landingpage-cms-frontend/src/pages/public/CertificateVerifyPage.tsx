@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
+import { useSearchParams } from "react-router";
 import { Badge } from "../../app/components/ui/badge";
 import { Button } from "../../app/components/ui/button";
 import { Card, CardContent } from "../../app/components/ui/card";
@@ -13,14 +14,28 @@ type VerifyState =
   | { status: "notfound"; message: string };
 
 export function CertificateVerifyPage() {
+  const [searchParams] = useSearchParams();
   const [certNo, setCertNo] = useState("");
   const [state, setState] = useState<VerifyState>({ status: "idle" });
+  const queryCertificateNumber = String(searchParams.get("certificateNumber") || "").trim().toUpperCase();
 
-  const handleVerify = async () => {
-    if (!certNo.trim()) return;
+  const handleVerify = async (candidate?: string) => {
+    const normalizedCertificateNumber = String(candidate ?? certNo).trim().toUpperCase();
+    if (!normalizedCertificateNumber) {
+      setState({ status: "idle" });
+      return;
+    }
+
     try {
       setState({ status: "loading" });
-      const payload = await certificateAPI.verify(certNo.trim());
+      const payload = await certificateAPI.verify(normalizedCertificateNumber);
+      if (!payload?.valid) {
+        setState({
+          status: "notfound",
+          message: "Nomor sertifikat tidak ditemukan.",
+        });
+        return;
+      }
       setState({ status: "found", payload });
     } catch (err) {
       setState({
@@ -29,6 +44,12 @@ export function CertificateVerifyPage() {
       });
     }
   };
+
+  useEffect(() => {
+    if (!queryCertificateNumber) return;
+    setCertNo(queryCertificateNumber);
+    void handleVerify(queryCertificateNumber);
+  }, [queryCertificateNumber]);
 
   const foundPayload = state.status === "found" ? state.payload : null;
 
@@ -50,11 +71,11 @@ export function CertificateVerifyPage() {
                 <input
                   value={certNo}
                   onChange={(e) => {
-                    setCertNo(e.target.value);
+                    setCertNo(e.target.value.toUpperCase());
                     if (state.status !== "idle") setState({ status: "idle" });
                   }}
                   onKeyDown={(e) => e.key === "Enter" && void handleVerify()}
-                  placeholder="Contoh: NMC-2026-001234"
+                  placeholder="Contoh: NMC-2026-U123456"
                   className="flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-yellow-500/50"
                 />
                 <Button className="bg-yellow-500 text-black hover:bg-yellow-400" onClick={() => void handleVerify()} disabled={state.status === "loading"}>
@@ -74,7 +95,7 @@ export function CertificateVerifyPage() {
                   </div>
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">
                     <Badge className="justify-start border-green-500/20 bg-green-500/5 text-green-200">Nama: {foundPayload?.userName || foundPayload?.user?.fullName || "-"}</Badge>
-                    <Badge className="justify-start border-green-500/20 bg-green-500/5 text-green-200">Jenis: {foundPayload?.certificateType || foundPayload?.type || "-"}</Badge>
+                    <Badge className="justify-start border-green-500/20 bg-green-500/5 text-green-200">Jenis: {foundPayload?.certType || foundPayload?.certificateType || foundPayload?.type || "-"}</Badge>
                   </div>
                 </motion.div>
               )}

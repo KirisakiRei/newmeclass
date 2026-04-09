@@ -1,15 +1,20 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { ContentStatus, Role } from '@prisma/client';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { AdminActivityLogService } from '../admin-activity/admin-activity.service';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('articles')
 export class ArticlesController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly adminActivityLogService: AdminActivityLogService,
+  ) {}
 
   private slugify(input: string) {
     return String(input || '')
@@ -110,15 +115,32 @@ export class ArticlesController {
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('articles.create')
-  async create(@Body() body: any) {
+  async create(@CurrentUser() user: any, @Req() req: any, @Body() body: any) {
     const created = await this.prisma.article.create({ data: this.sanitizeArticleInput(body) });
-    return this.mapArticle(created);
+    const mapped = this.mapArticle(created);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_ARTICLE_CREATED',
+      category: 'content',
+      targetType: 'article',
+      targetId: mapped?.id || null,
+      targetLabel: mapped?.title || 'Artikel',
+      summary: `Artikel ${mapped?.title || ''} dibuat.`,
+      after: {
+        title: mapped?.title,
+        category: mapped?.category,
+        status: mapped?.status,
+        isPublished: mapped?.isPublished,
+      },
+      ipAddress: req?.ip,
+    });
+    return mapped;
   }
   @Put('bulk')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission(['articles.create', 'articles.edit', 'articles.delete'])
-  async bulkSync(@Body() body: any) {
+  async bulkSync(@CurrentUser() user: any, @Req() req: any, @Body() body: any) {
     const items = Array.isArray(body?.items) ? body.items : [];
     const replaceMissing = body?.replaceMissing !== false;
     const existing = await this.prisma.article.findMany({ orderBy: { createdAt: 'asc' } });
@@ -153,23 +175,83 @@ export class ArticlesController {
       }
     }
 
-    return this.getAll();
+    const result = await this.getAll();
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_ARTICLE_BULK_UPDATED',
+      category: 'content',
+      targetType: 'article',
+      targetId: 'bulk',
+      targetLabel: 'Sinkronisasi Artikel',
+      summary: 'Sinkronisasi bulk artikel dijalankan.',
+      meta: {
+        itemCount: items.length,
+        replaceMissing,
+      },
+      ipAddress: req?.ip,
+    });
+    return result;
   }
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('articles.edit')
-  async update(@Param('id') id: string, @Body() body: any) {
+  async update(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string, @Body() body: any) {
     const existing = await this.prisma.article.findUnique({ where: { id } });
     const updated = await this.prisma.article.update({
       where: { id },
       data: this.sanitizeArticleInput({ ...this.mapArticle(existing), ...body }),
     });
-    return this.mapArticle(updated);
+    const mappedBefore = this.mapArticle(existing);
+    const mapped = this.mapArticle(updated);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_ARTICLE_UPDATED',
+      category: 'content',
+      targetType: 'article',
+      targetId: id,
+      targetLabel: mapped?.title || id,
+      summary: `Artikel ${mapped?.title || ''} diperbarui.`,
+      before: mappedBefore ? {
+        title: mappedBefore.title,
+        category: mappedBefore.category,
+        status: mappedBefore.status,
+        isPublished: mappedBefore.isPublished,
+      } : null,
+      after: mapped ? {
+        title: mapped.title,
+        category: mapped.category,
+        status: mapped.status,
+        isPublished: mapped.isPublished,
+      } : null,
+      ipAddress: req?.ip,
+    });
+    return mapped;
   }
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('articles.delete')
-  async remove(@Param('id') id: string) { await this.prisma.article.delete({ where: { id } }); return { message: 'Deleted' }; }
+  async remove(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string) {
+    const before = await this.prisma.article.findUnique({ where: { id } });
+    await this.prisma.article.delete({ where: { id } });
+    const mappedBefore = this.mapArticle(before);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_ARTICLE_DELETED',
+      category: 'content',
+      targetType: 'article',
+      targetId: id,
+      targetLabel: mappedBefore?.title || id,
+      summary: `Artikel ${mappedBefore?.title || ''} dihapus.`,
+      before: mappedBefore ? {
+        title: mappedBefore.title,
+        category: mappedBefore.category,
+        status: mappedBefore.status,
+        isPublished: mappedBefore.isPublished,
+      } : null,
+      ipAddress: req?.ip,
+    });
+    return { message: 'Deleted' };
+  }
 }

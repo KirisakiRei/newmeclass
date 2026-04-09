@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Put, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { mkdirSync } from 'fs';
 import { extname, resolve } from 'path';
 import { Role, YayasanApprovalStatus } from '@prisma/client';
@@ -21,6 +21,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
+import { AdminActivityLogService } from '../admin-activity/admin-activity.service';
 import { DisbursementsService } from '../disbursements/disbursements.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProcessWithdrawalDto } from './dto/process-withdrawal.dto';
@@ -31,6 +32,7 @@ export class YayasanController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly disbursementsService: DisbursementsService,
+    private readonly adminActivityLogService: AdminActivityLogService,
   ) {}
 
   private async findParentMitra(referredByCode?: string | null) {
@@ -522,7 +524,7 @@ export class YayasanController {
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('yayasan.manage')
-  async toggleActive(@Param('id') id: string) {
+  async toggleActive(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string) {
     const row = await this.prisma.user.findUnique({ where: { id }, include: { yayasanProfile: true, profile: true, wallet: true } });
     const nextActive = !(row?.yayasanProfile?.isActive ?? row?.status === 'ACTIVE');
     await this.prisma.yayasanProfile.upsert({
@@ -531,14 +533,33 @@ export class YayasanController {
       update: { isActive: nextActive },
     });
     const updated = await this.prisma.user.update({ where: { id }, data: { status: nextActive ? 'ACTIVE' : 'INACTIVE' }, include: { yayasanProfile: true, profile: true, wallet: true } });
-    return this.buildYayasanView(updated);
+    const result = this.buildYayasanView(updated);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_YAYASAN_UPDATED',
+      category: 'yayasan',
+      targetType: 'yayasan',
+      targetId: id,
+      targetLabel: result?.institutionName || row?.fullName || id,
+      summary: `Status aktif yayasan ${result?.institutionName || row?.fullName || ''} diubah.`,
+      before: {
+        isActive: row?.yayasanProfile?.isActive ?? row?.status === 'ACTIVE',
+        status: row?.status,
+      },
+      after: {
+        isActive: result?.isActive ?? nextActive,
+        status: result?.status || updated.status,
+      },
+      ipAddress: req?.ip,
+    });
+    return result;
   }
 
   @Put('admin/:id/verify')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('yayasan.manage')
-  async verify(@Param('id') id: string) {
+  async verify(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string) {
     const row = await this.prisma.user.findUnique({ where: { id }, include: { yayasanProfile: true, profile: true, wallet: true } });
     await this.prisma.yayasanProfile.upsert({
       where: { userId: id },
@@ -546,7 +567,26 @@ export class YayasanController {
       update: { isVerified: true, isActive: true },
     });
     const updated = await this.prisma.user.update({ where: { id }, data: { status: 'ACTIVE' }, include: { yayasanProfile: true, profile: true, wallet: true } });
-    return this.buildYayasanView(updated);
+    const result = this.buildYayasanView(updated);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_YAYASAN_VERIFIED',
+      category: 'approval',
+      targetType: 'yayasan',
+      targetId: id,
+      targetLabel: result?.institutionName || row?.fullName || id,
+      summary: `Yayasan ${result?.institutionName || row?.fullName || ''} diverifikasi.`,
+      before: {
+        isVerified: row?.yayasanProfile?.isVerified ?? false,
+        status: row?.status,
+      },
+      after: {
+        isVerified: result?.isVerified ?? true,
+        status: result?.status || updated.status,
+      },
+      ipAddress: req?.ip,
+    });
+    return result;
   }
 
   @Get('admin/withdrawals')
@@ -588,21 +628,38 @@ export class YayasanController {
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('yayasan_withdrawals.manage')
-  async approveWithdrawal(@Param('id') id: string, @Body() body: ProcessWithdrawalDto) {
+  async approveWithdrawal(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string, @Body() body: ProcessWithdrawalDto) {
     if (!id || id === 'undefined' || id === 'null') {
       throw new BadRequestException('Withdrawal request id is required.');
     }
-    return this.disbursementsService.processDisbursement(id, body, { type: 'yayasan' });
+    const before = await this.prisma.disbursement.findUnique({ where: { id } });
+    const updated = await this.disbursementsService.processDisbursement(id, body, { type: 'yayasan' });
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_WITHDRAWAL_REVIEWED',
+      category: 'approval',
+      targetType: 'yayasan_withdrawal',
+      targetId: id,
+      targetLabel: before?.userId || id,
+      summary: `Withdrawal yayasan ${id} direview.`,
+      before: before ? { status: before.status, amount: before.amount, note: before.notes } : null,
+      after: updated ? { status: updated.status, amount: before?.amount || null, note: updated.notes } : null,
+      meta: {
+        decision: body?.status || 'APPROVED',
+      },
+      ipAddress: req?.ip,
+    });
+    return updated;
   }
 
   @Put('admin/withdrawals/:id/reject')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('yayasan_withdrawals.manage')
-  async rejectWithdrawal(@Param('id') id: string, @Body() body: ProcessWithdrawalDto) {
+  async rejectWithdrawal(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string, @Body() body: ProcessWithdrawalDto) {
     if (!id || id === 'undefined' || id === 'null') {
       throw new BadRequestException('Withdrawal request id is required.');
     }
-    return this.disbursementsService.processDisbursement(id, { ...body, status: 'REJECTED' }, { type: 'yayasan' });
+    return this.approveWithdrawal(user, req, id, { ...body, status: 'REJECTED' });
   }
 }

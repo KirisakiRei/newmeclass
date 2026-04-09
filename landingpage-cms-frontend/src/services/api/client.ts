@@ -20,9 +20,20 @@ const extractPayload = (payload: any) => (
     : payload
 );
 
-const extractMessage = (payload: any, fallback = 'Terjadi kesalahan') => (
-  String(payload?.message || payload?.error || fallback).trim()
-);
+const extractMessage = (payload: any, fallback = 'Terjadi kesalahan') => {
+  const detail = payload?.detail;
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail.trim();
+  }
+
+  if (Array.isArray(payload?.messages)) {
+    const combined = payload.messages.map((item: unknown) => String(item || '').trim()).filter(Boolean).join('. ');
+    if (combined) return combined;
+  }
+
+  const message = String(payload?.message || payload?.error || fallback).trim();
+  return message || fallback;
+};
 
 const getCsrfToken = () => {
   if (typeof document === 'undefined') return '';
@@ -71,6 +82,7 @@ export const request = async <T = any>(path: string, options: RequestOptions = {
     const error = new Error(extractMessage(parsed));
     (error as Error & { status?: number; payload?: unknown }).status = response.status;
     (error as Error & { status?: number; payload?: unknown }).payload = parsed;
+    (error as Error & { code?: string }).code = typeof parsed?.error === 'string' ? parsed.error : undefined;
     throw error;
   }
 
@@ -121,6 +133,7 @@ export const upload = async <T = any>(
     const error = new Error(extractMessage(parsed));
     (error as Error & { status?: number; payload?: unknown }).status = response.status;
     (error as Error & { status?: number; payload?: unknown }).payload = parsed;
+    (error as Error & { code?: string }).code = typeof parsed?.error === 'string' ? parsed.error : undefined;
     throw error;
   }
 

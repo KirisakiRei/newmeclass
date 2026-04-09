@@ -4,16 +4,21 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { performance } from 'perf_hooks';
+import { PrismaClient } from '@prisma/client';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const backendRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(backendRoot, '..');
+const prisma = new PrismaClient();
+const DEFAULT_TEST_OTP = '654321';
 
 export const API_PREFIX = process.env.API_PREFIX || 'api';
 export const APP_URL = process.env.APP_URL || 'http://localhost:5000';
 export const API_BASE = `${APP_URL.replace(/\/$/, '')}/${API_PREFIX}`;
 export const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY || 'replace_midtrans_server_key';
+const DEFAULT_ORIGIN = (process.env.REQUEST_ORIGIN || APP_URL).replace(/\/$/, '');
+const DEFAULT_REFERER = `${DEFAULT_ORIGIN}/`;
 
 export function unwrap(payload) {
   return payload && typeof payload === 'object' && 'data' in payload ? payload.data : payload;
@@ -28,11 +33,141 @@ export function extractItems(payload) {
   return [];
 }
 
-export async function requestJson(route, { method = 'GET', token, body, headers } = {}) {
+export function extractAccessToken(payload) {
+  const data = unwrap(payload);
+  if (data?.cookies?.accessToken) return data.cookies.accessToken;
+  if (data?.token) return data.token;
+
+  const setCookieHeaders = Array.isArray(payload?.setCookieHeaders)
+    ? payload.setCookieHeaders
+    : Array.isArray(payload?.headers?.['set-cookie'])
+      ? payload.headers['set-cookie']
+      : (payload?.headers?.['set-cookie'] ? [payload.headers['set-cookie']] : []);
+
+  for (const rawCookie of setCookieHeaders) {
+    const match = String(rawCookie || '').match(/\b(nm_[^=;]*_at)=([^;]+)/i);
+    if (match?.[2]) {
+      return match[2];
+    }
+  }
+
+  return null;
+}
+
+export function extractCsrfToken(payload) {
+  const data = unwrap(payload);
+  if (data?.cookies?.csrfToken) return data.cookies.csrfToken;
+  if (data?.csrfToken) return data.csrfToken;
+
+  const setCookieHeaders = Array.isArray(payload?.setCookieHeaders)
+    ? payload.setCookieHeaders
+    : Array.isArray(payload?.headers?.['set-cookie'])
+      ? payload.headers['set-cookie']
+      : (payload?.headers?.['set-cookie'] ? [payload.headers['set-cookie']] : []);
+
+  for (const rawCookie of setCookieHeaders) {
+    const match = String(rawCookie || '').match(/\bnm_csrf=([^;]+)/i);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
+
+export function extractAuthSubject(payload, preferredKey = 'user') {
+  const data = unwrap(payload);
+  if (!data || typeof data !== 'object') return null;
+  return data[preferredKey] || data.user || data.yayasan || data.mitra || data.admin || null;
+}
+
+async function setKnownRegistrationOtp(registrationToken, otp = DEFAULT_TEST_OTP) {
+  const now = new Date();
+  await prisma.pendingRegistration.update({
+    where: {
+      registrationTokenHash: crypto.createHash('sha256').update(String(registrationToken || '')).digest('hex'),
+    },
+    data: {
+      otpHash: crypto.createHash('sha256').update(String(otp || DEFAULT_TEST_OTP)).digest('hex'),
+      otpExpiresAt: new Date(now.getTime() + 10 * 60 * 1000),
+      resendAvailableAt: now,
+      attemptCount: 0,
+    },
+  });
+}
+
+export async function completeOtpRegistration(
+  basePath,
+  {
+    startBody,
+    completeBody,
+    otp = DEFAULT_TEST_OTP,
+    preferredEntityKey = 'user',
+  } = {},
+) {
+  const start = await requestJson(`${basePath}/register/start`, {
+    method: 'POST',
+    body: startBody,
+  });
+  if (!start?.ok) {
+    return {
+      ok: false,
+      start,
+      verify: null,
+      complete: null,
+      token: null,
+      entity: null,
+    };
+  }
+
+  const registrationToken = String(start.data?.registrationToken || '').trim();
+  await setKnownRegistrationOtp(registrationToken, otp);
+
+  const verify = await requestJson(`${basePath}/register/verify-otp`, {
+    method: 'POST',
+    body: {
+      registrationToken,
+      otp,
+    },
+  });
+  if (!verify?.ok) {
+    return {
+      ok: false,
+      start,
+      verify,
+      complete: null,
+      token: null,
+      entity: null,
+    };
+  }
+
+  const complete = await requestJson(`${basePath}/register/complete`, {
+    method: 'POST',
+    body: {
+      registrationToken,
+      ...(completeBody || {}),
+    },
+  });
+
+  return {
+    ok: Boolean(complete?.ok),
+    start,
+    verify,
+    complete,
+    token: extractAccessToken(complete),
+    csrfToken: extractCsrfToken(complete),
+    entity: extractAuthSubject(complete, preferredEntityKey),
+  };
+}
+
+export async function requestJson(route, { method = 'GET', token, csrfToken, body, headers } = {}) {
   const started = performance.now();
   const response = await fetch(`${API_BASE}${route}`, {
     method,
     headers: {
+      Origin: DEFAULT_ORIGIN,
+      Referer: DEFAULT_REFERER,
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken, Cookie: `nm_csrf=${csrfToken}` } : {}),
       ...(body ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(headers || {}),
@@ -48,6 +183,12 @@ export async function requestJson(route, { method = 'GET', token, body, headers 
   } catch {
     payload = { raw: text };
   }
+  const setCookieHeaders = typeof response.headers.getSetCookie === 'function'
+    ? response.headers.getSetCookie()
+    : (() => {
+        const single = response.headers.get('set-cookie');
+        return single ? [single] : [];
+      })();
 
   return {
     ok: response.ok,
@@ -56,26 +197,37 @@ export async function requestJson(route, { method = 'GET', token, body, headers 
     body: payload,
     data: unwrap(payload),
     headers: Object.fromEntries(response.headers.entries()),
+    setCookieHeaders,
   };
 }
 
-export async function requestBuffer(route, { method = 'GET', token, headers } = {}) {
+export async function requestBuffer(route, { method = 'GET', token, csrfToken, headers } = {}) {
   const started = performance.now();
   const response = await fetch(`${API_BASE}${route}`, {
     method,
     headers: {
+      Origin: DEFAULT_ORIGIN,
+      Referer: DEFAULT_REFERER,
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken, Cookie: `nm_csrf=${csrfToken}` } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(headers || {}),
     },
   });
   const durationMs = performance.now() - started;
   const buffer = Buffer.from(await response.arrayBuffer());
+  const setCookieHeaders = typeof response.headers.getSetCookie === 'function'
+    ? response.headers.getSetCookie()
+    : (() => {
+        const single = response.headers.get('set-cookie');
+        return single ? [single] : [];
+      })();
   return {
     ok: response.ok,
     status: response.status,
     durationMs,
     buffer,
     headers: Object.fromEntries(response.headers.entries()),
+    setCookieHeaders,
   };
 }
 

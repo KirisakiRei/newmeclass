@@ -5,12 +5,15 @@ const USER_SESSION_EVENT = 'newme-user-session-changed';
 const ADMIN_SESSION_EVENT = 'newme-admin-session-changed';
 const AUTH_CHANNEL_NAME = 'newme-auth-channel';
 const LEGACY_LOCAL_STORAGE_KEYS = ['user_data', 'admin_data'];
+const ADMIN_RECENT_LOGOUT_KEY = 'newme_admin_recent_logout_at';
+const ADMIN_RECENT_LOGOUT_TTL_MS = 1500;
 
 let authChannel: BroadcastChannel | null = null;
 let userSessionCache: unknown = null;
 let adminSessionCache: unknown = null;
 let userSessionActive = false;
 let adminSessionActive = false;
+let adminRecentLogoutAt = 0;
 
 const getChannel = () => {
   if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null;
@@ -64,6 +67,46 @@ export const getAdminSessionEventName = () => ADMIN_SESSION_EVENT;
 export const getUserSession = <T = unknown,>() => userSessionCache as T | null;
 export const getAdminSession = <T = unknown,>() => adminSessionCache as T | null;
 
+const readRecentAdminLogoutAt = () => {
+  if (typeof window === 'undefined') return adminRecentLogoutAt;
+  try {
+    const raw = Number(sessionStorage.getItem(ADMIN_RECENT_LOGOUT_KEY) || 0);
+    if (!Number.isFinite(raw) || raw <= 0) return adminRecentLogoutAt;
+    return Math.max(adminRecentLogoutAt, raw);
+  } catch {
+    return adminRecentLogoutAt;
+  }
+};
+
+export const markRecentAdminLogout = () => {
+  const now = Date.now();
+  adminRecentLogoutAt = now;
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem(ADMIN_RECENT_LOGOUT_KEY, String(now));
+    } catch {}
+  }
+};
+
+export const clearRecentAdminLogout = () => {
+  adminRecentLogoutAt = 0;
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.removeItem(ADMIN_RECENT_LOGOUT_KEY);
+    } catch {}
+  }
+};
+
+export const hasRecentAdminLogout = () => {
+  const recentAt = readRecentAdminLogoutAt();
+  if (!recentAt) return false;
+  const isRecent = Date.now() - recentAt <= ADMIN_RECENT_LOGOUT_TTL_MS;
+  if (!isRecent) {
+    clearRecentAdminLogout();
+  }
+  return isRecent;
+};
+
 export const setUserSession = (_token?: string | null, user?: unknown) => {
   purgeLegacyLocalStorage();
   userSessionActive = true;
@@ -82,6 +125,7 @@ export const clearUserSession = () => {
 
 export const setAdminSession = (_token?: string | null, admin?: unknown) => {
   purgeLegacyLocalStorage();
+  clearRecentAdminLogout();
   adminSessionActive = true;
   if (admin) {
     adminSessionCache = admin;

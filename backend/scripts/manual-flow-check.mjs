@@ -1,4 +1,9 @@
 import {
+  completeOtpRegistration,
+  extractAccessToken,
+  extractCsrfToken,
+  extractAuthSubject,
+  extractItems,
   requestBuffer,
   requestJson,
   settleOrder,
@@ -8,7 +13,7 @@ import {
   uniquePhone,
 } from './shared.mjs';
 
-const ADMIN_EMAIL = process.env.SEED_SUPERADMIN_EMAIL || 'admin@newme.id';
+const ADMIN_USERNAME = process.env.SEED_SUPERADMIN_USERNAME || 'superadmin';
 const ADMIN_PASSWORD = process.env.SEED_SUPERADMIN_PASSWORD || 'ChangeMeNow123!';
 
 function summarizeResponse(response) {
@@ -30,7 +35,7 @@ function requireOk(label, response) {
 async function ensureQuestions() {
   await requestJson('/questions/seed-questions', { method: 'POST', body: {} });
   const questions = await requestJson('/questions');
-  const all = questions.data || [];
+  const all = extractItems(questions.body);
   return {
     all,
     free: all.filter((item) => item.isFree === true),
@@ -51,42 +56,51 @@ async function run() {
 
   const adminLogin = await requestJson('/admin/login', {
     method: 'POST',
-    body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+    body: { username: ADMIN_USERNAME, password: ADMIN_PASSWORD },
   });
   requireOk('admin login', adminLogin);
-  const adminToken = adminLogin.data.token;
+  const adminToken = extractAccessToken(adminLogin);
+  const adminCsrfToken = extractCsrfToken(adminLogin);
   const questions = await ensureQuestions();
   const freeAnswers = Object.fromEntries(questions.free.map((item) => [item._id, 0]));
   const paidAnswers = Object.fromEntries(questions.paid.map((item) => [item._id, 1]));
 
-  const individualRegister = await requestJson('/auth/register', {
-    method: 'POST',
-    body: {
+  const individualRegistration = await completeOtpRegistration('/auth', {
+    startBody: {
       email: uniqueEmail('individual', stamp, 1),
       fullName: 'Manual Individual User',
       password: 'Password123!',
+    },
+    completeBody: {
       phone: uniquePhone('0811', stamp, 1),
+      whatsapp: uniquePhone('0811', stamp, 1),
       address: 'Jl. Manual Individual 1',
     },
   });
-  requireOk('individual register', individualRegister);
-  const individualUser = individualRegister.data.user;
+  requireOk('individual register start', individualRegistration.start);
+  requireOk('individual register verify', individualRegistration.verify);
+  requireOk('individual register complete', individualRegistration.complete);
+  const individualRegister = individualRegistration.complete;
+  const individualUser = extractAuthSubject(individualRegister, 'user');
   const individualLogin = await requestJson('/auth/login', {
     method: 'POST',
     body: { email: individualUser.email, password: 'Password123!' },
   });
   requireOk('individual login', individualLogin);
-  const individualToken = individualLogin.data.token;
+  const individualToken = extractAccessToken(individualLogin);
+  const individualCsrfToken = extractCsrfToken(individualLogin);
   const individualProfile = await requestJson('/auth/me', { token: individualToken });
   const freeSubmit = await requestJson('/test-results', {
     method: 'POST',
     token: individualToken,
-    body: { userId: individualUser._id, testType: 'free', category: 'general', answers: freeAnswers },
+    csrfToken: individualCsrfToken,
+    body: { userId: individualUser._id || individualUser.id, testType: 'free', category: 'general', answers: freeAnswers },
   });
   const freeAccess = await requestJson('/test-access/check', { token: individualToken });
   const topup = await requestJson('/wallet/topup', {
     method: 'POST',
     token: individualToken,
+    csrfToken: individualCsrfToken,
     body: { amount: 150000 },
   });
   requireOk('individual wallet topup', topup);
@@ -97,6 +111,7 @@ async function run() {
   const walletPay = await requestJson('/wallet/pay-test', {
     method: 'POST',
     token: individualToken,
+    csrfToken: individualCsrfToken,
     body: {
       amount: 100000,
       description: 'Manual flow premium payment',
@@ -105,9 +120,10 @@ async function run() {
   const paidSubmit = await requestJson('/test-results', {
     method: 'POST',
     token: individualToken,
-    body: { userId: individualUser._id, testType: 'paid', category: 'general', answers: paidAnswers },
+    csrfToken: individualCsrfToken,
+    body: { userId: individualUser._id || individualUser.id, testType: 'paid', category: 'general', answers: paidAnswers },
   });
-  const generatedCertificate = await requestBuffer(`/certificates/generate-newme/${individualUser._id}`);
+  const generatedCertificate = await requestBuffer(`/certificates/generate-newme/${individualUser._id || individualUser.id}`);
 
   report.manualFlows.individualUser = {
     register: individualRegister,
@@ -127,73 +143,110 @@ async function run() {
     },
   };
 
-  const mitraRegister = await requestJson('/mitra/register', {
+  const mitraEmail = uniqueEmail('mitra', stamp, 1);
+  const mitraPhone = uniquePhone('0821', stamp, 1);
+  const mitraInvite = await requestJson('/mitra/admin', {
     method: 'POST',
+    token: adminToken,
+    csrfToken: adminCsrfToken,
     body: {
-      email: uniqueEmail('mitra', stamp, 1),
+      email: mitraEmail,
       fullName: 'Manual Mitra',
-      password: 'Password123!',
-      phone: uniquePhone('0821', stamp, 1),
+      phone: mitraPhone,
     },
   });
-  requireOk('mitra register', mitraRegister);
-  const mitraUser = mitraRegister.data.mitra;
-  const mitraToken = mitraRegister.data.token;
-  const mitraVerify = await requestJson(`/mitra/admin/${mitraUser._id}/verify`, {
+  requireOk('mitra admin create', mitraInvite);
+  const mitraInviteUrl = String(mitraInvite.data?.invite?.inviteUrl || '').trim();
+  const mitraInviteToken = mitraInviteUrl ? new URL(mitraInviteUrl).searchParams.get('token') : null;
+  if (!mitraInviteToken) {
+    throw new Error('Token invite mitra tidak tersedia dari admin create.');
+  }
+  const mitraRegister = await requestJson('/mitra/invite/claim', {
+    method: 'POST',
+    body: {
+      token: mitraInviteToken,
+      email: mitraEmail,
+      fullName: 'Manual Mitra',
+      password: 'Password123!',
+      phone: mitraPhone,
+      address: 'Jl. Manual Mitra',
+      description: 'Mitra untuk smoke test',
+    },
+  });
+  requireOk('mitra invite claim', mitraRegister);
+  const mitraUser = extractAuthSubject(mitraRegister, 'mitra');
+  const mitraToken = extractAccessToken(mitraRegister);
+  const mitraCsrfToken = extractCsrfToken(mitraRegister);
+  const mitraVerify = await requestJson(`/mitra/admin/${mitraUser._id || mitraUser.id}/verify`, {
     method: 'PUT',
     token: adminToken,
+    csrfToken: adminCsrfToken,
     body: {},
   });
   const mitraMe = await requestJson('/mitra/me', { token: mitraToken });
 
-  const yayasanRegister = await requestJson('/yayasan/register', {
-    method: 'POST',
-    body: {
+  const yayasanRegistration = await completeOtpRegistration('/yayasan', {
+    startBody: {
       email: uniqueEmail('yayasan', stamp, 1),
       fullName: 'Manual Yayasan',
-      institutionName: 'Manual Yayasan',
       password: 'Password123!',
+      referralCode: mitraMe.data.inviteCode,
+    },
+    completeBody: {
       phone: uniquePhone('0831', stamp, 1),
       referralCode: mitraMe.data.inviteCode,
-      referralPrice: 100000,
-      institutionAddress: 'Jl. Manual Yayasan',
+      address: 'Jl. Manual Yayasan',
       description: 'Yayasan untuk smoke test',
     },
   });
-  requireOk('yayasan register', yayasanRegister);
-  const yayasanUser = yayasanRegister.data.yayasan;
-  const yayasanToken = yayasanRegister.data.token;
-  const yayasanVerify = await requestJson(`/yayasan/admin/${yayasanUser._id}/verify`, {
+  requireOk('yayasan register start', yayasanRegistration.start);
+  requireOk('yayasan register verify', yayasanRegistration.verify);
+  requireOk('yayasan register complete', yayasanRegistration.complete);
+  const yayasanRegister = yayasanRegistration.complete;
+  const yayasanUser = extractAuthSubject(yayasanRegister, 'yayasan');
+  const yayasanToken = extractAccessToken(yayasanRegister);
+  const yayasanCsrfToken = yayasanRegistration.csrfToken || extractCsrfToken(yayasanRegister);
+  const yayasanVerify = await requestJson(`/yayasan/admin/${yayasanUser._id || yayasanUser.id}/verify`, {
     method: 'PUT',
     token: adminToken,
+    csrfToken: adminCsrfToken,
     body: {},
   });
-  const mitraSetPrice = await requestJson(`/mitra/yayasan/${yayasanUser._id}/price`, {
+  const mitraSetPrice = await requestJson(`/mitra/yayasan/${yayasanUser._id || yayasanUser.id}/price`, {
     method: 'PUT',
     token: mitraToken,
+    csrfToken: mitraCsrfToken,
     body: { yayasanShare: 100000, mitraShare: 50000, totalPrice: 250000 },
   });
   const yayasanMe = await requestJson('/yayasan/me', { token: yayasanToken });
 
-  const referredUserRegister = await requestJson('/auth/register', {
-    method: 'POST',
-    body: {
+  const referredUserRegistration = await completeOtpRegistration('/auth', {
+    startBody: {
       email: uniqueEmail('referred-user', stamp, 1),
       fullName: 'Manual Referred User',
       password: 'Password123!',
+      referralCode: yayasanMe.data.referralCode,
+    },
+    completeBody: {
       phone: uniquePhone('0841', stamp, 1),
+      whatsapp: uniquePhone('0841', stamp, 1),
       referralCode: yayasanMe.data.referralCode,
       address: 'Jl. Referral Yayasan 1',
       referralSource: 'yayasan',
     },
   });
-  requireOk('yayasan referred user register', referredUserRegister);
-  const referredUser = referredUserRegister.data.user;
-  const referredToken = referredUserRegister.data.token;
+  requireOk('yayasan referred user register start', referredUserRegistration.start);
+  requireOk('yayasan referred user register verify', referredUserRegistration.verify);
+  requireOk('yayasan referred user register complete', referredUserRegistration.complete);
+  const referredUserRegister = referredUserRegistration.complete;
+  const referredUser = extractAuthSubject(referredUserRegister, 'user');
+  const referredToken = extractAccessToken(referredUserRegister);
+  const referredCsrfToken = referredUserRegistration.csrfToken || extractCsrfToken(referredUserRegister);
   const referralPrice = await requestJson(`/user-payments/test-price?referralCode=${yayasanMe.data.referralCode}`);
   const qris = await requestJson('/user-payments/create-qris', {
     method: 'POST',
     token: referredToken,
+    csrfToken: referredCsrfToken,
     body: {},
   });
   await settleOrder(qris.data.orderId, qris.data.amount);
@@ -210,6 +263,7 @@ async function run() {
   const yayasanWithdraw = await requestJson('/yayasan/wallet/withdraw', {
     method: 'POST',
     token: yayasanToken,
+    csrfToken: yayasanCsrfToken,
     body: {
       amount: 15000,
       bankName: 'BCA',
@@ -221,6 +275,7 @@ async function run() {
   const mitraWithdraw = await requestJson('/mitra/withdraw', {
     method: 'POST',
     token: mitraToken,
+    csrfToken: mitraCsrfToken,
     body: {
       amount: 5000,
       bankName: 'BRI',
@@ -238,11 +293,13 @@ async function run() {
   const approveYayasanWithdraw = await requestJson(`/yayasan/admin/withdrawals/${yayasanWithdraw.data._id}/approve`, {
     method: 'PUT',
     token: adminToken,
+    csrfToken: adminCsrfToken,
     body: { status: 'APPROVED', notes: 'Approved in manual flow' },
   });
   const approveMitraWithdraw = await requestJson(`/mitra/admin/withdrawals/${mitraWithdraw.data._id}/approve`, {
     method: 'PUT',
     token: adminToken,
+    csrfToken: adminCsrfToken,
     body: { status: 'APPROVED', notes: 'Approved in manual flow' },
   });
   const yayasanWalletAfterWithdraw = await requestJson('/yayasan/wallet', { token: yayasanToken });
@@ -250,8 +307,9 @@ async function run() {
   const issueCertificate = await requestJson('/certificates/issue', {
     method: 'POST',
     token: adminToken,
+    csrfToken: adminCsrfToken,
     body: {
-      userId: referredUser._id,
+      userId: referredUser._id || referredUser.id,
       certType: 'INDIVIDU',
       courseName: 'NEWME Premium',
       userName: referredUser.name,
@@ -260,41 +318,55 @@ async function run() {
   });
   const downloadedCertificate = await requestBuffer(`/certificates/download/${issueCertificate.data.certificateNumber}`);
 
-  const userReferrerRegister = await requestJson('/auth/register', {
-    method: 'POST',
-    body: {
+  const userReferrerRegistration = await completeOtpRegistration('/auth', {
+    startBody: {
       email: uniqueEmail('user-referrer', stamp, 1),
       fullName: 'Manual User Referrer',
       password: 'Password123!',
+    },
+    completeBody: {
       phone: uniquePhone('0851', stamp, 1),
+      whatsapp: uniquePhone('0851', stamp, 1),
       address: 'Jl. Referral User 1',
     },
   });
-  requireOk('user referrer register', userReferrerRegister);
-  const userReferrer = userReferrerRegister.data.user;
-  const userReferrerToken = userReferrerRegister.data.token;
+  requireOk('user referrer register start', userReferrerRegistration.start);
+  requireOk('user referrer register verify', userReferrerRegistration.verify);
+  requireOk('user referrer register complete', userReferrerRegistration.complete);
+  const userReferrerRegister = userReferrerRegistration.complete;
+  const userReferrer = extractAuthSubject(userReferrerRegister, 'user');
+  const userReferrerToken = extractAccessToken(userReferrerRegister);
+  const userReferrerCsrfToken = userReferrerRegistration.csrfToken || extractCsrfToken(userReferrerRegister);
   const userReferrerProfileBefore = await requestJson('/auth/me', { token: userReferrerToken });
 
-  const userReferralRegister = await requestJson('/auth/register', {
-    method: 'POST',
-    body: {
+  const userReferralRegistration = await completeOtpRegistration('/auth', {
+    startBody: {
       email: uniqueEmail('user-referred', stamp, 1),
       fullName: 'Manual User Referred',
       password: 'Password123!',
+      referralCode: userReferrer.myReferralCode,
+    },
+    completeBody: {
       phone: uniquePhone('0861', stamp, 1),
+      whatsapp: uniquePhone('0861', stamp, 1),
       referralCode: userReferrer.myReferralCode,
       address: 'Jl. Referral User 2',
       referralSource: 'user',
     },
   });
-  requireOk('user referred register', userReferralRegister);
-  const userReferral = userReferralRegister.data.user;
-  const userReferralToken = userReferralRegister.data.token;
+  requireOk('user referred register start', userReferralRegistration.start);
+  requireOk('user referred register verify', userReferralRegistration.verify);
+  requireOk('user referred register complete', userReferralRegistration.complete);
+  const userReferralRegister = userReferralRegistration.complete;
+  const userReferral = extractAuthSubject(userReferralRegister, 'user');
+  const userReferralToken = extractAccessToken(userReferralRegister);
+  const userReferralCsrfToken = userReferralRegistration.csrfToken || extractCsrfToken(userReferralRegister);
   const userReferrerProfileAfterRegister = await requestJson('/auth/me', { token: userReferrerToken });
   const userReferralPrice = await requestJson(`/user-payments/test-price?referralCode=${userReferrer.myReferralCode}`);
   const userReferralQris = await requestJson('/user-payments/create-qris', {
     method: 'POST',
     token: userReferralToken,
+    csrfToken: userReferralCsrfToken,
     body: {},
   });
   requireOk('user referral qris', userReferralQris);

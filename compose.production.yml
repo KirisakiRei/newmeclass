@@ -1,0 +1,253 @@
+x-backend-env: &backend-env
+  NODE_ENV: ${NODE_ENV:-production}
+  PORT: ${PORT:-5000}
+  API_PREFIX: ${API_PREFIX:-api}
+  APP_NAME: ${APP_NAME:-NEWME Backend}
+  APP_URL: ${APP_URL:-https://your-domain.tld}
+  FRONTEND_URL: ${FRONTEND_URL:-https://app.your-domain.tld}
+  PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-https://your-domain.tld}
+  DASHBOARD_FRONTEND_URL: ${DASHBOARD_FRONTEND_URL:-https://app.your-domain.tld}
+  CMS_FRONTEND_URL: ${CMS_FRONTEND_URL:-https://your-domain.tld}
+  CORS_ORIGINS: ${CORS_ORIGINS:-https://your-domain.tld,https://app.your-domain.tld}
+  TZ: ${TZ:-Asia/Jakarta}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  DATABASE_URL: ${DATABASE_URL:-mysql://replace_user:replace_password@database:3306/replace_database}
+  DIRECT_URL: ${DIRECT_URL:-mysql://replace_user:replace_password@database:3306/replace_database}
+  DB_TX_TIMEOUT_MS: ${DB_TX_TIMEOUT_MS:-8000}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-replace_with_a_minimum_16_char_access_secret}
+  AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
+  AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
+  AUTH_COOKIE_SAME_SITE: ${AUTH_COOKIE_SAME_SITE:-lax}
+  AUTH_ACCESS_TTL_USER: ${AUTH_ACCESS_TTL_USER:-20m}
+  AUTH_ACCESS_TTL_STAFF: ${AUTH_ACCESS_TTL_STAFF:-15m}
+  AUTH_REFRESH_TTL_DAYS: ${AUTH_REFRESH_TTL_DAYS:-30}
+  AUTH_REGISTER_OTP_TTL_MINUTES: ${AUTH_REGISTER_OTP_TTL_MINUTES:-10}
+  AUTH_REGISTER_OTP_MAX_ATTEMPTS: ${AUTH_REGISTER_OTP_MAX_ATTEMPTS:-5}
+  AUTH_REGISTER_RESEND_COOLDOWN_SECONDS: ${AUTH_REGISTER_RESEND_COOLDOWN_SECONDS:-60}
+  CSP_REPORT_ONLY: ${CSP_REPORT_ONLY:-false}
+  BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+  RATE_LIMIT_TTL: ${RATE_LIMIT_TTL:-60}
+  RATE_LIMIT_LIMIT: ${RATE_LIMIT_LIMIT:-120}
+  AUTH_RATE_LIMIT_TTL: ${AUTH_RATE_LIMIT_TTL:-60}
+  AUTH_RATE_LIMIT_REGISTER_LIMIT: ${AUTH_RATE_LIMIT_REGISTER_LIMIT:-20}
+  AUTH_RATE_LIMIT_LOGIN_LIMIT: ${AUTH_RATE_LIMIT_LOGIN_LIMIT:-20}
+  AUTH_RATE_LIMIT_ADMIN_LOGIN_LIMIT: ${AUTH_RATE_LIMIT_ADMIN_LOGIN_LIMIT:-8}
+  AUTH_RATE_LIMIT_PASSWORD_RECOVERY_LIMIT: ${AUTH_RATE_LIMIT_PASSWORD_RECOVERY_LIMIT:-8}
+  CERT_DOWNLOAD_RATE_LIMIT_TTL: ${CERT_DOWNLOAD_RATE_LIMIT_TTL:-60}
+  CERT_DOWNLOAD_RATE_LIMIT: ${CERT_DOWNLOAD_RATE_LIMIT:-30}
+  CERT_AI_DOWNLOAD_RATE_LIMIT: ${CERT_AI_DOWNLOAD_RATE_LIMIT:-20}
+  CERT_GENERATE_RATE_LIMIT: ${CERT_GENERATE_RATE_LIMIT:-15}
+  CERTIFICATE_PDF_JPEG_QUALITY: ${CERTIFICATE_PDF_JPEG_QUALITY:-90}
+  CERTIFICATE_PDF_JPEG_MAX_QUALITY: ${CERTIFICATE_PDF_JPEG_MAX_QUALITY:-90}
+  CERTIFICATE_PDF_JPEG_MIN_QUALITY: ${CERTIFICATE_PDF_JPEG_MIN_QUALITY:-76}
+  CERTIFICATE_PDF_JPEG_QUALITY_STEP: ${CERTIFICATE_PDF_JPEG_QUALITY_STEP:-4}
+  CERTIFICATE_PDF_TARGET_MIN_BYTES: ${CERTIFICATE_PDF_TARGET_MIN_BYTES:-1048576}
+  CERTIFICATE_PDF_TARGET_MAX_BYTES: ${CERTIFICATE_PDF_TARGET_MAX_BYTES:-5242880}
+  CERTIFICATE_PDF_RENDER_SCALE: ${CERTIFICATE_PDF_RENDER_SCALE:-2}
+  CERTIFICATE_PDF_WAIT_TIMEOUT_MS: ${CERTIFICATE_PDF_WAIT_TIMEOUT_MS:-30000}
+  CERTIFICATE_PDF_RENDER_VERSION: ${CERTIFICATE_PDF_RENDER_VERSION:-2026-04-04-11}
+  TRUST_PROXY: ${TRUST_PROXY:-true}
+  REDIS_HOST: ${REDIS_HOST:-redis}
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  REDIS_DB: ${REDIS_DB:-0}
+  BULLMQ_PREFIX: ${BULLMQ_PREFIX:-newme}
+  BULLMQ_DEFAULT_REMOVE_ON_COMPLETE: ${BULLMQ_DEFAULT_REMOVE_ON_COMPLETE:-1000}
+  BULLMQ_DEFAULT_REMOVE_ON_FAIL: ${BULLMQ_DEFAULT_REMOVE_ON_FAIL:-5000}
+  QUEUE_CONCURRENCY_PAYMENT: ${QUEUE_CONCURRENCY_PAYMENT:-10}
+  QUEUE_CONCURRENCY_SCORING: ${QUEUE_CONCURRENCY_SCORING:-20}
+  MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
+  MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-replace_midtrans_server_key}
+  MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-replace_midtrans_client_key}
+  MIDTRANS_MERCHANT_ID: ${MIDTRANS_MERCHANT_ID:-replace_midtrans_merchant_id}
+  MIDTRANS_SANITIZED: ${MIDTRANS_SANITIZED:-true}
+  MIDTRANS_3DS: ${MIDTRANS_3DS:-true}
+  MIDTRANS_WEBHOOK_PATH: ${MIDTRANS_WEBHOOK_PATH:-/api/payments/midtrans/webhook}
+  DISBURSEMENT_PROVIDER: ${DISBURSEMENT_PROVIDER:-manual}
+  MIDTRANS_IRIS_API_KEY: ${MIDTRANS_IRIS_API_KEY:-}
+  MIDTRANS_IRIS_SANDBOX_API_KEY: ${MIDTRANS_IRIS_SANDBOX_API_KEY:-}
+  MIDTRANS_IRIS_PRODUCTION_API_KEY: ${MIDTRANS_IRIS_PRODUCTION_API_KEY:-}
+  MIDTRANS_IRIS_SANDBOX_BASE_URL: ${MIDTRANS_IRIS_SANDBOX_BASE_URL:-https://app.sandbox.midtrans.com/iris/api/v1}
+  MIDTRANS_IRIS_PRODUCTION_BASE_URL: ${MIDTRANS_IRIS_PRODUCTION_BASE_URL:-https://app.midtrans.com/iris/api/v1}
+  MIDTRANS_IRIS_PAYOUTS_PATH: ${MIDTRANS_IRIS_PAYOUTS_PATH:-/payouts}
+  PAYMENT_RECONCILE_CRON: ${PAYMENT_RECONCILE_CRON:-*/5 * * * *}
+  PAYMENT_RECONCILE_WINDOW_MINUTES: ${PAYMENT_RECONCILE_WINDOW_MINUTES:-120}
+  STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+  UPLOAD_DIR: ${UPLOAD_DIR:-./uploads}
+  UPLOAD_PUBLIC_BASE_URL: ${UPLOAD_PUBLIC_BASE_URL:-https://your-domain.tld/uploads}
+  MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-10}
+  ALLOWED_IMAGE_EXT: ${ALLOWED_IMAGE_EXT:-jpg,jpeg,png,webp}
+  ALLOWED_DOC_EXT: ${ALLOWED_DOC_EXT:-pdf}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-2525}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASS: ${SMTP_PASS:-}
+  SMTP_FROM_NAME: ${SMTP_FROM_NAME:-NEWME}
+  SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-no-reply@newme.id}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  CERT_TEMPLATE_DIR: ${CERT_TEMPLATE_DIR:-./uploads/certificates/templates}
+  CERT_OUTPUT_DIR: ${CERT_OUTPUT_DIR:-./uploads/certificates/generated}
+  CERT_NUMBER_PREFIX: ${CERT_NUMBER_PREFIX:-NEWME}
+  CERT_TIMEZONE: ${CERT_TIMEZONE:-Asia/Jakarta}
+  CRON_ANALYTICS_CLEANUP: ${CRON_ANALYTICS_CLEANUP:-0 */6 * * *}
+  CRON_TEMP_FILES_CLEANUP: ${CRON_TEMP_FILES_CLEANUP:-0 3 * * *}
+  SEED_SUPERADMIN_EMAIL: ${SEED_SUPERADMIN_EMAIL:-admin@newme.id}
+  SEED_SUPERADMIN_PASSWORD: ${SEED_SUPERADMIN_PASSWORD:-ChangeMeNow123!}
+  SEED_SUPERADMIN_NAME: ${SEED_SUPERADMIN_NAME:-Super Admin}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-}
+
+services:
+  database:
+    image: mysql:8.4
+    container_name: database
+    command:
+      - --mysql-native-password=ON
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-NEWME_DB}
+      MYSQL_USER: ${MYSQL_USER:-NEWME_ADMIN}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-replace_mysql_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-replace_with_a_strong_root_password}
+      TZ: ${TZ:-Asia/Jakarta}
+    volumes:
+      - database_data:/var/lib/mysql
+      - ./deploy/mysql/init/01-auth-plugin-compat.sh:/docker-entrypoint-initdb.d/01-auth-plugin-compat.sh:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u"$${MYSQL_USER}" -p"$${MYSQL_PASSWORD}" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command:
+      - sh
+      - -c
+      - |
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD";
+        fi
+        exec redis-server --appendonly yes;
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |
+          if [ -n "$$REDIS_PASSWORD" ]; then
+            redis-cli -a "$$REDIS_PASSWORD" ping | grep PONG >/dev/null;
+          else
+            redis-cli ping | grep PONG >/dev/null;
+          fi
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  migrate:
+    profiles: ["ops"]
+    image: favcreamyy/newme-backend-tools:${APP_IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      <<: *backend-env
+    depends_on:
+      database:
+        condition: service_healthy
+    command: ["npx", "prisma", "migrate", "deploy"]
+    restart: "no"
+
+  backend:
+    container_name: newme-backend-v1
+    image: favcreamyy/newme-backend:${APP_IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      <<: *backend-env
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_uploads:/app/uploads
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:5000/api/health').then((res)=>res.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  public_frontend:
+    container_name: public_frontend
+    image: favcreamyy/newme-landing-cms-frontend:${APP_IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      NGINX_BACKEND_UPSTREAM: ${NGINX_BACKEND_UPSTREAM:-http://backend:5000}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-8081}:80"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://127.0.0.1/healthz || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  dashboard_frontend:
+    container_name: dashboard_frontend
+    image: favcreamyy/newme-app-frontend:${APP_IMAGE_TAG:-latest}
+    pull_policy: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${APP_FRONTEND_PORT:-8080}:80"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --spider http://127.0.0.1/healthz || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  seed:
+    profiles: ["ops"]
+    image: favcreamyy/newme-backend-tools:${APP_IMAGE_TAG:-latest}
+    pull_policy: always
+    environment:
+      <<: *backend-env
+    depends_on:
+      database:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command: ["node", "dist/prisma/seed.js"]
+    volumes:
+      - backend_uploads:/app/uploads
+    restart: "no"
+
+volumes:
+  database_data:
+  redis_data:
+  backend_uploads:

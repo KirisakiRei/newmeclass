@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { AccountStatus, Prisma, Role } from '@prisma/client';
-import { createHash } from 'crypto';
+import { hashLocalPassword } from 'src/common/auth/password.utils';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   DEVELOPER_ROOT_ROLE_SLUG,
@@ -25,10 +25,6 @@ export class AdminRbacService {
   private hasBackfilledAdminUsers = false;
 
   constructor(private readonly prisma: PrismaService) {}
-
-  private hashPassword(password: string) {
-    return createHash('sha256').update(password).digest('hex');
-  }
 
   private async sleep(ms: number) {
     await new Promise((resolve) => setTimeout(resolve, ms));
@@ -288,7 +284,7 @@ export class AdminRbacService {
             email: developerEmail,
             username: developerUsername,
             fullName: developerName,
-            passwordHash: this.hashPassword(String(process.env.SEED_DEVELOPER_PASSWORD || 'udahlupa')),
+            passwordHash: await hashLocalPassword(String(process.env.SEED_DEVELOPER_PASSWORD || 'udahlupa')),
             role: Role.DEVELOPER,
             status: AccountStatus.ACTIVE,
             adminRoleId: developerRoleId,

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { Loader2 } from "lucide-react";
 import { adminAuthAPI } from "../../services/api";
-import { clearAdminSession, setAdminSession } from "../../lib/session";
+import { clearAdminSession, hasRecentAdminLogout, setAdminSession } from "../../lib/session";
 
 type AdminProfile = {
   permissionKeys?: string[];
@@ -22,6 +22,15 @@ export function CMSProtectedRoute() {
     let active = true;
 
     const hydrate = async () => {
+      if (hasRecentAdminLogout()) {
+        clearAdminSession();
+        if (active) {
+          setReason("unauthorized");
+          setStatus("unauthorized");
+        }
+        return;
+      }
+
       try {
         const sessionState = await adminAuthAPI.getSession();
         if (!sessionState?.authenticated) {
@@ -55,7 +64,7 @@ export function CMSProtectedRoute() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [location.search]);
 
   if (status === "loading") {
     return (

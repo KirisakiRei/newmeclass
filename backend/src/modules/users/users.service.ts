@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { AccountStatus, PaymentStatus, Prisma, Role, TestStatus } from '@prisma/client';
-import { createHash } from 'crypto';
 import { mapUserForClient, toClientPaymentStatus } from 'src/common/mappers/client-shapes';
 import { buildPaginatedResult, resolvePagination } from 'src/common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,10 +14,6 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly authService: AuthService,
   ) {}
-
-  private hash(value: string) {
-    return createHash('sha256').update(value).digest('hex');
-  }
 
   private readonly endUserWhere: Prisma.UserWhereInput = {
     role: Role.USER,

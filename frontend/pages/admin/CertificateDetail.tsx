@@ -13,7 +13,7 @@ const CertificateDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [cert, setCert] = useState(null);
-  const [template, setTemplate] = useState(null);
+  const [template, setTemplate] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,7 +24,17 @@ const CertificateDetail = () => {
         setCert(certData);
 
         const tplRes = await certificatesAPI.getTemplate(certData.certType || 'individu');
-        setTemplate(tplRes.data || {});
+        const baseTemplate = tplRes.data || {};
+        const issuedTemplate = certData.templateSnapshot && typeof certData.templateSnapshot === 'object'
+          ? certData.templateSnapshot
+          : {};
+        const yayasanLogoUrl = certData.secondaryLogoUrl || certData.yayasan?.logoUrl || issuedTemplate.secondaryLogoUrl || null;
+        setTemplate({
+          ...baseTemplate,
+          ...issuedTemplate,
+          secondaryLogoUrl: yayasanLogoUrl,
+          logoUrl: yayasanLogoUrl,
+        });
       } catch (error) {
         console.error('Error loading certificate:', error);
       } finally {
@@ -69,11 +79,12 @@ const CertificateDetail = () => {
       <Card className="bg-[#2a2a2a] border-yellow-400/20 mb-6">
         <CardContent className="p-6">
           <CertificatePreview
-            template={template || {}}
+            template={template}
             certType={cert.certType || 'individu'}
             recipientName={cert.userName || 'Nama Penerima'}
             courseName={cert.courseName || 'Program'}
             certificateNumber={cert.certificateNumber}
+            qrCodeDataUrl={cert.qrCodeDataUrl || ''}
             date={new Date(cert.issuedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
             personalityData={cert.personalityData}
           />

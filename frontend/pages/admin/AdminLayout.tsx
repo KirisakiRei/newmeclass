@@ -83,6 +83,7 @@ const NAVIGATION = [
       { label: 'Running Text', href: '/admin/running-text', icon: Megaphone, permission: 'settings.view' },
       { label: 'Pengaturan Website', href: '/admin/settings', icon: Settings, permission: 'settings.view' },
       { label: 'Manajemen Admin', href: '/admin/admin-users', icon: Shield, permission: 'admin_management.view' },
+      { label: 'Log Aktivitas', href: '/admin/activity-logs', icon: FileText, permission: 'activity_logs.view' },
     ],
   },
 ];

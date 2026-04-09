@@ -1,6 +1,9 @@
 import 'dotenv/config';
 import {
   API_BASE,
+  completeOtpRegistration,
+  extractAccessToken,
+  extractAuthSubject,
   extractItems,
   pollUntil,
   requestJson,
@@ -85,7 +88,7 @@ async function main() {
     body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
   });
   requireOk('admin login', adminLogin);
-  const adminToken = adminLogin.data.token;
+  const adminToken = extractAccessToken(adminLogin);
   const questions = await ensureQuestions();
   requireCondition(questions.paid.length > 0, 'Referral flow check membutuhkan minimal 1 pertanyaan premium.');
   const paidAnswers = Object.fromEntries(questions.paid.map((item) => [item._id, 1]));
@@ -100,10 +103,10 @@ async function main() {
     },
   });
   requireOk('mitra register', mitraRegister);
-  const mitraUser = mitraRegister.data.mitra;
-  const mitraToken = mitraRegister.data.token;
+  const mitraUser = extractAuthSubject(mitraRegister, 'mitra');
+  const mitraToken = extractAccessToken(mitraRegister);
 
-  const mitraVerify = await requestJson(`/mitra/admin/${mitraUser._id}/verify`, {
+  const mitraVerify = await requestJson(`/mitra/admin/${mitraUser._id || mitraUser.id}/verify`, {
     method: 'PUT',
     token: adminToken,
     body: {},
@@ -127,23 +130,26 @@ async function main() {
   );
   report.redirects.yayasanRegister = yayasanRedirect;
 
-  const yayasanRegister = await requestJson('/yayasan/register', {
-    method: 'POST',
-    body: {
+  const yayasanRegistration = await completeOtpRegistration('/yayasan', {
+    startBody: {
       email: uniqueEmail('flow-yayasan', stamp, 1),
       fullName: 'Flow Yayasan',
-      institutionName: 'Flow Yayasan',
       password: 'Password123!',
+      referralCode: inviteCode,
+    },
+    completeBody: {
       phone: uniquePhone('0837', stamp, 1),
       referralCode: inviteCode,
-      referralPrice: 100000,
-      institutionAddress: 'Jl. Flow Yayasan',
+      address: 'Jl. Flow Yayasan',
       description: 'Yayasan flow smoke test',
     },
   });
-  requireOk('yayasan register', yayasanRegister);
-  const yayasanUser = yayasanRegister.data.yayasan;
-  const yayasanToken = yayasanRegister.data.token;
+  requireOk('yayasan register start', yayasanRegistration.start);
+  requireOk('yayasan register verify', yayasanRegistration.verify);
+  requireOk('yayasan register complete', yayasanRegistration.complete);
+  const yayasanRegister = yayasanRegistration.complete;
+  const yayasanUser = extractAuthSubject(yayasanRegister, 'yayasan');
+  const yayasanToken = extractAccessToken(yayasanRegister);
 
   const yayasanMe = await requestJson('/yayasan/me', { token: yayasanToken });
   requireOk('yayasan me', yayasanMe);
@@ -192,16 +198,13 @@ async function main() {
     'Harga yayasan sebelum approval seharusnya masih sama dengan harga dasar.',
   );
 
-  const preApproveUserRegister = await requestJson('/auth/register', {
+  const preApproveUserRegister = await requestJson('/auth/register/start', {
     method: 'POST',
     body: {
       email: uniqueEmail('preapprove-user', stamp, 1),
       fullName: 'Preapprove User Yayasan',
       password: 'Password123!',
-      phone: uniquePhone('0846', stamp, 1),
       referralCode: yayasanReferralCode,
-      address: 'Jl. Preapprove User',
-      referralSource: 'yayasan',
     },
   });
   requireCondition(
@@ -209,7 +212,7 @@ async function main() {
     'Registrasi user dengan referral yayasan sebelum approval seharusnya ditolak.',
   );
 
-  const approveYayasan = await requestJson(`/mitra/yayasan/${yayasanUser._id}/approve`, {
+  const approveYayasan = await requestJson(`/mitra/yayasan/${yayasanUser._id || yayasanUser.id}/approve`, {
     method: 'POST',
     token: mitraToken,
     body: {
@@ -251,21 +254,27 @@ async function main() {
     'Split pricing setelah approval tidak sinkron dengan komisi yang diset mitra.',
   );
 
-  const referredUserRegister = await requestJson('/auth/register', {
-    method: 'POST',
-    body: {
+  const referredUserRegistration = await completeOtpRegistration('/auth', {
+    startBody: {
       email: uniqueEmail('flow-user', stamp, 1),
       fullName: 'Flow User Yayasan',
       password: 'Password123!',
+      referralCode: yayasanReferralCode,
+    },
+    completeBody: {
       phone: uniquePhone('0847', stamp, 1),
+      whatsapp: uniquePhone('0847', stamp, 1),
       referralCode: yayasanReferralCode,
       address: 'Jl. Flow User',
       referralSource: 'yayasan',
     },
   });
-  requireOk('yayasan referred user register', referredUserRegister);
-  const referredUser = referredUserRegister.data.user;
-  const referredUserToken = referredUserRegister.data.token;
+  requireOk('yayasan referred user register start', referredUserRegistration.start);
+  requireOk('yayasan referred user register verify', referredUserRegistration.verify);
+  requireOk('yayasan referred user register complete', referredUserRegistration.complete);
+  const referredUserRegister = referredUserRegistration.complete;
+  const referredUser = extractAuthSubject(referredUserRegister, 'user');
+  const referredUserToken = extractAccessToken(referredUserRegister);
 
   const referredUserProfile = await requestJson('/auth/me', { token: referredUserToken });
   requireOk('referred user profile', referredUserProfile);

@@ -379,6 +379,29 @@ model PasswordResetToken {
   @@index([userId, expiresAt])
 }
 
+model PendingRegistration {
+  id                   String    @id @default(cuid())
+  role                 Role
+  email                String
+  fullName             String
+  passwordHash         String
+  referralContext      Json?
+  payload              Json?
+  registrationTokenHash String   @unique
+  otpHash              String
+  otpExpiresAt         DateTime
+  resendAvailableAt    DateTime
+  attemptCount         Int       @default(0)
+  verifiedAt           DateTime?
+  consumedAt           DateTime?
+  expiresAt            DateTime
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([email, role, expiresAt])
+  @@index([role, consumedAt, expiresAt])
+}
+
 model AuditLog {
   id            String    @id @default(cuid())
   actorUserId    String?

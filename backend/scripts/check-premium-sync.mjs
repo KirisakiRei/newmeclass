@@ -1,6 +1,9 @@
 import 'dotenv/config';
 import { Prisma, PrismaClient } from '@prisma/client';
 import {
+  completeOtpRegistration,
+  extractAccessToken,
+  extractAuthSubject,
   extractItems,
   requestJson,
   saveReport,
@@ -210,7 +213,7 @@ async function main() {
     body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
   });
   requireOk('admin login', adminLogin);
-  const adminToken = adminLogin.data.token;
+  const adminToken = extractAccessToken(adminLogin);
 
   const mitraRegister = await requestJson('/mitra/register', {
     method: 'POST',
@@ -222,10 +225,10 @@ async function main() {
     },
   });
   requireOk('mitra register', mitraRegister);
-  const mitraUser = mitraRegister.data.mitra;
-  const mitraToken = mitraRegister.data.token;
+  const mitraUser = extractAuthSubject(mitraRegister, 'mitra');
+  const mitraToken = extractAccessToken(mitraRegister);
 
-  const mitraVerify = await requestJson(`/mitra/admin/${mitraUser._id}/verify`, {
+  const mitraVerify = await requestJson(`/mitra/admin/${mitraUser._id || mitraUser.id}/verify`, {
     method: 'PUT',
     token: adminToken,
     body: {},
@@ -237,25 +240,28 @@ async function main() {
   const inviteCode = mitraMe.data.inviteCode;
   requireCondition(!!inviteCode, 'Invite code mitra tidak tersedia.');
 
-  const yayasanRegister = await requestJson('/yayasan/register', {
-    method: 'POST',
-    body: {
+  const yayasanRegistration = await completeOtpRegistration('/yayasan', {
+    startBody: {
       email: uniqueEmail('sync-yayasan', stamp, 1),
       fullName: 'Sync Yayasan',
-      institutionName: 'Sync Yayasan',
       password: DEFAULT_PASSWORD,
+      referralCode: inviteCode,
+    },
+    completeBody: {
       phone: uniquePhone('0837', stamp, 1),
       referralCode: inviteCode,
-      referralPrice: 50000,
-      institutionAddress: 'Jl. Sinkron Yayasan',
+      address: 'Jl. Sinkron Yayasan',
       description: 'Yayasan untuk validasi hasil premium',
     },
   });
-  requireOk('yayasan register', yayasanRegister);
-  const yayasanUser = yayasanRegister.data.yayasan;
-  const yayasanToken = yayasanRegister.data.token;
+  requireOk('yayasan register start', yayasanRegistration.start);
+  requireOk('yayasan register verify', yayasanRegistration.verify);
+  requireOk('yayasan register complete', yayasanRegistration.complete);
+  const yayasanRegister = yayasanRegistration.complete;
+  const yayasanUser = extractAuthSubject(yayasanRegister, 'yayasan');
+  const yayasanToken = extractAccessToken(yayasanRegister);
 
-  const approveYayasan = await requestJson(`/mitra/yayasan/${yayasanUser._id}/approve`, {
+  const approveYayasan = await requestJson(`/mitra/yayasan/${yayasanUser._id || yayasanUser.id}/approve`, {
     method: 'POST',
     token: mitraToken,
     body: {
@@ -269,26 +275,32 @@ async function main() {
   const yayasanReferralCode = yayasanMe.data.referralCode;
   requireCondition(!!yayasanReferralCode, 'Referral code yayasan tidak tersedia.');
 
-  const userRegister = await requestJson('/auth/register', {
-    method: 'POST',
-    body: {
+  const userRegistration = await completeOtpRegistration('/auth', {
+    startBody: {
       email: uniqueEmail('sync-user', stamp, 1),
       fullName: 'vvaa',
       password: DEFAULT_PASSWORD,
+      referralCode: yayasanReferralCode,
+    },
+    completeBody: {
       phone: uniquePhone('0847', stamp, 1),
+      whatsapp: uniquePhone('0847', stamp, 1),
       referralCode: yayasanReferralCode,
       referralSource: 'yayasan',
       address: 'Jl. Sinkron User',
     },
   });
-  requireOk('user register', userRegister);
-  const testUser = userRegister.data.user;
-  const userToken = userRegister.data.token;
+  requireOk('user register start', userRegistration.start);
+  requireOk('user register verify', userRegistration.verify);
+  requireOk('user register complete', userRegistration.complete);
+  const userRegister = userRegistration.complete;
+  const testUser = extractAuthSubject(userRegister, 'user');
+  const userToken = extractAccessToken(userRegister);
 
   await prisma.userProfile.upsert({
-    where: { userId: testUser._id },
+    where: { userId: testUser._id || testUser.id },
     create: {
-      userId: testUser._id,
+      userId: testUser._id || testUser.id,
       province: 'DKI Jakarta',
       city: 'Jakarta Selatan',
       extra: {
@@ -304,11 +316,11 @@ async function main() {
     },
   });
 
-  const createdResult = await seedPremiumLogamResult(testUser._id, template);
+  const createdResult = await seedPremiumLogamResult(testUser._id || testUser.id, template);
 
   const expected = {
     resultId: createdResult.id,
-    userId: testUser._id,
+    userId: testUser._id || testUser.id,
     userEmail: testUser.email,
     personalityCode: template.code,
     personalityLabel: template.insights?.personalityLabel || template.label,

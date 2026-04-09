@@ -1,10 +1,12 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { AdminActivityLogService } from '../admin-activity/admin-activity.service';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,6 +17,7 @@ export class ProductsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly uploadService: UploadService,
+    private readonly adminActivityLogService: AdminActivityLogService,
   ) {}
 
   @Get()
@@ -34,8 +37,8 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('shop_products.create')
-  create(@Body() body: any) {
-    return this.prisma.product.create({
+  async create(@CurrentUser() user: any, @Req() req: any, @Body() body: any) {
+    const created = await this.prisma.product.create({
       data: {
         name: body.name || '',
         description: body.description,
@@ -45,22 +48,80 @@ export class ProductsController {
         isActive: body.isActive ?? true,
       },
     });
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_SHOP_PRODUCT_CREATED',
+      category: 'content',
+      targetType: 'shop_product',
+      targetId: created.id,
+      targetLabel: created.name,
+      summary: `Produk shop ${created.name} dibuat.`,
+      after: {
+        name: created.name,
+        category: created.category,
+        price: created.price,
+        isActive: created.isActive,
+      },
+      ipAddress: req?.ip,
+    });
+    return created;
   }
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('shop_products.edit')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.prisma.product.update({ where: { id }, data: body });
+  async update(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string, @Body() body: any) {
+    const before = await this.prisma.product.findUnique({ where: { id } });
+    const updated = await this.prisma.product.update({ where: { id }, data: body });
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_SHOP_PRODUCT_UPDATED',
+      category: 'content',
+      targetType: 'shop_product',
+      targetId: id,
+      targetLabel: updated.name,
+      summary: `Produk shop ${updated.name} diperbarui.`,
+      before: before ? {
+        name: before.name,
+        category: before.category,
+        price: before.price,
+        isActive: before.isActive,
+      } : null,
+      after: {
+        name: updated.name,
+        category: updated.category,
+        price: updated.price,
+        isActive: updated.isActive,
+      },
+      ipAddress: req?.ip,
+    });
+    return updated;
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('shop_products.delete')
-  async remove(@Param('id') id: string) {
+  async remove(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string) {
+    const before = await this.prisma.product.findUnique({ where: { id } });
     await this.prisma.product.delete({ where: { id } });
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_SHOP_PRODUCT_DELETED',
+      category: 'content',
+      targetType: 'shop_product',
+      targetId: id,
+      targetLabel: before?.name || id,
+      summary: `Produk shop ${before?.name || ''} dihapus.`,
+      before: before ? {
+        name: before.name,
+        category: before.category,
+        price: before.price,
+        isActive: before.isActive,
+      } : null,
+      ipAddress: req?.ip,
+    });
     return { message: 'Deleted' };
   }
 

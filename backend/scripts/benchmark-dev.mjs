@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import {
+  extractAccessToken,
   requestBuffer,
   requestJson,
   sampleStats,
@@ -61,6 +62,7 @@ async function ensureQuestions() {
 }
 
 async function registerUsers(count, stamp) {
+  // Keep benchmark registration on the legacy endpoint for now to avoid OTP email bursts.
   const registrations = await Promise.all(
     Array.from({ length: count }, (_, index) => {
       return requestJson('/auth/register', {
@@ -80,7 +82,7 @@ async function registerUsers(count, stamp) {
     email: uniqueEmail('bench-user', stamp, index),
     password: 'Password123!',
     userId: item.data?.user?._id,
-    token: item.data?.token,
+    token: extractAccessToken(item),
   }));
 }
 
@@ -94,10 +96,10 @@ async function benchmarkLogins(credentials) {
 
   return {
     summary: sampleStats(results),
-    tokens: results.map((item) => item.data?.token).filter(Boolean),
+    tokens: results.map((item) => extractAccessToken(item)).filter(Boolean),
     users: results.map((item, index) => ({
       userId: item.data?.user?._id || credentials[index].userId,
-      token: item.data?.token,
+      token: extractAccessToken(item),
       email: credentials[index].email,
     })),
     rawErrors: results.filter((item) => !item.ok).map((item) => ({ status: item.status, body: item.body })),
@@ -181,7 +183,7 @@ async function run() {
     method: 'POST',
     body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
   });
-  const adminToken = adminLogin.data.token;
+  const adminToken = extractAccessToken(adminLogin);
 
   const questions = await ensureQuestions();
   if (questions.free.length === 0) {

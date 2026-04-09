@@ -1,7 +1,7 @@
 // @ts-nocheck
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Loader2, Printer } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { certificatesAPI, hasSessionPresence } from '../../services/api';
 import ResultCertificate from '../../components/certificates/ResultCertificate';
 
@@ -33,11 +33,28 @@ export default function CertificateDownload() {
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const autoDownloadStartedRef = useRef(false);
+  const certificateRef = useRef(null);
   const shouldAutoPrint = searchParams.get('download') === '1';
   const isEmbedded = searchParams.get('embed') === '1';
   const viewer = resolveViewerContext(searchParams.get('viewer'));
   const backLink = resolveBackLink(viewer);
   const isPremiumResult = payload?.result?.testType === 'paid';
+
+  const savePdfBuffer = (data, fileName) => {
+    const blob = new Blob([data], { type: 'application/pdf' });
+    const objectUrl = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => {
+      window.URL.revokeObjectURL(objectUrl);
+    }, 1000);
+  };
 
   useEffect(() => {
     let active = true;
@@ -60,23 +77,30 @@ export default function CertificateDownload() {
     };
   }, [userId]);
 
+  const handleDownloadPdf = async () => {
+    if (!userId || !isPremiumResult || downloading) return;
+    setDownloading(true);
+    try {
+      const response = await certificatesAPI.generateMyCertificate(userId);
+      savePdfBuffer(
+        response.data,
+        `${payload?.certificateNumber || `certificate-${userId}`}.pdf`,
+      );
+    } catch {
+      setError('PDF sertifikat gagal diunduh. Silakan coba lagi.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   useEffect(() => {
-    if (isEmbedded || !shouldAutoPrint || loading || !payload || !isPremiumResult) return undefined;
+    if (isEmbedded || !shouldAutoPrint || loading || !payload || !isPremiumResult || autoDownloadStartedRef.current) {
+      return;
+    }
 
-    const closeAfterPrint = () => {
-      window.removeEventListener('afterprint', closeAfterPrint);
-      window.close();
-    };
-    const timer = window.setTimeout(() => {
-      window.addEventListener('afterprint', closeAfterPrint);
-      window.print();
-    }, 300);
-
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener('afterprint', closeAfterPrint);
-    };
-  }, [isPremiumResult, loading, payload, shouldAutoPrint]);
+    autoDownloadStartedRef.current = true;
+    void handleDownloadPdf();
+  }, [isEmbedded, shouldAutoPrint, loading, payload, isPremiumResult]);
 
   if (loading) {
     return (
@@ -98,8 +122,20 @@ export default function CertificateDownload() {
     );
   }
 
+  const resolvedTemplate = payload?.template && typeof payload.template === 'object'
+    ? {
+        ...payload.template,
+        ...(payload.secondaryLogoUrl
+          ? {
+              secondaryLogoUrl: payload.secondaryLogoUrl,
+              logoUrl: payload.secondaryLogoUrl,
+            }
+          : {}),
+      }
+    : {};
+
   return (
-    <div className={isEmbedded ? 'min-h-0 bg-white' : 'min-h-screen bg-neutral-100 py-6 px-4 print:min-h-0 print:bg-white print:px-0 print:py-0'}>
+    <div className={isEmbedded ? 'min-h-0 overflow-x-hidden bg-white' : 'min-h-screen overflow-x-hidden bg-neutral-100 px-3 py-4 sm:px-4 sm:py-6 print:m-0 print:min-h-0 print:bg-white print:px-0 print:py-0 print:overflow-hidden'}>
       <style>
         {`
           @page {
@@ -108,14 +144,20 @@ export default function CertificateDownload() {
           }
 
           @media print {
-            html, body {
+            html, body, #root {
               width: 297mm;
               height: 210mm;
               background: #ffffff;
+              overflow: hidden;
             }
 
             body {
               margin: 0;
+            }
+
+            #root {
+              margin: 0;
+              padding: 0;
             }
 
             * {
@@ -126,16 +168,17 @@ export default function CertificateDownload() {
         `}
       </style>
       {!isEmbedded ? (
-        <div className="max-w-4xl mx-auto mb-4 flex items-center justify-between print:hidden">
+        <div className="mx-auto mb-4 flex max-w-4xl flex-col items-start justify-between gap-3 print:hidden sm:flex-row sm:items-center">
           <Link to={backLink} className="text-yellow-600 underline text-sm">Kembali</Link>
           {isPremiumResult ? (
             <button
               type="button"
-              onClick={() => window.print()}
-              className="px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition flex items-center gap-2"
+              onClick={() => void handleDownloadPdf()}
+              disabled={downloading}
+              className="inline-flex items-center gap-2 rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-yellow-600"
             >
-              <Printer className="w-4 h-4" />
-              Cetak / Simpan PDF
+              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Download PDF
             </button>
           ) : (
             <div className="rounded-lg border border-yellow-400/40 bg-yellow-50 px-4 py-2 text-sm font-semibold text-yellow-700">
@@ -144,17 +187,20 @@ export default function CertificateDownload() {
           )}
         </div>
       ) : null}
-      <ResultCertificate
-        template={payload.template || {}}
-        result={payload.result}
-        resultId={payload.result?.resultId || payload.result?.id}
-        certificateNumber={payload.certificateNumber}
-        identityLabel={isPremiumResult ? 'No. Sertifikat' : 'Member ID'}
-        identityValue={isPremiumResult ? payload.certificateNumber : (payload.result?.memberCode || payload.memberCode || payload.userId)}
-        issuedAt={payload.issuedAt}
-        certType={payload.certType || 'individu'}
-        lockPremiumSections={!isPremiumResult}
-      />
+      <div ref={certificateRef} className="block bg-white leading-none print:h-[210mm] print:w-[297mm] print:overflow-hidden">
+        <ResultCertificate
+          template={resolvedTemplate}
+          result={payload.result}
+          resultId={payload.result?.resultId || payload.result?.id}
+          certificateNumber={payload.certificateNumber}
+          qrCodeDataUrl={payload.qrCodeDataUrl || ''}
+          identityLabel={isPremiumResult ? 'No. Sertifikat' : 'Member ID'}
+          identityValue={isPremiumResult ? payload.certificateNumber : (payload.result?.memberCode || payload.memberCode || payload.userId)}
+          issuedAt={payload.issuedAt}
+          certType={payload.certType || 'individu'}
+          lockPremiumSections={!isPremiumResult}
+        />
+      </div>
     </div>
   );
 }

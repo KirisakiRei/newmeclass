@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { useToast } from '../../hooks/use-toast';
-import { certificatesAPI, usersAPI } from '../../services/api';
+import { certificatesAPI } from '../../services/api';
 import PageHeader from '../../components/ui/page-header';
 import LoadingSpinner from '../../components/ui/loading-spinner';
 import CertificatePreview from '../../components/admin/CertificatePreview';
@@ -20,13 +20,7 @@ const CERT_TYPES = [
   { id: 'yayasan', label: 'Yayasan', icon: Building2, description: 'Sertifikat resmi untuk pengguna yang terhubung ke yayasan' },
 ];
 
-const BUILTIN_LOGO_PATHS = ['/logo.png', '/images/newme-logo.png'];
 const BACKEND_UPLOAD_BASE = String(process.env.REACT_APP_BACKEND_URL || '').trim().replace(/\/+$/, '');
-
-const isBuiltinLogo = (value) => {
-  const normalized = String(value || '').trim().toLowerCase();
-  return BUILTIN_LOGO_PATHS.some((item) => normalized.endsWith(item));
-};
 
 const toAbsoluteCertificateAssetUrl = (value) => {
   if (typeof value !== 'string' || !value) return value;
@@ -66,7 +60,6 @@ const createEmptyTemplate = (type) => ({
   brandLogoUrl: '/logo.png',
   secondaryLogoUrl: null,
   productionBadgeUrl: null,
-  signatureUrl: null,
   organization: '',
   backgroundUrl: null,
   logoUrl: null,
@@ -75,19 +68,15 @@ const createEmptyTemplate = (type) => ({
 const normalizeTemplateState = (value, type) => {
   const defaults = createEmptyTemplate(type);
   const next = value && typeof value === 'object' ? value : {};
-  const resolvedSecondaryLogo =
-    isBuiltinLogo(next.secondaryLogoUrl) || isBuiltinLogo(next.logoUrl)
-      ? null
-      : (next.secondaryLogoUrl ?? next.logoUrl ?? defaults.secondaryLogoUrl);
   return {
     ...defaults,
     ...next,
     backgroundTextureUrl: next.backgroundTextureUrl ?? next.backgroundUrl ?? defaults.backgroundTextureUrl,
     brandLogoUrl: next.brandLogoUrl ?? defaults.brandLogoUrl,
-    secondaryLogoUrl: resolvedSecondaryLogo,
+    secondaryLogoUrl: null,
     productionBadgeUrl: next.productionBadgeUrl ?? defaults.productionBadgeUrl,
     backgroundUrl: next.backgroundTextureUrl ?? next.backgroundUrl ?? defaults.backgroundTextureUrl,
-    logoUrl: resolvedSecondaryLogo,
+    logoUrl: null,
   };
 };
 
@@ -99,10 +88,10 @@ const Certificates = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [issuedCerts, setIssuedCerts] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [eligibleUsers, setEligibleUsers] = useState([]);
   const [activeTab, setActiveTab] = useState('template');
   const [certType, setCertType] = useState('individu');
-  const [issueForm, setIssueForm] = useState({ userId: '', courseName: '', certType: 'individu' });
+  const [issueForm, setIssueForm] = useState({ userId: '', courseName: '' });
   const [issuedSearch, setIssuedSearch] = useState('');
   const [issuedPage, setIssuedPage] = useState(1);
   const [issuedPageSize, setIssuedPageSize] = useState(10);
@@ -127,23 +116,24 @@ const Certificates = () => {
     }
   }, [activeTab, availableTabs]);
 
+  const selectedEligibleUser = eligibleUsers.find((item) => item.userId === issueForm.userId) || null;
+
   const loadData = async () => {
     try {
-      const [templateRes, certsRes, usersRes] = await Promise.all([
+      const [templateRes, certsRes, eligibleRes] = await Promise.all([
         canViewCertificates ? certificatesAPI.getTemplate(certType) : Promise.resolve({ data: null }),
         canViewCertificates ? certificatesAPI.getIssued({
           page: issuedPage,
           pageSize: issuedPageSize,
           search: issuedSearch || undefined,
         }) : Promise.resolve({ data: [] }),
-        canCreateCertificates ? usersAPI.getAll({ page: 1, pageSize: 100 }) : Promise.resolve({ data: [] }),
+        canCreateCertificates ? certificatesAPI.getEligible() : Promise.resolve({ data: [] }),
       ]);
       setTemplate(normalizeTemplateState(templateRes.data, certType));
       const issuedPageResult = extractPaginatedResponse(certsRes.data, issuedPageSize);
       setIssuedCerts(issuedPageResult.items || []);
       setIssuedPagination(issuedPageResult);
-      const usersPageResult = extractPaginatedResponse(usersRes.data, 100);
-      setUsers(usersPageResult.items || []);
+      setEligibleUsers(Array.isArray(eligibleRes.data) ? eligibleRes.data : []);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -181,10 +171,10 @@ const Certificates = () => {
         styleVersion: template.styleVersion || 'official-certificate-v1',
         brandLogoUrl: template.brandLogoUrl || '/logo.png',
         backgroundTextureUrl: template.backgroundTextureUrl || null,
-        secondaryLogoUrl: template.secondaryLogoUrl || null,
+        secondaryLogoUrl: null,
         productionBadgeUrl: template.productionBadgeUrl || null,
-        signatureUrl: template.signatureUrl || null,
-        logoUrl: template.secondaryLogoUrl || null,
+        signatureUrl: null,
+        logoUrl: null,
         backgroundUrl: template.backgroundTextureUrl || null,
       });
       toast({ title: 'Sukses', description: `Template ${certType === 'yayasan' ? 'Yayasan' : 'Individu'} berhasil disimpan` });
@@ -204,9 +194,6 @@ const Certificates = () => {
         if (assetType === 'background') {
           return { ...current, backgroundTextureUrl: uploadedUrl, backgroundUrl: uploadedUrl };
         }
-        if (assetType === 'logo') {
-          return { ...current, secondaryLogoUrl: uploadedUrl, logoUrl: uploadedUrl };
-        }
         return { ...current, [`${assetType}Url`]: uploadedUrl };
       });
       toast({ title: 'Sukses', description: `${assetType} berhasil diupload` });
@@ -222,9 +209,6 @@ const Certificates = () => {
       if (assetType === 'background') {
         return { ...current, backgroundTextureUrl: null, backgroundUrl: null };
       }
-      if (assetType === 'logo') {
-        return { ...current, secondaryLogoUrl: null, logoUrl: null };
-      }
       return { ...current, [`${assetType}Url`]: null };
     });
   };
@@ -236,10 +220,9 @@ const Certificates = () => {
       const response = await certificatesAPI.issue({
         userId: issueForm.userId,
         courseName: issueForm.courseName,
-        certType: issueForm.certType,
       });
       toast({ title: 'Sukses', description: `Sertifikat diterbitkan: ${response.data.certificateNumber}` });
-      setIssueForm({ userId: '', courseName: '', certType: 'individu' });
+      setIssueForm({ userId: '', courseName: '' });
       loadData();
     } catch (error) {
       toast({ title: 'Error', description: 'Gagal menerbitkan sertifikat', variant: 'destructive' });
@@ -318,7 +301,7 @@ const Certificates = () => {
                 template={template}
                 certType={certType}
                 recipientName="NAMA PENERIMA"
-                certificateNumber="NMC-2026-XXXXX"
+                certificateNumber="NMC-2026-U123456"
               />
             </CardContent>
           </Card>
@@ -352,7 +335,7 @@ const Certificates = () => {
                 </div>
               </div>
               <div className="rounded-lg border border-yellow-400/20 bg-[#1a1a1a] p-4 text-sm text-gray-400">
-                Layout resmi sertifikat dikunci. Admin hanya mengatur logo yayasan, tanda tangan, texture background, dan identitas penandatangan.
+                Layout resmi sertifikat dikunci. Logo yayasan otomatis diambil dari profil yayasan masing-masing user. Preview di sini mengikuti render sertifikat asli, termasuk area QR. Admin hanya mengatur texture background, badge produksi, dan identitas penandatangan.
               </div>
               <Button onClick={handleSaveTemplate} disabled={saving || !canEditCertificates} className="w-full bg-yellow-400 text-black hover:bg-yellow-500">
                 <Save className="w-4 h-4 mr-2" /> {saving ? 'Menyimpan...' : 'Simpan Template'}
@@ -373,24 +356,6 @@ const Certificates = () => {
                 previewClassName="min-h-[160px]"
                 onUpload={handleUploadAsset}
                 onRemove={() => handleRemoveAsset('background')}
-              />
-              <CertificateAssetUploader
-                title="Logo Yayasan / Partner"
-                description="Logo NEWME tampil otomatis. Upload di sini untuk logo kedua di area atas tengah sertifikat."
-                assetType="logo"
-                value={template.secondaryLogoUrl}
-                previewClassName="min-h-[160px]"
-                onUpload={handleUploadAsset}
-                onRemove={() => handleRemoveAsset('logo')}
-              />
-              <CertificateAssetUploader
-                title="Tanda Tangan"
-                description="Tanda tangan tampil pada blok footer kanan sesuai desain sertifikat resmi."
-                assetType="signature"
-                value={template.signatureUrl}
-                previewClassName="min-h-[120px]"
-                onUpload={handleUploadAsset}
-                onRemove={() => handleRemoveAsset('signature')}
               />
               <CertificateAssetUploader
                 title="Production Badge"
@@ -416,33 +381,28 @@ const Certificates = () => {
           <CardContent>
             <form onSubmit={handleIssueCertificate} className="space-y-4">
               <div>
-                <label className="text-gray-400 text-sm">Tipe Sertifikat</label>
-                <div className="flex gap-2 mt-1">
-                  {CERT_TYPES.map((type) => (
-                    <button
-                      key={type.id}
-                      type="button"
-                      onClick={() => setIssueForm({ ...issueForm, certType: type.id })}
-                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-                        issueForm.certType === type.id ?
-                           'bg-yellow-400 text-[#1a1a1a]'
-                          : 'bg-[#1a1a1a] text-gray-400 border border-yellow-400/20'
-                      }`}
-                    >
-                      {type.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
                 <label className="text-gray-400 text-sm">Pilih Pengguna</label>
                 <select value={issueForm.userId} onChange={(e) => setIssueForm({ ...issueForm, userId: e.target.value })} required className="w-full bg-[#1a1a1a] border border-yellow-400/20 rounded-md p-2 text-white">
                   <option value="">-- Pilih Pengguna --</option>
-                  {users.map(user => (
-                    <option key={user._id} value={user._id}>{user.fullName || user.name || 'Tanpa Nama'} ({user.email || '-'})</option>
+                  {eligibleUsers.map((user) => (
+                    <option key={user.userId} value={user.userId}>
+                      {user.userName || 'Tanpa Nama'} ({user.userEmail || '-'})
+                    </option>
                   ))}
                 </select>
               </div>
+              {selectedEligibleUser ? (
+                <div className="rounded-lg border border-yellow-400/20 bg-[#1a1a1a] p-4 text-sm">
+                  <p className="text-white font-medium">{selectedEligibleUser.userName}</p>
+                  <p className="mt-1 text-gray-400">Tipe sertifikat akan ditentukan backend sebagai <span className="text-yellow-400">{selectedEligibleUser.resolvedCertType === 'yayasan' ? 'Yayasan' : 'Individu'}</span>.</p>
+                  {selectedEligibleUser.resolvedCertType === 'yayasan' ? (
+                    <p className="mt-2 text-gray-400">
+                      Yayasan: <span className="text-white">{selectedEligibleUser.yayasanName || 'Tidak ditemukan'}</span>
+                      {' '}| Logo: <span className={selectedEligibleUser.yayasanLogoAvailable ? 'text-green-400' : 'text-red-400'}>{selectedEligibleUser.yayasanLogoAvailable ? 'Tersedia' : 'Belum diupload'}</span>
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <div>
                 <label className="text-gray-400 text-sm">Nama Kursus/Program</label>
                 <Input value={issueForm.courseName} onChange={(e) => setIssueForm({ ...issueForm, courseName: e.target.value })} required placeholder="e.g., NEWME Test Level 1" className="bg-[#1a1a1a] border-yellow-400/20 text-white" />

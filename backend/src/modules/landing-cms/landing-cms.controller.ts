@@ -1,9 +1,11 @@
-import { BadRequestException, Body, Controller, Get, Param, Put, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthAudience, Role } from '@prisma/client';
 import { AuthAudienceAccess } from 'src/common/auth/auth-audience.decorator';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { AdminActivityLogService } from '../admin-activity/admin-activity.service';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
 import { LandingCmsService } from './landing-cms.service';
@@ -15,7 +17,10 @@ const isLandingDomainKey = (value: string): value is LandingDomainKey => (
 
 @Controller('landing')
 export class LandingCmsController {
-  constructor(private readonly landingCmsService: LandingCmsService) {}
+  constructor(
+    private readonly landingCmsService: LandingCmsService,
+    private readonly adminActivityLogService: AdminActivityLogService,
+  ) {}
 
   @Get('public/bootstrap')
   getPublicBootstrap() {
@@ -122,11 +127,31 @@ export class LandingCmsController {
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('cms_access.manage')
   @Put('cms/:domainKey')
-  updateCmsDomain(@Param('domainKey') domainKey: string, @Body() body: any) {
+  async updateCmsDomain(@CurrentUser() user: any, @Req() req: any, @Param('domainKey') domainKey: string, @Body() body: any) {
     if (!isLandingDomainKey(domainKey)) {
       throw new BadRequestException('Domain landing CMS tidak valid');
     }
     const value = body && Object.prototype.hasOwnProperty.call(body, 'value') ? body.value : body;
-    return this.landingCmsService.updateDomain(domainKey, value);
+    const before = await this.landingCmsService.getCmsDomain(domainKey);
+    const updated = await this.landingCmsService.updateDomain(domainKey, value);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_LANDING_CMS_UPDATED',
+      category: 'content',
+      targetType: 'landing_cms',
+      targetId: domainKey,
+      targetLabel: domainKey,
+      summary: `Landing CMS domain ${domainKey} diperbarui.`,
+      before: {
+        itemCount: Array.isArray((before as any)?.sections) ? (before as any).sections.length : undefined,
+        name: (before as any)?.name || domainKey,
+      },
+      after: {
+        itemCount: Array.isArray((updated as any)?.sections) ? (updated as any).sections.length : undefined,
+        name: (updated as any)?.name || domainKey,
+      },
+      ipAddress: req?.ip,
+    });
+    return updated;
   }
 }

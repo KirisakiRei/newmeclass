@@ -37,6 +37,7 @@ const UserDashboard = lazy(() => import('./pages/user/UserDashboard'));
 const UserTest = lazy(() => import('./pages/user/UserTest'));
 const TestResult = lazy(() => import('./pages/user/TestResult'));
 const CertificateDownload = lazy(() => import('./pages/shared/CertificateDownload'));
+const CertificatePdfRender = lazy(() => import('./pages/shared/CertificatePdfRender'));
 
 // Admin pages are downloaded only when a user navigates to /admin/*
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
@@ -57,6 +58,7 @@ const RunningText = lazy(() => import('./pages/admin/RunningText'));
 const Settings = lazy(() => import('./pages/admin/Settings'));
 const Referrals = lazy(() => import('./pages/admin/Referrals'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminActivityLogs = lazy(() => import('./pages/admin/AdminActivityLogs'));
 const PremiumResults = lazy(() => import('./pages/admin/PremiumResults'));
 const AdminYayasan = lazy(() => import('./pages/admin/AdminYayasan'));
 const AdminWithdrawals = lazy(() => import('./pages/admin/AdminWithdrawals'));
@@ -299,6 +301,7 @@ const AppContent = () => {
           <Route path="running-text" element={<RunningText />} />
           <Route path="settings" element={<Settings />} />
           <Route path="admin-users" element={<AdminUsers />} />
+          <Route path="activity-logs" element={<AdminActivityLogs />} />
           <Route path="website-content" element={<RedirectToPublicWeb path="/cms" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
           <Route path="hero-slides" element={<RedirectToPublicWeb path="/cms/landing/hero" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
           <Route path="homepage-products" element={<RedirectToPublicWeb path="/cms/landing/products" preserveSearch={false} label="Mengalihkan ke CMS landing..." />} />
@@ -332,6 +335,7 @@ const AppContent = () => {
         />
 
         <Route path="/certificate-download/:userId" element={<CertificateDownload />} />
+        <Route path="/certificate-pdf/:certificateNumber" element={<CertificatePdfRender />} />
         
         {/* Mitra routes */}
         <Route path="/mitra" element={<Navigate to="/mitra/login" replace />} />

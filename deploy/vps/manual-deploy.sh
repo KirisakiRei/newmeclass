@@ -7,6 +7,7 @@ REPO_URL="${REPO_URL:-https://github.com/KirisakiRei/newmeclass.git}"
 BASE_DIR="${BASE_DIR:-/opt/newme}"
 APP_DIR="${APP_DIR:-${BASE_DIR}/app}"
 ENV_FILE="${ENV_FILE:-${BASE_DIR}/.env.production}"
+COMPOSE_FILE="${COMPOSE_FILE:-compose.production.yml}"
 
 if ! command -v git >/dev/null 2>&1; then
   echo "git belum terpasang. Install git dulu di server."
@@ -39,10 +40,15 @@ cd "${APP_DIR}"
 
 cp "${ENV_FILE}" "${APP_DIR}/.env"
 
-docker compose up -d --build
+if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+  echo "${DOCKERHUB_TOKEN}" | docker login --username "${DOCKERHUB_USERNAME}" --password-stdin
+fi
+
+docker compose --env-file .env -f "${COMPOSE_FILE}" pull
+docker compose --env-file .env -f "${COMPOSE_FILE}" up -d
 
 if [ "${RUN_SEED}" = "true" ]; then
-  docker compose --profile ops run --rm seed
+  docker compose --env-file .env -f "${COMPOSE_FILE}" --profile ops run --rm seed
 fi
 
 docker image prune -f

@@ -22,11 +22,16 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, resolve } from 'path';
 import { mkdirSync } from 'fs';
+import { mkdir, stat } from 'fs/promises';
+import { createHash } from 'crypto';
+import sharp from 'sharp';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { AuthAudienceAccess } from 'src/common/auth/auth-audience.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { buildPublicFrontendUrl } from 'src/common/frontend-urls';
+import { buildCertificateQrCodeDataUrl } from 'src/common/utils/certificate-qr';
 import { buildSimplePdf } from 'src/common/utils/pdf';
 import {
   buildCertificateTemplateMetadata,
@@ -42,8 +47,10 @@ import {
 } from 'src/common/personality-template-catalog';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
+import { AdminActivityLogService } from '../admin-activity/admin-activity.service';
 import { AdminRbacService } from '../admin-rbac/admin-rbac.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CertificatePdfCacheService } from './certificate-pdf-cache.service';
 
 const CERT_DOWNLOAD_RATE_LIMIT_TTL_MS = Number(process.env.CERT_DOWNLOAD_RATE_LIMIT_TTL || 60) * 1000;
 const CERT_DOWNLOAD_RATE_LIMIT = Number(process.env.CERT_DOWNLOAD_RATE_LIMIT || 30);
@@ -55,6 +62,8 @@ export class CertificatesController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminRbacService: AdminRbacService,
+    private readonly certificatePdfCacheService: CertificatePdfCacheService,
+    private readonly adminActivityLogService: AdminActivityLogService,
   ) {}
 
   private safeObject(value: unknown) {
@@ -69,6 +78,15 @@ export class CertificatesController {
       : CertificateType.INDIVIDU;
   }
 
+  private stripSecondaryLogoFromTemplate(template: any) {
+    if (!template || typeof template !== 'object') return template;
+    return {
+      ...template,
+      secondaryLogoUrl: null,
+      logoUrl: null,
+    };
+  }
+
   private uploadsDir() {
     const dir = resolve(process.cwd(), 'uploads', 'certificates');
     mkdirSync(dir, { recursive: true });
@@ -81,6 +99,59 @@ export class CertificatesController {
 
   private sanitizeFileSegment(value: string) {
     return value.replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 'asset';
+  }
+
+  private resolveLocalUploadPath(uploadUrl?: string | null) {
+    const normalized = String(uploadUrl || '').trim();
+    if (!normalized.startsWith('/uploads/')) {
+      return null;
+    }
+
+    const uploadsRoot = resolve(process.cwd(), 'uploads');
+    const absolutePath = resolve(process.cwd(), normalized.replace(/^\/+/, ''));
+    if (!absolutePath.startsWith(uploadsRoot)) {
+      return null;
+    }
+
+    return absolutePath;
+  }
+
+  private async ensurePngUploadVariant(uploadUrl?: string | null) {
+    const normalized = String(uploadUrl || '').trim();
+    if (!normalized || !/\.webp(?:$|[?#])/i.test(normalized)) {
+      return normalized || null;
+    }
+
+    const sourcePath = this.resolveLocalUploadPath(normalized);
+    if (!sourcePath) {
+      return normalized;
+    }
+
+    try {
+      const sourceStat = await stat(sourcePath);
+      const cacheKey = createHash('sha256')
+        .update(`${normalized}:${sourceStat.size}:${sourceStat.mtimeMs}`)
+        .digest('hex')
+        .slice(0, 24);
+
+      const cacheDir = resolve(process.cwd(), 'uploads', 'certificates', 'derived');
+      const outputPath = resolve(cacheDir, `${cacheKey}.png`);
+      const publicPath = `/uploads/certificates/derived/${cacheKey}.png`;
+
+      try {
+        await stat(outputPath);
+        return publicPath;
+      } catch {}
+
+      await mkdir(cacheDir, { recursive: true });
+      await sharp(sourcePath)
+        .png()
+        .toFile(outputPath);
+
+      return publicPath;
+    } catch {
+      return normalized;
+    }
   }
 
   private async findLatestCertificateResult(userId: string, includeUser = false) {
@@ -284,6 +355,13 @@ export class CertificatesController {
       testResultId: cert.testResultId,
       metadata,
     });
+    const verificationUrl = this.buildCertificateVerificationUrl(cert.certificateNumber);
+    const qrCodeDataUrl = verificationUrl
+      ? await buildCertificateQrCodeDataUrl(verificationUrl)
+      : null;
+    const secondaryLogoUrl = await this.ensurePngUploadVariant(metadata.secondaryLogoUrl || null);
+
+    const templateSnapshot = this.stripSecondaryLogoFromTemplate(this.safeObject(metadata.templateSnapshot));
 
     return {
       ...cert,
@@ -296,6 +374,36 @@ export class CertificatesController {
       personalityCode: personality.personalityCode,
       personalityType: personality.personalityType,
       personalityData: personality.personalityData,
+      verificationUrl,
+      qrCodeDataUrl,
+      secondaryLogoUrl,
+      templateSnapshot,
+      yayasan: {
+        ...this.safeObject(metadata.yayasan),
+        ...(secondaryLogoUrl ? { logoUrl: secondaryLogoUrl } : {}),
+      },
+    };
+  }
+
+  private buildCertificateVerificationUrl(certificateNumber?: string | null) {
+    const normalized = String(certificateNumber || '').trim();
+    if (!normalized) return null;
+    return buildPublicFrontendUrl('/certificate/verify', {
+      certificateNumber: normalized,
+    });
+  }
+
+  private restoreSecondaryLogoToTemplate(template: any, secondaryLogoUrl?: string | null) {
+    const resolvedTemplate = this.safeObject(template);
+    const resolvedSecondaryLogoUrl = String(secondaryLogoUrl || '').trim();
+    if (!resolvedSecondaryLogoUrl) {
+      return resolvedTemplate;
+    }
+
+    return {
+      ...resolvedTemplate,
+      secondaryLogoUrl: resolvedSecondaryLogoUrl,
+      logoUrl: resolvedSecondaryLogoUrl,
     };
   }
 
@@ -304,7 +412,7 @@ export class CertificatesController {
     return new Date(value).toLocaleDateString('id-ID');
   }
 
-  private async resolveYayasanSecondaryLogo(targetUser: any) {
+  private async resolveYayasanContext(targetUser: any) {
     const targetExtra = this.safeObject(targetUser?.profile?.extra);
     const yayasanId = String(targetExtra.yayasanId || '').trim();
     const yayasanCode = String(targetExtra.yayasanReferralCode || targetUser?.referredByCode || '').trim();
@@ -312,39 +420,61 @@ export class CertificatesController {
     const yayasan = yayasanId
       ? await this.prisma.user.findUnique({
           where: { id: yayasanId },
-          include: { profile: true },
+          include: { profile: true, yayasanProfile: true },
         })
       : yayasanCode
         ? await this.prisma.user.findFirst({
             where: { role: Role.YAYASAN, myReferralCode: yayasanCode },
-            include: { profile: true },
+            include: { profile: true, yayasanProfile: true },
           })
         : null;
 
     const yayasanExtra = this.safeObject(yayasan?.profile?.extra);
-    return String(yayasanExtra.yayasanLogoUrl || '').trim() || null;
+    return {
+      id: yayasan?.id || null,
+      name: yayasan?.yayasanProfile?.institutionName || yayasan?.fullName || null,
+      email: yayasan?.email || null,
+      referralCode: yayasan?.myReferralCode || null,
+      logoUrl: String(yayasanExtra.yayasanLogoUrl || '').trim() || null,
+    };
   }
 
-  private buildCertificatePdf(cert: any) {
-    const lines = [
-      'NEWME DIGITAL CERTIFICATE',
-      `Certificate Number: ${cert.certificateNumber || 'N/A'}`,
-      `Name: ${cert.userName || cert.metadata?.userName || cert.metadata?.fullName || 'Peserta NEWME'}`,
-      `Email: ${cert.userEmail || cert.metadata?.userEmail || cert.metadata?.email || '-'}`,
-      `Program: ${cert.courseName || cert.metadata?.courseName || cert.metadata?.programName || cert.certType || 'NEWME Assessment'}`,
-      `Personality: ${cert.personalityType || cert.metadata?.personalityType || '-'}`,
-      `Issued At: ${this.formatIssuedDate(cert.issuedAt || cert.createdAt)}`,
-      'Status: Valid',
-    ];
-
-    return buildSimplePdf(lines);
+  private async buildCertificatePdf(cert: any) {
+    return this.certificatePdfCacheService.getOrCreatePdf(cert);
   }
 
   private sendPdf(response: Response, fileName: string, payload: Buffer) {
+    response.status(200);
     response.setHeader('Content-Type', 'application/pdf');
     response.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    response.setHeader('Content-Length', payload.length);
-    response.end(payload);
+    response.setHeader('Content-Transfer-Encoding', 'binary');
+    response.setHeader('Content-Length', String(payload.length));
+    response.send(payload);
+  }
+
+  private buildCertificateIdSuffix(userId: string, attempt = 0) {
+    const seed = `${String(userId || '').trim()}:${attempt}`;
+    const digest = createHash('sha256').update(seed).digest();
+    const digits = Array.from(digest.slice(0, 6)).map((value) => String(value % 10)).join('');
+    return `U${digits}`;
+  }
+
+  private async generateCertificateNumber(userId: string, excludeCertificateId?: string | null) {
+    const year = new Date().getFullYear();
+    const prefix = 'NMC';
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const candidate = `${prefix}-${year}-${this.buildCertificateIdSuffix(userId, attempt)}`;
+      const existing = await this.prisma.issuedCertificate.findUnique({
+        where: { certificateNumber: candidate },
+        select: { id: true },
+      });
+      if (!existing || existing.id === excludeCertificateId) {
+        return candidate;
+      }
+    }
+
+    throw new BadRequestException('Gagal membuat nomor sertifikat yang unik.');
   }
 
   private async assertCertificateAccess(currentUser: any, userId: string) {
@@ -377,7 +507,71 @@ export class CertificatesController {
     }
   }
 
-  private async getCertificateSourceData(userId: string) {
+  private async getTemplateSnapshot(certType: CertificateType, secondaryLogoUrl?: string | null) {
+    await ensureDemoCertificateTemplate(this.prisma, certType);
+    const templateRow = await this.prisma.certificateTemplate.findUnique({
+      where: { certType },
+    });
+    const template = this.stripSecondaryLogoFromTemplate(await mapCertificateTemplateForClient(this.prisma, templateRow));
+    return secondaryLogoUrl ? { ...template, secondaryLogoUrl, logoUrl: secondaryLogoUrl } : template;
+  }
+
+  private async buildCertificateSnapshot(input: {
+    userId: string;
+    certType: CertificateType;
+    latestResult?: any;
+    courseName?: string | null;
+  }) {
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: input.userId },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        referredByCode: true,
+        myReferralCode: true,
+        role: true,
+        profile: {
+          select: {
+            extra: true,
+          },
+        },
+      },
+    });
+    if (!targetUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    const personality = await this.resolvePersonalityData({
+      userId: input.userId,
+      testResultId: input.latestResult?.id || null,
+    });
+    const yayasan = input.certType === CertificateType.YAYASAN
+      ? await this.resolveYayasanContext(targetUser)
+      : null;
+    const templateSnapshot = await this.getTemplateSnapshot(input.certType, yayasan?.logoUrl || null);
+
+    return {
+      targetUser,
+      personality,
+      yayasan,
+      templateSnapshot,
+      metadata: {
+        userName: targetUser.fullName,
+        userEmail: targetUser.email,
+        courseName: input.courseName || 'NEWME Personality Assessment',
+        personalityCode: personality.personalityCode,
+        personalityType: personality.personalityType,
+        personalityData: personality.personalityData,
+        certType: String(input.certType).toLowerCase(),
+        secondaryLogoUrl: yayasan?.logoUrl || null,
+        yayasan: yayasan || null,
+        templateSnapshot,
+      },
+    };
+  }
+
+  private async resolveCertificateSourceData(userId: string) {
     const targetUser = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -385,6 +579,8 @@ export class CertificatesController {
         fullName: true,
         email: true,
         myReferralCode: true,
+        referredByCode: true,
+        role: true,
         profile: {
           select: {
             extra: true,
@@ -397,54 +593,63 @@ export class CertificatesController {
     }
 
     const latestResult = await this.findLatestCertificateResult(userId, true);
-
-    const personality = await this.resolvePersonalityData({
-      userId,
-      testResultId: latestResult?.id || null,
-    });
     const targetExtra = this.safeObject(targetUser.profile?.extra);
     const latestResultExtra = this.safeObject((latestResult as any)?.user?.profile?.extra);
     const resolvedCertType =
       targetExtra.isYayasanLinked || latestResultExtra.isYayasanLinked
         ? CertificateType.YAYASAN
         : CertificateType.INDIVIDU;
+    const snapshot = await this.buildCertificateSnapshot({
+      userId,
+      certType: resolvedCertType,
+      latestResult,
+      courseName: 'NEWME Personality Assessment',
+    });
+
+    return {
+      latestResult,
+      resolvedCertType,
+      ...snapshot,
+    };
+  }
+
+  private async getCertificateSourceData(userId: string) {
+    const source = await this.resolveCertificateSourceData(userId);
 
     let cert = await this.prisma.issuedCertificate.findFirst({
       where: { userId },
       orderBy: { issuedAt: 'desc' },
     });
 
-    if (cert && cert.certType !== resolvedCertType) {
+    if (cert && cert.certType !== source.resolvedCertType) {
       cert = await this.prisma.issuedCertificate.update({
         where: { id: cert.id },
-        data: { certType: resolvedCertType },
-      });
-    }
-
-    if (!cert) {
-      cert = await this.prisma.issuedCertificate.create({
         data: {
-          certificateNumber: `${process.env.CERT_NUMBER_PREFIX || 'NEWME'}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${targetUser.id.slice(-6).toUpperCase()}`,
-          userId,
-          certType: resolvedCertType,
-          testResultId: latestResult?.id || null,
+          certType: source.resolvedCertType,
           metadata: {
-            userName: targetUser.fullName,
-            userEmail: targetUser.email,
-            courseName: 'NEWME Personality Assessment',
-            personalityCode: personality.personalityCode,
-            personalityType: personality.personalityType,
-            personalityData: personality.personalityData,
+            ...this.safeObject(cert.metadata),
+            ...source.metadata,
           },
         },
       });
     }
 
+    if (!cert) {
+      const certificateNumber = await this.generateCertificateNumber(userId);
+      cert = await this.prisma.issuedCertificate.create({
+        data: {
+          certificateNumber,
+          userId,
+          certType: source.resolvedCertType,
+          testResultId: source.latestResult?.id || null,
+          metadata: source.metadata,
+        },
+      });
+    }
+
     return {
-      targetUser,
-      latestResult,
+      ...source,
       cert,
-      personality,
     };
   }
 
@@ -459,7 +664,7 @@ export class CertificatesController {
     const row = await this.prisma.certificateTemplate.findUnique({
       where: { certType: resolvedType },
     });
-    return mapCertificateTemplateForClient(this.prisma, row);
+    return this.stripSecondaryLogoFromTemplate(await mapCertificateTemplateForClient(this.prisma, row));
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
@@ -467,9 +672,12 @@ export class CertificatesController {
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('certificates.edit')
   @Put('template')
-  async updateTemplate(@Body() body: any) {
+  async updateTemplate(@CurrentUser() user: any, @Req() req: Request, @Body() body: any) {
     const resolvedType = this.toCertificateType(body.certType);
     await ensureDemoCertificateTemplate(this.prisma, resolvedType);
+    const before = await this.prisma.certificateTemplate.findUnique({
+      where: { certType: resolvedType },
+    });
     const payload = serializeCertificateTemplateForStorage(resolvedType, body || {});
     const metadata = buildCertificateTemplateMetadata(resolvedType, body || {});
     const updated = await this.prisma.certificateTemplate.upsert({
@@ -485,7 +693,25 @@ export class CertificatesController {
         value: metadata as any,
       },
     });
-    return mapCertificateTemplateForClient(this.prisma, updated);
+    const mapped = this.stripSecondaryLogoFromTemplate(await mapCertificateTemplateForClient(this.prisma, updated));
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_CERTIFICATE_TEMPLATE_UPDATED',
+      category: 'testing',
+      targetType: 'certificate_template',
+      targetId: String(resolvedType).toLowerCase(),
+      targetLabel: `Template ${String(resolvedType).toLowerCase()}`,
+      summary: `Template sertifikat ${String(resolvedType).toLowerCase()} diperbarui.`,
+      before: before ? {
+        certType: String(before.certType).toLowerCase(),
+      } : null,
+      after: {
+        certType: mapped?.certType || String(resolvedType).toLowerCase(),
+        title: mapped?.title || null,
+      },
+      ipAddress: req?.ip,
+    });
+    return mapped;
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
@@ -514,6 +740,7 @@ export class CertificatesController {
   }))
   @Post('template/upload/:assetType')
   uploadAsset(
+    @CurrentUser() user: any,
     @Param('assetType') assetType: string,
     @UploadedFile() file: any,
     @Req() request: Request,
@@ -522,10 +749,88 @@ export class CertificatesController {
       throw new BadRequestException('File gambar wajib diunggah');
     }
 
-    return {
+    const result = {
       assetType,
       url: this.publicUploadUrl(request, file.filename),
     };
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_CERTIFICATE_ASSET_UPLOADED',
+      category: 'testing',
+      targetType: 'certificate_asset',
+      targetId: assetType,
+      targetLabel: assetType,
+      summary: `Aset sertifikat ${assetType} diunggah.`,
+      after: {
+        type: assetType,
+        imageUrl: result.url,
+      },
+      ipAddress: request?.ip,
+    });
+    return result;
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
+  @AuthAudienceAccess(AuthAudience.ADMIN)
+  @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
+  @AdminPermission('certificates.view')
+  @Get('eligible')
+  async eligible() {
+    const latestResults = await this.prisma.testResult.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            myReferralCode: true,
+            referredByCode: true,
+            role: true,
+            profile: {
+              select: {
+                extra: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    const seenUserIds = new Set<string>();
+
+    const items = await Promise.all(latestResults
+      .filter((row) => {
+        const userId = String(row.userId || '').trim();
+        if (!userId || seenUserIds.has(userId)) return false;
+        seenUserIds.add(userId);
+        return true;
+      })
+      .filter((row) => row.user?.role === Role.USER)
+      .map(async (row) => {
+        const targetExtra = this.safeObject(row.user?.profile?.extra);
+        const resultUserExtra = this.safeObject((row as any)?.user?.profile?.extra);
+        const resolvedCertType = targetExtra.isYayasanLinked || resultUserExtra.isYayasanLinked
+          ? CertificateType.YAYASAN
+          : CertificateType.INDIVIDU;
+        const yayasan = resolvedCertType === CertificateType.YAYASAN
+          ? await this.resolveYayasanContext(row.user)
+          : null;
+
+        return {
+          userId: row.userId,
+          userName: row.user?.fullName || 'Tanpa Nama',
+          userEmail: row.user?.email || null,
+          resolvedCertType: String(resolvedCertType).toLowerCase(),
+          latestTestResultId: row.id,
+          latestTestType: row.testType,
+          yayasanId: yayasan?.id || null,
+          yayasanName: yayasan?.name || null,
+          yayasanLogoUrl: yayasan?.logoUrl || null,
+          yayasanLogoAvailable: Boolean(yayasan?.logoUrl),
+        };
+      }));
+
+    return items.sort((left, right) => String(left.userName || '').localeCompare(String(right.userName || '')));
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
@@ -561,43 +866,49 @@ export class CertificatesController {
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('certificates.create')
   @Post('issue')
-  async issue(@Body() body: any) {
-    const certType = this.toCertificateType(body.certType);
-    const user = body.userId
-      ? await this.prisma.user.findUnique({
-          where: { id: body.userId },
-          select: { fullName: true, email: true },
-        })
-      : null;
-    const latestResult = body.testResultId
-      ? await this.prisma.testResult.findUnique({ where: { id: body.testResultId } })
-      : body.userId
-        ? await this.findLatestCertificateResult(body.userId)
-        : null;
-    const personality = await this.resolvePersonalityData({
-      userId: body.userId || null,
-      testResultId: body.testResultId || latestResult?.id || null,
-      metadata: body,
-    });
-    const certNo = `${process.env.CERT_NUMBER_PREFIX || 'NEWME'}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(16).slice(2, 10).toUpperCase()}`;
+  async issue(@CurrentUser() user: any, @Req() req: Request, @Body() body: any) {
+    if (!String(body.userId || '').trim()) {
+      throw new BadRequestException('User wajib dipilih.');
+    }
+
+    const source = await this.resolveCertificateSourceData(String(body.userId));
+    if (!source.latestResult) {
+      throw new BadRequestException('User belum memiliki hasil test yang bisa dijadikan sertifikat.');
+    }
+
+    const certNo = await this.generateCertificateNumber(String(body.userId || ''));
     const created = await this.prisma.issuedCertificate.create({
       data: {
         certificateNumber: certNo,
         userId: body.userId || null,
-        certType,
-        testResultId: body.testResultId || latestResult?.id || null,
+        certType: source.resolvedCertType,
+        testResultId: source.latestResult?.id || null,
         metadata: {
-          ...body,
-          userName: user?.fullName || body.userName || null,
-          userEmail: user?.email || body.userEmail || null,
-          courseName: body.courseName || 'NEWME Personality Assessment',
-          personalityCode: personality.personalityCode,
-          personalityType: personality.personalityType,
-          personalityData: personality.personalityData,
+          ...source.metadata,
+          issuedFromAdminDashboard: true,
+          courseName: body.courseName || source.metadata.courseName || 'NEWME Personality Assessment',
         },
       },
     });
-    return this.enrichCertificate(created);
+    const enriched = await this.enrichCertificate(created);
+    void this.certificatePdfCacheService.queueWarmGeneration(enriched).catch(() => undefined);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_CERTIFICATE_ISSUED',
+      category: 'testing',
+      targetType: 'certificate_issue',
+      targetId: enriched?.id || created.id,
+      targetLabel: enriched?.certificateNumber || created.certificateNumber,
+      summary: `Sertifikat ${enriched?.certificateNumber || created.certificateNumber} diterbitkan.`,
+      after: {
+        certificateNumber: enriched?.certificateNumber || created.certificateNumber,
+        certType: enriched?.certType || String(source.resolvedCertType).toLowerCase(),
+        userName: enriched?.userName || null,
+        userEmail: enriched?.userEmail || null,
+      },
+      ipAddress: req?.ip,
+    });
+    return enriched;
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
@@ -620,9 +931,22 @@ export class CertificatesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @AuthAudienceAccess([AuthAudience.USER, AuthAudience.YAYASAN])
   @Get('check-eligibility')
-  eligibility() {
-    return { eligible: true };
+  async eligibility(@CurrentUser() currentUser: any) {
+    if (currentUser?.role !== Role.USER) {
+      return { eligible: false };
+    }
+
+    try {
+      const source = await this.resolveCertificateSourceData(String(currentUser?.sub || ''));
+      return { eligible: Boolean(source.latestResult) };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        return { eligible: false };
+      }
+      throw error;
+    }
   }
 
   @UseGuards(JwtAuthGuard)
@@ -630,7 +954,7 @@ export class CertificatesController {
   @Get('preview-data/:userId')
   async previewData(@CurrentUser() currentUser: any, @Param('userId') userId: string) {
     await this.assertCertificateAccess(currentUser, userId);
-    const { latestResult, cert, targetUser } = await this.getCertificateSourceData(userId);
+    const { latestResult, cert, targetUser, templateSnapshot, yayasan } = await this.getCertificateSourceData(userId);
 
     if (!latestResult) {
       throw new NotFoundException('Test result not found');
@@ -638,19 +962,17 @@ export class CertificatesController {
 
     const result = await mapTestResultForClient(this.prisma, latestResult);
     const enrichedCert = await this.enrichCertificate(cert);
-    const templateRow = await this.prisma.certificateTemplate.findUnique({
-      where: { certType: this.toCertificateType(enrichedCert.certType) },
-    });
-    const template = await mapCertificateTemplateForClient(this.prisma, templateRow);
-    const yayasanSecondaryLogo = enrichedCert.certType === 'yayasan'
-      ? await this.resolveYayasanSecondaryLogo(targetUser)
-      : null;
+    const template = enrichedCert.templateSnapshot && Object.keys(enrichedCert.templateSnapshot).length
+      ? enrichedCert.templateSnapshot
+      : templateSnapshot;
 
     return {
       certificateNumber: enrichedCert.certificateNumber,
       issuedAt: enrichedCert.issuedAt,
       courseName: enrichedCert.courseName || 'NEWME Personality Assessment',
       certType: enrichedCert.certType,
+      verificationUrl: enrichedCert.verificationUrl || null,
+      qrCodeDataUrl: enrichedCert.qrCodeDataUrl || null,
       userId: targetUser.id,
       userName: targetUser.fullName,
       userEmail: targetUser.email,
@@ -659,12 +981,8 @@ export class CertificatesController {
         || this.safeObject(targetUser.profile?.extra).publicCode
         || targetUser.myReferralCode
         || null,
-      template: yayasanSecondaryLogo
-        ? {
-            ...template,
-            secondaryLogoUrl: yayasanSecondaryLogo,
-          }
-        : template,
+      yayasan,
+      template: this.restoreSecondaryLogoToTemplate(template, enrichedCert.secondaryLogoUrl || yayasan?.logoUrl || null),
       result,
     };
   }
@@ -690,7 +1008,7 @@ export class CertificatesController {
     }
 
     const enriched = await this.enrichCertificate(cert);
-    this.sendPdf(response, `${certificateNumber}.pdf`, this.buildCertificatePdf(enriched));
+    this.sendPdf(response, `${certificateNumber}.pdf`, await this.buildCertificatePdf(enriched));
   }
 
   @UseGuards(JwtAuthGuard)
@@ -702,6 +1020,6 @@ export class CertificatesController {
     const { cert, targetUser } = await this.getCertificateSourceData(userId);
 
     const enriched = await this.enrichCertificate(cert);
-    this.sendPdf(response, `newme-${targetUser.id}.pdf`, this.buildCertificatePdf(enriched));
+    this.sendPdf(response, `newme-${targetUser.id}.pdf`, await this.buildCertificatePdf(enriched));
   }
 }

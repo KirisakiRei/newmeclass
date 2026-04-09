@@ -1,8 +1,29 @@
 import { API_URL, request } from './client';
 
 export const authAPI = {
+  /** @deprecated Use registerStart -> verifyRegisterOtp -> completeRegister for new flows. */
   register: (data: Record<string, unknown>) =>
     request('/auth/register', {
+      method: 'POST',
+      body: data,
+    }),
+  registerStart: (data: Record<string, unknown>) =>
+    request('/auth/register/start', {
+      method: 'POST',
+      body: data,
+    }),
+  verifyRegisterOtp: (data: Record<string, unknown>) =>
+    request('/auth/register/verify-otp', {
+      method: 'POST',
+      body: data,
+    }),
+  resendRegisterOtp: (data: Record<string, unknown>) =>
+    request('/auth/register/resend-otp', {
+      method: 'POST',
+      body: data,
+    }),
+  completeRegister: (data: Record<string, unknown>) =>
+    request('/auth/register/complete', {
       method: 'POST',
       body: data,
     }),

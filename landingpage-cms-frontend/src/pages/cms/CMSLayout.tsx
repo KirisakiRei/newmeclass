@@ -12,7 +12,14 @@ import {
 import { Button } from "../../app/components/ui/button";
 import { Badge } from "../../app/components/ui/badge";
 import { adminAuthAPI } from "../../services/api";
-import { clearAdminSession, getAdminSession, getAdminSessionEventName, hasAdminSession } from "../../lib/session";
+import {
+  clearAdminSession,
+  getAdminSession,
+  getAdminSessionEventName,
+  hasAdminSession,
+  hasRecentAdminLogout,
+  markRecentAdminLogout,
+} from "../../lib/session";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 import { SeoHead } from "../../app/components/SeoHead";
 
@@ -139,6 +146,7 @@ export function CMSLayout() {
   const { lastSaved } = useCMS();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const navigate = useNavigate();
   const [adminProfile, setAdminProfile] = useState(() => getAdminSession());
   const adminInitial = String(adminProfile?.fullName || adminProfile?.name || "A").trim().charAt(0).toUpperCase() || "A";
@@ -147,7 +155,12 @@ export function CMSLayout() {
   useEffect(() => {
     let active = true;
 
+    const shouldSkipSessionCheck = () => isLoggingOut || hasRecentAdminLogout();
+
     const ensureSession = async () => {
+      if (shouldSkipSessionCheck()) {
+        return;
+      }
       try {
         const sessionState = await adminAuthAPI.getSession();
         if (!sessionState?.authenticated) {
@@ -170,9 +183,15 @@ export function CMSLayout() {
     };
 
     const handleFocus = () => {
+      if (shouldSkipSessionCheck()) {
+        return;
+      }
       void ensureSession();
     };
     const handleSessionEvent = (event: Event) => {
+      if (shouldSkipSessionCheck()) {
+        return;
+      }
       const detail = (event as CustomEvent<{ action?: string }>).detail;
       if (detail?.action === "cleared" || !hasAdminSession()) {
         if (active) {
@@ -191,7 +210,9 @@ export function CMSLayout() {
       void ensureSession();
     };
 
-    void ensureSession();
+    if (!shouldSkipSessionCheck()) {
+      void ensureSession();
+    }
     window.addEventListener("focus", handleFocus);
     window.addEventListener(getAdminSessionEventName(), handleSessionEvent);
 
@@ -200,11 +221,28 @@ export function CMSLayout() {
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener(getAdminSessionEventName(), handleSessionEvent);
     };
-  }, [navigate]);
+  }, [navigate, isLoggingOut]);
 
-  const handleLogout = () => {
-    clearAdminSession();
-    navigate("/cms/login", { replace: true });
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await adminAuthAPI.logout();
+    } catch {
+      // Keep local logout resilient even when network/API logout fails.
+    } finally {
+      markRecentAdminLogout();
+      clearAdminSession();
+      setAdminProfile(null);
+      if (typeof window !== "undefined") {
+        window.location.replace("/cms/login");
+        return;
+      }
+      navigate("/cms/login", { replace: true });
+    }
   };
 
   return (
@@ -311,7 +349,7 @@ export function CMSLayout() {
                 <p className="text-xs text-white" style={{ fontWeight: 600 }}>{adminName}</p>
                 <p className="text-[10px] text-zinc-500">Landing CMS</p>
               </div>
-              <Button variant="ghost" size="sm" className="hidden text-zinc-500 hover:text-red-400 sm:inline-flex" onClick={handleLogout}>
+              <Button variant="ghost" size="sm" className="hidden text-zinc-500 hover:text-red-400 sm:inline-flex" onClick={handleLogout} disabled={isLoggingOut}>
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>

@@ -1,6 +1,10 @@
 import 'dotenv/config';
 import {
   API_BASE,
+  completeOtpRegistration,
+  extractAccessToken,
+  extractCsrfToken,
+  extractAuthSubject,
   extractItems,
   pollUntil,
   requestBuffer,
@@ -13,6 +17,8 @@ import {
 
 const ADMIN_USERNAME = process.env.SEED_SUPERADMIN_USERNAME || 'superadmin';
 const ADMIN_PASSWORD = process.env.SEED_SUPERADMIN_PASSWORD || 'ChangeMeNow123!';
+const REQUEST_ORIGIN = (process.env.REQUEST_ORIGIN || process.env.APP_URL || 'http://localhost:5000').replace(/\/$/, '');
+const REQUEST_REFERER = `${REQUEST_ORIGIN}/`;
 
 const PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7ZfGQAAAAASUVORK5CYII=';
@@ -36,10 +42,13 @@ async function adminLogin() {
     body: { username: ADMIN_USERNAME, password: ADMIN_PASSWORD },
   });
   requireOk('admin login', response);
-  return response.data.token;
+  return {
+    token: extractAccessToken(response),
+    csrfToken: extractCsrfToken(response),
+  };
 }
 
-async function uploadTestImage(token) {
+async function uploadTestImage(token, csrfToken) {
   const form = new FormData();
   form.append('file', new Blob([Buffer.from(PNG_BASE64, 'base64')], { type: 'image/png' }), 'qa-logo.png');
   form.append('category', 'branding');
@@ -52,6 +61,9 @@ async function uploadTestImage(token) {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
+      Origin: REQUEST_ORIGIN,
+      Referer: REQUEST_REFERER,
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken, Cookie: `nm_csrf=${csrfToken}` } : {}),
     },
     body: form,
   });
@@ -77,10 +89,11 @@ async function getCmsDomain(token, domainKey) {
   return response.data;
 }
 
-async function putCmsDomain(token, domainKey, value) {
+async function putCmsDomain(token, csrfToken, domainKey, value) {
   const response = await requestJson(`/landing/cms/${domainKey}`, {
     method: 'PUT',
     token,
+    csrfToken,
     body: value,
   });
   requireOk(`update cms domain ${domainKey}`, response);
@@ -107,7 +120,7 @@ async function main() {
   report.healthBefore = await requestJson('/health');
   requireOk('health before', report.healthBefore);
 
-  const adminToken = await adminLogin();
+  const { token: adminToken, csrfToken: adminCsrfToken } = await adminLogin();
 
   const domainKeys = ['global', 'home', 'companyProfile', 'services', 'shop', 'privacyPolicy', 'navigation'];
   originalDomains = Object.fromEntries(
@@ -123,7 +136,7 @@ async function main() {
     report.cms.summaryBefore = cmsSummaryBefore.data;
     report.cms.stateKeysBefore = Object.keys(cmsStateBefore.data || {});
 
-    uploadedLogo = await uploadTestImage(adminToken);
+    uploadedLogo = await uploadTestImage(adminToken, adminCsrfToken);
     requireCondition(!!uploadedLogo?.url, 'Upload logo tidak mengembalikan URL');
     if (uploadedLogo?.asset?.id) {
       createdMediaIds.push(uploadedLogo.asset.id);
@@ -137,6 +150,7 @@ async function main() {
     const renamedMedia = await requestJson(`/media/${uploadedAsset.id}`, {
       method: 'PUT',
       token: adminToken,
+      csrfToken: adminCsrfToken,
       body: {
         name: `QA Logo ${stamp}`,
         category: 'branding',
@@ -160,7 +174,7 @@ async function main() {
         { platform: 'qa-linkedin', url: `https://example.com/${stamp}` },
       ],
     };
-    await putCmsDomain(adminToken, 'global', tempGlobal);
+    await putCmsDomain(adminToken, adminCsrfToken, 'global', tempGlobal);
 
     const tempHome = {
       ...originalDomains.home,
@@ -221,7 +235,7 @@ async function main() {
         ctaLink: '/login',
       },
     };
-    await putCmsDomain(adminToken, 'home', tempHome);
+    await putCmsDomain(adminToken, adminCsrfToken, 'home', tempHome);
 
     const tempCompanyProfile = {
       ...originalDomains.companyProfile,
@@ -239,7 +253,7 @@ async function main() {
         ...(Array.isArray(originalDomains.companyProfile.teamMembers) ? originalDomains.companyProfile.teamMembers : []),
       ],
     };
-    await putCmsDomain(adminToken, 'companyProfile', tempCompanyProfile);
+    await putCmsDomain(adminToken, adminCsrfToken, 'companyProfile', tempCompanyProfile);
 
     const qaServiceSlug = `qa-service-${stamp}`;
     const tempServices = {
@@ -259,7 +273,7 @@ async function main() {
         ...(Array.isArray(originalDomains.services.servicePages) ? originalDomains.services.servicePages : []),
       ],
     };
-    await putCmsDomain(adminToken, 'services', tempServices);
+    await putCmsDomain(adminToken, adminCsrfToken, 'services', tempServices);
 
     const tempShop = {
       ...originalDomains.shop,
@@ -288,7 +302,7 @@ async function main() {
         ...(Array.isArray(originalDomains.shop.products) ? originalDomains.shop.products : []),
       ],
     };
-    await putCmsDomain(adminToken, 'shop', tempShop);
+    await putCmsDomain(adminToken, adminCsrfToken, 'shop', tempShop);
 
     const tempPrivacyPolicy = {
       ...originalDomains.privacyPolicy,
@@ -302,7 +316,7 @@ async function main() {
         ...(Array.isArray(originalDomains.privacyPolicy.sections) ? originalDomains.privacyPolicy.sections : []),
       ],
     };
-    await putCmsDomain(adminToken, 'privacyPolicy', tempPrivacyPolicy);
+    await putCmsDomain(adminToken, adminCsrfToken, 'privacyPolicy', tempPrivacyPolicy);
 
     const tempNavigation = {
       ...originalDomains.navigation,
@@ -311,11 +325,12 @@ async function main() {
         ...(Array.isArray(originalDomains.navigation.mainLinks) ? originalDomains.navigation.mainLinks : []),
       ],
     };
-    await putCmsDomain(adminToken, 'navigation', tempNavigation);
+    await putCmsDomain(adminToken, adminCsrfToken, 'navigation', tempNavigation);
 
     const createdArticle = await requestJson('/articles', {
       method: 'POST',
       token: adminToken,
+      csrfToken: adminCsrfToken,
       body: {
         title: `Artikel QA ${stamp}`,
         slug: `artikel-qa-${stamp}`,
@@ -332,6 +347,7 @@ async function main() {
     const updatedArticle = await requestJson(`/articles/${createdArticle.data.id}`, {
       method: 'PUT',
       token: adminToken,
+      csrfToken: adminCsrfToken,
       body: {
         title: `Artikel QA Updated ${stamp}`,
         excerpt: 'Artikel QA telah diupdate.',
@@ -433,13 +449,15 @@ async function main() {
 
     const userEmail = uniqueEmail('landing-user', stamp, 1);
     const userPassword = 'Password123!';
-    const userRegister = await requestJson('/auth/register', {
-      method: 'POST',
-      body: {
+    const userRegistration = await completeOtpRegistration('/auth', {
+      startBody: {
         email: userEmail,
         fullName: 'Landing QA User',
         password: userPassword,
+      },
+      completeBody: {
         phone: uniquePhone('0812', stamp, 1),
+        whatsapp: uniquePhone('0812', stamp, 1),
         address: `Jl. QA User ${stamp}`,
         birthDate: '2003-09-29',
         province: province.name,
@@ -448,9 +466,13 @@ async function main() {
         village: village.name,
       },
     });
-    requireOk('user register', userRegister);
-    const userId = userRegister.data.user.id || userRegister.data.user._id;
-    const userToken = userRegister.data.token;
+    requireOk('user register start', userRegistration.start);
+    requireOk('user register verify', userRegistration.verify);
+    requireOk('user register complete', userRegistration.complete);
+    const userRegister = userRegistration.complete;
+    const registeredUser = extractAuthSubject(userRegister, 'user');
+    const userId = registeredUser.id || registeredUser._id;
+    const userToken = extractAccessToken(userRegister);
 
     const userLogin = await requestJson('/auth/login', {
       method: 'POST',
@@ -460,6 +482,7 @@ async function main() {
       },
     });
     requireOk('user login', userLogin);
+    const userCsrfToken = extractCsrfToken(userLogin) || userRegistration.csrfToken || null;
 
     const userProfile = await requestJson('/auth/me', { token: userToken });
     requireOk('user profile', userProfile);
@@ -477,6 +500,7 @@ async function main() {
     const snap = await requestJson('/user-payments/create-snap', {
       method: 'POST',
       token: userToken,
+      csrfToken: userCsrfToken,
       body: {},
     });
     requireOk('create snap', snap);
@@ -507,6 +531,7 @@ async function main() {
     const coreSubmit = await requestJson('/personality-tests/core-premium/submit', {
       method: 'POST',
       token: userToken,
+      csrfToken: userCsrfToken,
       body: {
         tes_a: {
           q1: true,
@@ -548,6 +573,7 @@ async function main() {
     const issuedCertificate = await requestJson('/certificates/issue', {
       method: 'POST',
       token: adminToken,
+      csrfToken: adminCsrfToken,
       body: {
         userId,
         certType: 'INDIVIDU',
@@ -578,7 +604,7 @@ async function main() {
     if (originalDomains) {
       for (const key of domainKeys) {
         try {
-          await putCmsDomain(adminToken, key, originalDomains[key]);
+          await putCmsDomain(adminToken, adminCsrfToken, key, originalDomains[key]);
         } catch (error) {
           report.cleanup[`restore_${key}`] = {
             ok: false,
@@ -593,6 +619,7 @@ async function main() {
         await requestJson(`/articles/${articleId}`, {
           method: 'DELETE',
           token: adminToken,
+          csrfToken: adminCsrfToken,
         });
       } catch (error) {
         report.cleanup[`delete_article_${articleId}`] = {
@@ -607,6 +634,7 @@ async function main() {
         await requestJson(`/media/${mediaId}`, {
           method: 'DELETE',
           token: adminToken,
+          csrfToken: adminCsrfToken,
         });
       } catch (error) {
         report.cleanup[`delete_media_${mediaId}`] = {

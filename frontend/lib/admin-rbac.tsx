@@ -9,6 +9,7 @@ const PAGE_ACTIONS = {
   analytics: ['view', 'manage'],
   settings: ['view', 'edit', 'manage'],
   admin_management: ['view', 'create', 'edit', 'delete', 'manage'],
+  activity_logs: ['view'],
   cms_access: ['manage'],
   website_content: ['view', 'edit', 'manage'],
   hero_slides: ['view', 'create', 'edit', 'delete', 'manage'],
@@ -94,6 +95,7 @@ const ADMIN_ROUTE_RULES = [
   { prefix: '/admin/analytics', permission: 'analytics.view' },
   { prefix: '/admin/settings', permission: 'settings.view' },
   { prefix: '/admin/admin-users', permission: 'admin_management.view' },
+  { prefix: '/admin/activity-logs', permission: 'activity_logs.view' },
   { prefix: '/admin/website-content', permission: 'website_content.view' },
   { prefix: '/admin/hero-slides', permission: 'hero_slides.view' },
   { prefix: '/admin/homepage-products', permission: 'homepage_products.view' },
@@ -131,6 +133,7 @@ const ADMIN_REDIRECT_ORDER = [
   '/admin/running-text',
   '/admin/settings',
   '/admin/admin-users',
+  '/admin/activity-logs',
 ];
 
 const AdminAccessContext = createContext(null);

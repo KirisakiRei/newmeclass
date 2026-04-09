@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { AccountStatus, MitraInviteStatus, PriceChangeRequestStatus, Role, YayasanApprovalStatus } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
@@ -17,6 +17,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
+import { AdminActivityLogService } from '../admin-activity/admin-activity.service';
 import { AuthService } from '../auth/auth.service';
 import { DisbursementsService } from '../disbursements/disbursements.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -48,6 +49,7 @@ export class MitraController {
     private readonly prisma: PrismaService,
     private readonly disbursementsService: DisbursementsService,
     private readonly authService: AuthService,
+    private readonly adminActivityLogService: AdminActivityLogService,
   ) {}
 
   private hash(value: string) {
@@ -758,7 +760,7 @@ export class MitraController {
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('mitra.manage')
-  async adminCreateMitra(@Body() body: CreateMitraInviteDto) {
+  async adminCreateMitra(@CurrentUser() user: any, @Req() req: any, @Body() body: CreateMitraInviteDto) {
     const fullName = String(body.fullName || '').trim();
     const phone = this.normalizePhone(body.phone);
     if (!fullName || !phone) {
@@ -818,7 +820,7 @@ export class MitraController {
     });
 
     const invite = await this.createInviteToken(mitra.id, mitra.mitraProfile!.id);
-    return {
+    const result = {
       mitra: this.buildMitraView(mitra, {
         capacityLimit: DEFAULT_MITRA_CAPACITY_LIMIT,
         capacityUsed: 0,
@@ -829,13 +831,31 @@ export class MitraController {
       }),
       invite,
     };
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_MITRA_CREATED',
+      category: 'mitra',
+      targetType: 'mitra',
+      targetId: mitra.id,
+      targetLabel: result.mitra?.fullName || fullName,
+      summary: `Mitra ${result.mitra?.fullName || fullName} dibuat.`,
+      after: {
+        fullName: result.mitra?.fullName || fullName,
+        email: result.mitra?.email || mitra.email,
+        phone: result.mitra?.phone || phone,
+        status: result.mitra?.status || mitra.status,
+        isVerified: result.mitra?.isVerified || false,
+      },
+      ipAddress: req?.ip,
+    });
+    return result;
   }
 
   @Post('admin/:id/invite/resend')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('mitra.manage')
-  async adminResendInvite(@Param('id') id: string) {
+  async adminResendInvite(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string) {
     const mitra = await this.prisma.user.findUnique({
       where: { id },
       include: { mitraProfile: true, profile: true, wallet: true },
@@ -844,7 +864,7 @@ export class MitraController {
       throw new NotFoundException('Mitra not found');
     }
     const invite = await this.createInviteToken(mitra.id, mitra.mitraProfile.id);
-    return {
+    const result = {
       mitra: this.buildMitraView(mitra, {
         ...(await this.syncMitraCapacityUsage(mitra.id)),
         inviteStatus: invite.status,
@@ -852,13 +872,29 @@ export class MitraController {
       }),
       invite,
     };
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_MITRA_INVITE_RESENT',
+      category: 'mitra',
+      targetType: 'mitra_invite',
+      targetId: id,
+      targetLabel: mitra.fullName || mitra.email || id,
+      summary: `Undangan mitra ${mitra.fullName || mitra.email || ''} dikirim ulang.`,
+      meta: {
+        inviteStatus: invite.status,
+        expiresAt: invite.expiresAt,
+      },
+      ipAddress: req?.ip,
+    });
+    return result;
   }
 
   @Post('admin/:id/invite/revoke')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('mitra.manage')
-  async adminRevokeInvite(@Param('id') id: string) {
+  async adminRevokeInvite(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string) {
+    const mitra = await this.prisma.user.findUnique({ where: { id } });
     await this.prisma.mitraInvite.updateMany({
       where: { userId: id, status: MitraInviteStatus.PENDING },
       data: {
@@ -867,17 +903,31 @@ export class MitraController {
       },
     });
     const latestInvite = await this.getLatestInvite(id);
-    return {
+    const result = {
       success: true,
       invite: latestInvite ? this.buildInviteView(latestInvite) : null,
     };
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_MITRA_INVITE_REVOKED',
+      category: 'mitra',
+      targetType: 'mitra_invite',
+      targetId: id,
+      targetLabel: mitra?.fullName || mitra?.email || id,
+      summary: `Undangan mitra ${mitra?.fullName || mitra?.email || ''} dicabut.`,
+      meta: {
+        inviteStatus: result.invite?.status || 'REVOKED',
+      },
+      ipAddress: req?.ip,
+    });
+    return result;
   }
 
   @Put('admin/:id/capacity')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('mitra.manage')
-  async adminUpdateCapacity(@CurrentUser() user: any, @Param('id') id: string, @Body() body: UpdateMitraCapacityDto) {
+  async adminUpdateCapacity(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string, @Body() body: UpdateMitraCapacityDto) {
     const mitra = await this.prisma.user.findUnique({
       where: { id },
       include: { mitraProfile: true, profile: true, wallet: true },
@@ -916,7 +966,28 @@ export class MitraController {
       where: { id },
       include: { mitraProfile: true, profile: true, wallet: true },
     });
-    return this.buildMitraView(updated, await this.syncMitraCapacityUsage(id));
+    const result = this.buildMitraView(updated, await this.syncMitraCapacityUsage(id));
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_MITRA_CAPACITY_UPDATED',
+      category: 'mitra',
+      targetType: 'mitra_capacity',
+      targetId: id,
+      targetLabel: result?.fullName || mitra.fullName || id,
+      summary: `Kapasitas mitra ${result?.fullName || mitra.fullName || ''} diperbarui.`,
+      before: {
+        amount: Number(mitra.mitraProfile?.capacityLimit || DEFAULT_MITRA_CAPACITY_LIMIT),
+      },
+      after: {
+        amount: Number(body.capacityLimit || 0),
+      },
+      meta: {
+        reason: body.note || null,
+        capacityUsed: currentCapacity.capacityUsed,
+      },
+      ipAddress: req?.ip,
+    });
+    return result;
   }
 
   @Get('admin/:id/capacity-history')
@@ -1096,7 +1167,7 @@ export class MitraController {
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('price_change_requests.manage')
-  async reviewPriceChangeRequest(@CurrentUser() user: any, @Param('id') id: string, @Body() body: ReviewPriceChangeRequestDto) {
+  async reviewPriceChangeRequest(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string, @Body() body: ReviewPriceChangeRequestDto) {
     const request = await this.prisma.yayasanPriceChangeRequest.findUnique({ where: { id } });
     if (!request) {
       throw new BadRequestException('Price change request not found');
@@ -1131,14 +1202,38 @@ export class MitraController {
       return reviewed;
     });
 
-    return this.mapPriceChangeRequest(updated);
+    const result = this.mapPriceChangeRequest(updated);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_PRICE_CHANGE_REVIEWED',
+      category: 'approval',
+      targetType: 'price_change_request',
+      targetId: id,
+      targetLabel: id,
+      summary: `Permintaan ubah harga ${id} direview.`,
+      before: {
+        status: request.status,
+        amount: request.currentYayasanShare,
+      },
+      after: {
+        status: result.status,
+        amount: request.requestedYayasanShare,
+      },
+      meta: {
+        decision: body.status,
+        reason: request.reason || null,
+        reviewNote: body.reviewNote || null,
+      },
+      ipAddress: req?.ip,
+    });
+    return result;
   }
 
   @Put('admin/:id/toggle-active')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('mitra.manage')
-  async toggleActive(@Param('id') id: string) {
+  async toggleActive(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string) {
     const row = await this.prisma.user.findUnique({ where: { id }, include: { mitraProfile: true, profile: true, wallet: true } });
     const nextActive = !(row?.mitraProfile?.isActive ?? row?.status === 'ACTIVE');
     await this.prisma.mitraProfile.upsert({
@@ -1154,14 +1249,33 @@ export class MitraController {
       update: { isActive: nextActive },
     });
     const updated = await this.prisma.user.update({ where: { id }, data: { status: nextActive ? 'ACTIVE' : 'INACTIVE' }, include: { mitraProfile: true, profile: true, wallet: true } });
-    return this.buildMitraView(updated);
+    const result = this.buildMitraView(updated);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_MITRA_UPDATED',
+      category: 'mitra',
+      targetType: 'mitra',
+      targetId: id,
+      targetLabel: result?.fullName || row?.fullName || id,
+      summary: `Status aktif mitra ${result?.fullName || row?.fullName || ''} diubah.`,
+      before: {
+        isActive: row?.mitraProfile?.isActive ?? row?.status === 'ACTIVE',
+        status: row?.status,
+      },
+      after: {
+        isActive: result?.isActive ?? nextActive,
+        status: result?.status || updated.status,
+      },
+      ipAddress: req?.ip,
+    });
+    return result;
   }
 
   @Put('admin/:id/verify')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('mitra.manage')
-  async verify(@Param('id') id: string) {
+  async verify(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string) {
     const row = await this.prisma.user.findUnique({ where: { id }, include: { mitraProfile: true, profile: true, wallet: true } });
     await this.prisma.mitraProfile.upsert({
       where: { userId: id },
@@ -1177,15 +1291,46 @@ export class MitraController {
       update: { isVerified: true, isActive: true },
     });
     const updated = await this.prisma.user.update({ where: { id }, data: { status: 'ACTIVE' }, include: { mitraProfile: true, profile: true, wallet: true } });
-    return this.buildMitraView(updated);
+    const result = this.buildMitraView(updated);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_MITRA_VERIFIED',
+      category: 'approval',
+      targetType: 'mitra',
+      targetId: id,
+      targetLabel: result?.fullName || row?.fullName || id,
+      summary: `Mitra ${result?.fullName || row?.fullName || ''} diverifikasi.`,
+      before: {
+        isVerified: row?.mitraProfile?.isVerified ?? false,
+        status: row?.status,
+      },
+      after: {
+        isVerified: result?.isVerified ?? true,
+        status: result?.status || updated.status,
+      },
+      ipAddress: req?.ip,
+    });
+    return result;
   }
 
   @Post('admin/:id/reset-password')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('mitra.manage')
-  async resetPassword(@Param('id') id: string) {
-    return this.authService.requestPasswordResetByUserId(id, Role.MITRA);
+  async resetPassword(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string) {
+    const target = await this.prisma.user.findUnique({ where: { id } });
+    const result = await this.authService.requestPasswordResetByUserId(id, Role.MITRA);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_MITRA_PASSWORD_RESET',
+      category: 'mitra',
+      targetType: 'mitra',
+      targetId: id,
+      targetLabel: target?.fullName || target?.email || id,
+      summary: `Password mitra ${target?.fullName || target?.email || ''} direset.`,
+      ipAddress: req?.ip,
+    });
+    return result;
   }
 
   @Get('admin/withdrawals')
@@ -1227,18 +1372,35 @@ export class MitraController {
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('mitra_withdrawals.manage')
-  async approveWithdrawal(@Param('id') id: string, @Body() body: ProcessWithdrawalDto) {
+  async approveWithdrawal(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string, @Body() body: ProcessWithdrawalDto) {
     if (!id || id === 'undefined' || id === 'null') {
       throw new BadRequestException('Withdrawal request id is required.');
     }
-    return this.disbursementsService.processDisbursement(id, body, { type: 'mitra' });
+    const before = await this.prisma.disbursement.findUnique({ where: { id } });
+    const updated = await this.disbursementsService.processDisbursement(id, body, { type: 'mitra' });
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub,
+      action: 'ADMIN_WITHDRAWAL_REVIEWED',
+      category: 'approval',
+      targetType: 'mitra_withdrawal',
+      targetId: id,
+      targetLabel: before?.userId || id,
+      summary: `Withdrawal mitra ${id} direview.`,
+      before: before ? { status: before.status, amount: before.amount, note: before.notes } : null,
+      after: updated ? { status: updated.status, amount: before?.amount || null, note: updated.notes } : null,
+      meta: {
+        decision: body?.status || 'APPROVED',
+      },
+      ipAddress: req?.ip,
+    });
+    return updated;
   }
 
   @Put('admin/withdrawals/:id/reject')
   @UseGuards(JwtAuthGuard, RolesGuard, AdminPermissionGuard)
   @Roles(Role.OPERATOR, Role.ADMIN, Role.SUPERADMIN, Role.DEVELOPER)
   @AdminPermission('mitra_withdrawals.manage')
-  rejectWithdrawal(@Param('id') id: string, @Body() body: ProcessWithdrawalDto) {
-    return this.approveWithdrawal(id, { ...body, status: 'REJECTED' });
+  rejectWithdrawal(@CurrentUser() user: any, @Req() req: any, @Param('id') id: string, @Body() body: ProcessWithdrawalDto) {
+    return this.approveWithdrawal(user, req, id, { ...body, status: 'REJECTED' });
   }
 }

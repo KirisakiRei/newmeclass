@@ -3,7 +3,7 @@
 NestJS + Prisma + MySQL backend for NEWME SaaS platform.
 
 ## Quick Start
-1. Copy `.env.example` to `.env` and fill real values.
+1. Copy `.env.example` to `.env` di folder `backend` lalu isi real values.
 2. Run `npm install`.
 3. Start local infra (MySQL + Redis 7): `npm run dev:infra:up`.
 4. Run `npm run prisma:generate`.
@@ -27,6 +27,8 @@ NestJS + Prisma + MySQL backend for NEWME SaaS platform.
 
 ## Docker
 - Local backend infra only: `docker compose -f docker-compose.dev.yml up -d`
+- Root project `/.env` dipakai oleh Docker Compose stack penuh.
+- `backend/.env` dipakai saat backend dijalankan langsung dengan `npm run start:dev`.
 
 ## Production VPS
 1. Use [/.env.example](/c:/Users/LENOVO/Documents/Project/2026/newme/.env.example) as the reference for runtime variables.

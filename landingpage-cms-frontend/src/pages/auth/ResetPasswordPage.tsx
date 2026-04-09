@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { ArrowRight, Eye, EyeOff, Loader2, Lock } from "lucide-react";
 import { Button } from "../../app/components/ui/button";
 import { authAPI } from "../../services/api";
+import { getApiErrorMessage } from "../../services/api-error";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 
 export function ResetPasswordPage() {
@@ -34,7 +35,7 @@ export function ResetPasswordPage() {
       setSuccess("Password baru berhasil disimpan. Anda akan diarahkan ke halaman login.");
       window.setTimeout(() => navigate("/login", { replace: true }), 1200);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal menyimpan password baru");
+      setError(getApiErrorMessage(err, "Gagal menyimpan password baru."));
     } finally {
       setLoading(false);
     }

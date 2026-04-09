@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AccountStatus, Role } from '@prisma/client';
-import { createHash } from 'crypto';
+import { hashLocalPassword } from 'src/common/auth/password.utils';
 import { AuthService } from '../auth/auth.service';
 import { DEVELOPER_ROOT_ROLE_SLUG, isAdminActorRole, isHiddenSystemAdminRoleSlug } from '../admin-rbac/admin-permission-catalog';
 import { AdminRbacService } from '../admin-rbac/admin-rbac.service';
@@ -18,10 +18,6 @@ export class AdminManagementService {
     private readonly authService: AuthService,
     private readonly adminRbacService: AdminRbacService,
   ) {}
-
-  private hashPassword(password: string) {
-    return createHash('sha256').update(password).digest('hex');
-  }
 
   private normalizeUsername(username?: string | null) {
     return String(username || '').trim().toLowerCase();
@@ -336,7 +332,7 @@ export class AdminManagementService {
         username,
         email,
         fullName: username,
-        passwordHash: this.hashPassword(body.password),
+        passwordHash: await hashLocalPassword(body.password),
         role: Role.ADMIN,
         status: AccountStatus.ACTIVE,
         adminRoleId: role.id,
@@ -381,7 +377,7 @@ export class AdminManagementService {
     }
 
     if (body.password) {
-      data.passwordHash = this.hashPassword(body.password);
+      data.passwordHash = await hashLocalPassword(body.password);
     }
 
     if (body.adminRoleId !== undefined) {
@@ -403,7 +399,7 @@ export class AdminManagementService {
 
     await this.prisma.user.update({
       where: { id: adminId },
-      data: { passwordHash: this.hashPassword(body.newPassword) },
+      data: { passwordHash: await hashLocalPassword(body.newPassword) },
     });
 
     return { message: 'Admin password updated' };

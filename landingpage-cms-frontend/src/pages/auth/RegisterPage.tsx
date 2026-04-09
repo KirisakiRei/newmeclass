@@ -1,127 +1,85 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { ArrowRight, Calendar, CheckCircle2, ChevronDown, Eye, EyeOff, Loader2, Lock, Mail, MapPin, Phone, User } from "lucide-react";
+import {
+  ArrowRight,
+  Calendar,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  MapPin,
+  Phone,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 import { Button } from "../../app/components/ui/button";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "../../app/components/ui/input-otp";
+import { getApiErrorMessage } from "../../services/api-error";
 import { authAPI, landingAPI } from "../../services/api";
 import { buildDashboardBridgeUrl, setUserSession } from "../../lib/session";
 import newmeLogo from "../../assets/585f88d5e9a2256caa217475b070012672c11723.png";
 
 type LocationOption = { id: string; name: string };
-type SelectOption = { value: string; label: string };
+type RegistrationSession = {
+  registrationToken: string;
+  email: string;
+  maskedEmail: string;
+  fullName: string;
+  verified: boolean;
+  resendAvailableAt: string;
+  expiresAt: string;
+};
 
-const sourceOptions: SelectOption[] = [
-  { value: "google", label: "Google" },
-  { value: "instagram", label: "Instagram" },
-  { value: "facebook", label: "Facebook" },
-  { value: "tiktok", label: "TikTok" },
-  { value: "iklan", label: "Iklan Online" },
-  { value: "teman", label: "Teman" },
-  { value: "sekolah", label: "Sekolah" },
-  { value: "lainnya", label: "Lainnya" },
-];
+const STORAGE_KEY = "newme:user-registration";
+const SOURCE_OPTIONS = ["Google", "Instagram", "Facebook", "TikTok", "Iklan Online", "Teman", "Sekolah", "Lainnya"];
 
-function FieldWrapper({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-sm text-zinc-400">
-        {label}
-        {required && <span className="ml-0.5 text-yellow-500">*</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
+const readStoredSession = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(STORAGE_KEY) || "null");
+    if (!parsed?.registrationToken) return null;
+    if (parsed.expiresAt && new Date(parsed.expiresAt).getTime() <= Date.now()) return null;
+    return parsed as RegistrationSession;
+  } catch {
+    return null;
+  }
+};
 
-function TextInput({
-  icon: Icon,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
-  ...rest
-}: {
-  icon?: React.ElementType;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  placeholder?: string;
-  [key: string]: any;
-}) {
-  return (
-    <div className="relative">
-      {Icon && <Icon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />}
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={`w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 text-sm text-white placeholder:text-zinc-600 outline-none transition-colors focus:border-yellow-500/50 focus:bg-white/[0.06] ${Icon ? "pl-10 pr-4" : "px-4"}`}
-        {...rest}
-      />
-    </div>
-  );
-}
-
-function SelectInput({
-  value,
-  onChange,
-  options,
-  placeholder,
-  disabled,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: SelectOption[];
-  placeholder: string;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className={`w-full appearance-none rounded-xl border border-white/10 bg-[#18181b] py-3 px-4 pr-9 text-sm outline-none transition-colors focus:border-yellow-500/50 disabled:cursor-not-allowed disabled:opacity-40 ${value ? "text-white" : "text-zinc-600"}`}
-      >
-        <option value="" disabled className="bg-[#18181b]">
-          {placeholder}
-        </option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value} className="bg-[#18181b] text-white">
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-    </div>
-  );
-}
-
-const toSelectOptions = (items: LocationOption[]) => items.map((item) => ({ value: item.id, label: item.name }));
+const selectOptions = (items: LocationOption[]) => (
+  items.map((item) => (
+    <option key={item.id} value={item.id}>
+      {item.name}
+    </option>
+  ))
+);
 
 export function RegisterPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const referralCode = String(searchParams.get("ref") || "").trim();
-  const [showPass, setShowPass] = useState(false);
+
+  const [step, setStep] = useState<1 | 2>(readStoredSession() ? 2 : 1);
+  const [registrationSession, setRegistrationSession] = useState<RegistrationSession | null>(() => readStoredSession());
+  const [otp, setOtp] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [agreed, setAgreed] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState<"start" | "verify" | "resend" | "complete" | "">("");
   const [error, setError] = useState("");
-  const [loadingLocations, setLoadingLocations] = useState({
-    provinces: false,
-    cities: false,
-    districts: false,
-    villages: false,
-  });
+  const [success, setSuccess] = useState("");
+  const [countdown, setCountdown] = useState(0);
+
   const [provinceOptions, setProvinceOptions] = useState<LocationOption[]>([]);
   const [cityOptions, setCityOptions] = useState<LocationOption[]>([]);
   const [districtOptions, setDistrictOptions] = useState<LocationOption[]>([]);
   const [villageOptions, setVillageOptions] = useState<LocationOption[]>([]);
+
   const [form, setForm] = useState({
-    name: "",
-    email: "",
+    name: registrationSession?.fullName || "",
+    email: registrationSession?.email || "",
     phone: "",
     birthdate: "",
     address: "",
@@ -129,386 +87,606 @@ export function RegisterPage() {
     cityId: "",
     districtId: "",
     villageId: "",
-    districtText: "",
-    villageText: "",
     source: "",
     sourceOther: "",
     password: "",
     confirm: "",
   });
 
+  const updateForm = (key: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const selectedProvince = useMemo(
+    () => provinceOptions.find((item) => item.id === form.provinceId) || null,
+    [form.provinceId, provinceOptions],
+  );
+  const selectedCity = useMemo(
+    () => cityOptions.find((item) => item.id === form.cityId) || null,
+    [form.cityId, cityOptions],
+  );
+  const selectedDistrict = useMemo(
+    () => districtOptions.find((item) => item.id === form.districtId) || null,
+    [form.districtId, districtOptions],
+  );
+  const selectedVillage = useMemo(
+    () => villageOptions.find((item) => item.id === form.villageId) || null,
+    [form.villageId, villageOptions],
+  );
+
+  const otpVerified = Boolean(registrationSession?.verified);
+  const passwordTooShort = form.password.length > 0 && form.password.length < 8;
+  const passwordMismatch = form.confirm.length > 0 && form.password !== form.confirm;
+
   useEffect(() => {
     let active = true;
-    const bootstrap = async () => {
-      try {
-        const sessionState = await authAPI.getSession();
-        if (!sessionState?.authenticated) {
-          return;
+    authAPI
+      .getSession()
+      .then((sessionState) => {
+        if (active && sessionState?.authenticated) {
+          setUserSession(null, sessionState?.viewer || null);
+          navigate("/dashboard", { replace: true });
         }
-        if (!active) return;
-        setUserSession(null, sessionState?.viewer || null);
-        navigate("/dashboard", { replace: true });
-      } catch {
-        // Stay on register page when no valid session exists.
-      }
-    };
+      })
+      .catch(() => undefined);
 
-    void bootstrap();
     return () => {
       active = false;
     };
   }, [navigate]);
 
-  const selectedProvince = useMemo(() => provinceOptions.find((item) => item.id === form.provinceId) || null, [form.provinceId, provinceOptions]);
-  const selectedCity = useMemo(() => cityOptions.find((item) => item.id === form.cityId) || null, [cityOptions, form.cityId]);
-  const selectedDistrict = useMemo(() => districtOptions.find((item) => item.id === form.districtId) || null, [districtOptions, form.districtId]);
-  const selectedVillage = useMemo(() => villageOptions.find((item) => item.id === form.villageId) || null, [form.villageId, villageOptions]);
-  const passwordMatch = Boolean(form.password && form.confirm && form.password === form.confirm);
-  const passwordMismatch = Boolean(form.confirm && form.password !== form.confirm);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (!registrationSession) {
+      window.sessionStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(registrationSession));
+  }, [registrationSession]);
 
   useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        setLoadingLocations((prev) => ({ ...prev, provinces: true }));
-        const rows = await landingAPI.getProvinces();
-        if (active) setProvinceOptions(Array.isArray(rows) ? rows : []);
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Gagal memuat provinsi");
-      } finally {
-        if (active) setLoadingLocations((prev) => ({ ...prev, provinces: false }));
-      }
-    };
-    void load();
-    return () => { active = false; };
+    if (!registrationSession?.resendAvailableAt) return;
+
+    const timer = window.setInterval(() => {
+      setCountdown(Math.max(new Date(registrationSession.resendAvailableAt).getTime() - Date.now(), 0));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [registrationSession?.resendAvailableAt]);
+
+  useEffect(() => {
+    landingAPI
+      .getProvinces()
+      .then((rows) => setProvinceOptions(Array.isArray(rows) ? rows : []))
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
-    let active = true;
     if (!form.provinceId) {
       setCityOptions([]);
       return;
     }
-    const load = async () => {
-      try {
-        setLoadingLocations((prev) => ({ ...prev, cities: true }));
-        const rows = await landingAPI.getCities(form.provinceId);
-        if (active) setCityOptions(Array.isArray(rows) ? rows : []);
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Gagal memuat kota");
-      } finally {
-        if (active) setLoadingLocations((prev) => ({ ...prev, cities: false }));
-      }
-    };
-    void load();
-    return () => { active = false; };
+
+    landingAPI
+      .getCities(form.provinceId)
+      .then((rows) => setCityOptions(Array.isArray(rows) ? rows : []))
+      .catch(() => undefined);
   }, [form.provinceId]);
 
   useEffect(() => {
-    let active = true;
     if (!form.cityId) {
       setDistrictOptions([]);
       return;
     }
-    const load = async () => {
-      try {
-        setLoadingLocations((prev) => ({ ...prev, districts: true }));
-        const rows = await landingAPI.getDistricts(form.cityId);
-        if (active) setDistrictOptions(Array.isArray(rows) ? rows : []);
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Gagal memuat kecamatan");
-      } finally {
-        if (active) setLoadingLocations((prev) => ({ ...prev, districts: false }));
-      }
-    };
-    void load();
-    return () => { active = false; };
+
+    landingAPI
+      .getDistricts(form.cityId)
+      .then((rows) => setDistrictOptions(Array.isArray(rows) ? rows : []))
+      .catch(() => undefined);
   }, [form.cityId]);
 
   useEffect(() => {
-    let active = true;
     if (!form.districtId) {
       setVillageOptions([]);
       return;
     }
-    const load = async () => {
-      try {
-        setLoadingLocations((prev) => ({ ...prev, villages: true }));
-        const rows = await landingAPI.getVillages(form.districtId);
-        if (active) setVillageOptions(Array.isArray(rows) ? rows : []);
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Gagal memuat kelurahan");
-      } finally {
-        if (active) setLoadingLocations((prev) => ({ ...prev, villages: false }));
-      }
-    };
-    void load();
-    return () => { active = false; };
+
+    landingAPI
+      .getVillages(form.districtId)
+      .then((rows) => setVillageOptions(Array.isArray(rows) ? rows : []))
+      .catch(() => undefined);
   }, [form.districtId]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const clearSession = () => {
+    setRegistrationSession(null);
+    setOtp("");
+    setStep(1);
+    setSuccess("");
+
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(STORAGE_KEY);
+    }
+  };
+
+  const startRegistration = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError("");
-    if (!agreed) return setError("Harap setujui Kebijakan Privasi terlebih dahulu.");
-    if (form.password !== form.confirm) return setError("Password dan konfirmasi password belum sama.");
-    if (form.password.length < 8) return setError("Password minimal 8 karakter.");
-    if (!selectedProvince || !selectedCity) return setError("Provinsi dan kota wajib dipilih.");
-    if (!form.source) return setError("Silakan pilih sumber Anda mengenal NEWME.");
-    if (form.source === "lainnya" && !form.sourceOther.trim()) return setError("Silakan isi sumber lainnya.");
+    setSuccess("");
+
+    if (!agreed) {
+      setError("Harap setujui Syarat dan Ketentuan terlebih dahulu.");
+      return;
+    }
+
+    if (passwordTooShort) {
+      setError("Password minimal 8 karakter.");
+      return;
+    }
+
+    if (passwordMismatch) {
+      setError("Password dan konfirmasi password belum sama.");
+      return;
+    }
+
+    setBusy("start");
     try {
-      setLoading(true);
-      const response = await authAPI.register({
+      const response: any = await authAPI.registerStart({
+        fullName: form.name,
         email: form.email,
         password: form.password,
-        fullName: form.name,
+        referralCode: referralCode || null,
+      });
+
+      const session = {
+        registrationToken: String(response.registrationToken),
+        email: String(response.email || form.email),
+        maskedEmail: String(response.maskedEmail || form.email),
+        fullName: String(response.fullName || form.name),
+        verified: Boolean(response.verified),
+        resendAvailableAt: String(response.resendAvailableAt),
+        expiresAt: String(response.expiresAt),
+      };
+
+      setRegistrationSession(session);
+      setForm((prev) => ({
+        ...prev,
+        name: session.fullName,
+        email: session.email,
+        password: "",
+        confirm: "",
+      }));
+      setStep(2);
+      setSuccess("OTP sudah dikirim ke email Anda.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Gagal memulai registrasi."));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const verifyOtp = async () => {
+    if (!registrationSession?.registrationToken || otp.length !== 6) {
+      setError("Masukkan 6 digit OTP.");
+      return;
+    }
+
+    setError("");
+    setSuccess("");
+    setBusy("verify");
+
+    try {
+      const response: any = await authAPI.verifyRegisterOtp({
+        registrationToken: registrationSession.registrationToken,
+        otp,
+      });
+
+      setRegistrationSession((prev) => (
+        prev
+          ? {
+              ...prev,
+              verified: Boolean(response.verified ?? true),
+              resendAvailableAt: String(response.resendAvailableAt || prev.resendAvailableAt),
+            }
+          : prev
+      ));
+      setSuccess("Email berhasil diverifikasi. Lengkapi biodata Anda.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "OTP tidak valid."));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const resendOtp = async () => {
+    if (!registrationSession?.registrationToken) return;
+
+    setError("");
+    setSuccess("");
+    setBusy("resend");
+
+    try {
+      const response: any = await authAPI.resendRegisterOtp({
+        registrationToken: registrationSession.registrationToken,
+      });
+
+      setRegistrationSession((prev) => (
+        prev
+          ? {
+              ...prev,
+              resendAvailableAt: String(response.resendAvailableAt || prev.resendAvailableAt),
+            }
+          : prev
+      ));
+      setOtp("");
+      setSuccess("OTP baru sudah dikirim.");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Gagal mengirim ulang OTP."));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const completeRegistration = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!registrationSession?.registrationToken) {
+      setError("Sesi registrasi tidak ditemukan.");
+      return;
+    }
+
+    if (!otpVerified) {
+      setError("Verifikasi email dulu sebelum lanjut.");
+      return;
+    }
+
+    if (!selectedProvince || !selectedCity || !selectedDistrict || !selectedVillage) {
+      setError("Provinsi, kota, kecamatan, dan kelurahan/desa wajib dipilih.");
+      return;
+    }
+
+    if (!form.source) {
+      setError("Silakan pilih sumber Anda mengenal NEWME.");
+      return;
+    }
+
+    if (form.source === "Lainnya" && !form.sourceOther.trim()) {
+      setError("Silakan isi sumber lainnya.");
+      return;
+    }
+
+    setBusy("complete");
+    try {
+      const response: any = await authAPI.completeRegister({
+        registrationToken: registrationSession.registrationToken,
         phone: form.phone,
         whatsapp: form.phone,
         birthDate: form.birthdate,
         address: form.address,
         province: selectedProvince.name,
         city: selectedCity.name,
-        district: selectedDistrict?.name || form.districtText,
-        village: selectedVillage?.name || form.villageText,
+        district: selectedDistrict.name,
+        village: selectedVillage.name,
         userType: "individual",
-        referralSource: form.source,
-        referralOther: form.source === "lainnya" ? form.sourceOther : null,
+        referralSource: form.source.toLowerCase(),
+        referralOther: form.source === "Lainnya" ? form.sourceOther : null,
         referralCode: referralCode || null,
       });
+
+      clearSession();
       setUserSession(null, response?.user || null);
       window.location.href = buildDashboardBridgeUrl("", "/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal membuat akun");
+      setError(getApiErrorMessage(err, "Gagal menyelesaikan registrasi."));
     } finally {
-      setLoading(false);
+      setBusy("");
     }
   };
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pt-16">
-      <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
           <div className="mb-8 text-center">
-            <div className="mb-4 flex flex-col items-center gap-2">
-              <div className="h-16 w-16">
-                <img src={newmeLogo} alt="NEWME Logo" className="h-full w-full object-contain" style={{ mixBlendMode: "screen" }} />
-              </div>
-              <div className="leading-none">
-                <p className="text-base text-white" style={{ fontWeight: 800 }}>NEWME <span className="text-yellow-500">CLASS</span></p>
-                <p className="text-[11px] italic text-zinc-500">Jati dirimu disini</p>
-              </div>
-            </div>
-            <div className="mb-1 inline-block rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-500" style={{ fontWeight: 500 }}>
+            <img src={newmeLogo} alt="NEWME Logo" className="mx-auto mb-4 h-16 w-16 object-contain" style={{ mixBlendMode: "screen" }} />
+            <div className="mb-1 inline-block rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-500">
               DAFTAR AKUN BARU
             </div>
-            <h1 className="mt-3 mb-2 text-2xl text-white sm:text-3xl" style={{ fontWeight: 800 }}>Mulai Perjalananmu</h1>
+            <h1 className="mb-2 mt-3 text-2xl font-extrabold text-white sm:text-3xl">Mulai Perjalananmu</h1>
             <p className="text-sm text-zinc-400">
-              Sudah punya akun?{" "}
-              <Link to="/login" className="text-yellow-500 transition-colors hover:text-yellow-400" style={{ fontWeight: 500 }}>
-                Login di sini
-              </Link>
+              Sudah punya akun? <Link to="/login" className="text-yellow-500 hover:text-yellow-400">Login di sini</Link>
             </p>
-            {referralCode && <p className="mt-3 text-xs text-yellow-500/80">Kode referral aktif: <span className="font-semibold">{referralCode}</span></p>}
+            {referralCode && (
+              <p className="mt-3 text-xs text-yellow-500/80">
+                Kode referral aktif: <span className="font-semibold">{referralCode}</span>
+              </p>
+            )}
+          </div>
+
+          <div className="mb-6 grid gap-3 sm:grid-cols-2">
+            {["Buat Akun", "Verifikasi & Biodata"].map((label, index) => (
+              <div
+                key={label}
+                className={`rounded-2xl border px-4 py-4 ${step === index + 1 ? "border-yellow-500/40 bg-yellow-500/10" : "border-white/10 bg-[#18181b]"}`}
+              >
+                <div className="flex items-center gap-3 text-sm text-white">
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-full ${step > index + 1 || (index === 1 && otpVerified) ? "bg-green-500/20 text-green-300" : step === index + 1 ? "bg-yellow-500/20 text-yellow-400" : "bg-white/5 text-zinc-500"}`}
+                  >
+                    {step > index + 1 || (index === 1 && otpVerified) ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                  </div>
+                  <div>
+                    <p>{label}</p>
+                    <p className="text-xs text-zinc-500">{index === 0 ? "Nama, email, password" : "OTP lalu biodata lengkap"}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-[#18181b] p-6 sm:p-8">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <h2 className="mb-4 flex items-center gap-2 text-sm text-yellow-500" style={{ fontWeight: 600 }}>
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/15 text-xs">1</span>
-                  Informasi Pribadi
-                </h2>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldWrapper label="Nama Lengkap" required>
-                    <TextInput icon={User} placeholder="Nama lengkap Anda" value={form.name} onChange={(value) => setForm((prev) => ({ ...prev, name: value }))} required />
-                  </FieldWrapper>
-                  <FieldWrapper label="Email" required>
-                    <TextInput icon={Mail} type="email" placeholder="Masukkan email" value={form.email} onChange={(value) => setForm((prev) => ({ ...prev, email: value }))} required />
-                  </FieldWrapper>
-                  <FieldWrapper label="Nomor HP / WhatsApp" required>
-                    <TextInput icon={Phone} type="tel" placeholder="Masukkan nomor HP" value={form.phone} onChange={(value) => setForm((prev) => ({ ...prev, phone: value }))} required />
-                  </FieldWrapper>
-                  <FieldWrapper label="Tanggal Lahir" required>
-                    <TextInput icon={Calendar} type="date" value={form.birthdate} onChange={(value) => setForm((prev) => ({ ...prev, birthdate: value }))} required />
-                  </FieldWrapper>
+            {error && <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</div>}
+            {success && <div className="mb-4 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">{success}</div>}
+
+            {step === 1 ? (
+              <form onSubmit={startRegistration} className="space-y-5">
+                <label className="block text-sm text-zinc-400">Nama Lengkap</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                  <input
+                    value={form.name}
+                    onChange={(e) => updateForm("name", e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-10 pr-4 text-sm text-white"
+                    required
+                  />
                 </div>
-              </div>
 
-              <div className="h-px bg-white/8" />
-
-              <div>
-                <h2 className="mb-4 flex items-center gap-2 text-sm text-yellow-500" style={{ fontWeight: 600 }}>
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/15 text-xs">2</span>
-                  Alamat Lengkap
-                </h2>
-                <div className="space-y-4">
-                  <FieldWrapper label="Alamat Jalan">
-                    <TextInput icon={MapPin} placeholder="Jl. Nama Jalan No. XX, RT/RW" value={form.address} onChange={(value) => setForm((prev) => ({ ...prev, address: value }))} />
-                  </FieldWrapper>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FieldWrapper label="Provinsi" required>
-                      <SelectInput
-                        placeholder={loadingLocations.provinces ? "Memuat provinsi..." : "Pilih provinsi"}
-                        value={form.provinceId}
-                        onChange={(value) => setForm((prev) => ({ ...prev, provinceId: value, cityId: "", districtId: "", villageId: "", districtText: "", villageText: "" }))}
-                        options={toSelectOptions(provinceOptions)}
-                        disabled={loadingLocations.provinces}
-                      />
-                    </FieldWrapper>
-                    <FieldWrapper label="Kota / Kabupaten" required>
-                      <SelectInput
-                        placeholder={form.provinceId ? (loadingLocations.cities ? "Memuat kota..." : "Pilih kota / kabupaten") : "Pilih provinsi dahulu"}
-                        value={form.cityId}
-                        onChange={(value) => setForm((prev) => ({ ...prev, cityId: value, districtId: "", villageId: "", districtText: "", villageText: "" }))}
-                        options={toSelectOptions(cityOptions)}
-                        disabled={!form.provinceId || loadingLocations.cities}
-                      />
-                    </FieldWrapper>
-                    <FieldWrapper label="Kecamatan">
-                      <SelectInput
-                        placeholder={form.cityId ? (loadingLocations.districts ? "Memuat kecamatan..." : districtOptions.length ? "Pilih kecamatan" : "Isi manual bila tidak tersedia") : "Pilih kota dahulu"}
-                        value={form.districtId}
-                        onChange={(value) => setForm((prev) => ({ ...prev, districtId: value, villageId: "", villageText: "" }))}
-                        options={toSelectOptions(districtOptions)}
-                        disabled={!form.cityId || loadingLocations.districts}
-                      />
-                      {form.cityId && !loadingLocations.districts && districtOptions.length === 0 && (
-                        <div className="mt-2">
-                          <TextInput placeholder="Tulis kecamatan manual" value={form.districtText} onChange={(value) => setForm((prev) => ({ ...prev, districtText: value }))} />
-                        </div>
-                      )}
-                    </FieldWrapper>
-                    <FieldWrapper label="Kelurahan / Desa">
-                      <SelectInput
-                        placeholder={form.districtId ? (loadingLocations.villages ? "Memuat kelurahan..." : villageOptions.length ? "Pilih kelurahan / desa" : "Isi manual bila tidak tersedia") : "Pilih kecamatan dahulu"}
-                        value={form.villageId}
-                        onChange={(value) => setForm((prev) => ({ ...prev, villageId: value }))}
-                        options={toSelectOptions(villageOptions)}
-                        disabled={!form.districtId || loadingLocations.villages}
-                      />
-                      {form.districtId && !loadingLocations.villages && villageOptions.length === 0 && (
-                        <div className="mt-2">
-                          <TextInput placeholder="Tulis kelurahan / desa manual" value={form.villageText} onChange={(value) => setForm((prev) => ({ ...prev, villageText: value }))} />
-                        </div>
-                      )}
-                    </FieldWrapper>
-                  </div>
+                <label className="block text-sm text-zinc-400">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => updateForm("email", e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-10 pr-4 text-sm text-white"
+                    required
+                  />
                 </div>
-              </div>
 
-              <div className="h-px bg-white/8" />
-
-              <div>
-                <h2 className="mb-4 flex items-center gap-2 text-sm text-yellow-500" style={{ fontWeight: 600 }}>
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/15 text-xs">3</span>
-                  Mengenal NEWME
-                </h2>
-                <FieldWrapper label="Mengetahui NEWME dari mana?" required>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {sourceOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setForm((prev) => ({ ...prev, source: option.value, sourceOther: option.value === "lainnya" ? prev.sourceOther : "" }))}
-                        className={`rounded-xl border px-3 py-2.5 text-left text-xs transition-all ${form.source === option.value ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-400" : "border-white/10 bg-white/[0.03] text-zinc-400 hover:border-white/20 hover:text-zinc-200"}`}
-                        style={{ fontWeight: form.source === option.value ? 600 : 400 }}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </FieldWrapper>
-                {form.source === "lainnya" && (
-                  <div className="mt-4">
-                    <FieldWrapper label="Sumber lainnya" required>
-                      <TextInput placeholder="Contoh: rekomendasi guru, event komunitas, dll" value={form.sourceOther} onChange={(value) => setForm((prev) => ({ ...prev, sourceOther: value }))} required />
-                    </FieldWrapper>
-                  </div>
-                )}
-              </div>
-
-              <div className="h-px bg-white/8" />
-
-              <div>
-                <h2 className="mb-4 flex items-center gap-2 text-sm text-yellow-500" style={{ fontWeight: 600 }}>
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/15 text-xs">4</span>
-                  Keamanan Akun
-                </h2>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldWrapper label="Password" required>
+                  <div>
+                    <label className="mb-2 block text-sm text-zinc-400">Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
                       <input
-                        type={showPass ? "text" : "password"}
+                        type={showPassword ? "text" : "password"}
                         value={form.password}
-                        onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-                        placeholder="Min. 8 karakter"
-                        minLength={8}
+                        onChange={(e) => updateForm("password", e.target.value)}
+                        className={`w-full rounded-xl border bg-white/[0.04] py-3 pl-10 pr-11 text-sm text-white ${passwordTooShort ? "border-red-500/40" : "border-white/10"}`}
                         required
-                        className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-10 pr-11 text-sm text-white placeholder:text-zinc-600 outline-none transition-colors focus:border-yellow-500/50 focus:bg-white/[0.06]"
+                        minLength={8}
                       />
-                      <button type="button" onClick={() => setShowPass((prev) => !prev)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 transition-colors hover:text-zinc-300">
-                        {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                  </FieldWrapper>
-                  <FieldWrapper label="Konfirmasi Password" required>
+                    <p className={`mt-2 text-xs ${passwordTooShort ? "text-red-300" : "text-zinc-500"}`}>Minimal 8 karakter.</p>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm text-zinc-400">Konfirmasi Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
                       <input
                         type={showConfirm ? "text" : "password"}
                         value={form.confirm}
-                        onChange={(e) => setForm((prev) => ({ ...prev, confirm: e.target.value }))}
-                        placeholder="Ulangi password"
+                        onChange={(e) => updateForm("confirm", e.target.value)}
+                        className={`w-full rounded-xl border bg-white/[0.04] py-3 pl-10 pr-11 text-sm text-white ${passwordMismatch ? "border-red-500/40" : "border-white/10"}`}
                         required
-                        className={`w-full rounded-xl border bg-white/[0.04] py-3 pl-10 pr-11 text-sm text-white placeholder:text-zinc-600 outline-none transition-colors focus:bg-white/[0.06] ${passwordMismatch ? "border-red-500/50 focus:border-red-500" : passwordMatch ? "border-green-500/50 focus:border-green-500" : "border-white/10 focus:border-yellow-500/50"}`}
+                        minLength={8}
                       />
-                      <button type="button" onClick={() => setShowConfirm((prev) => !prev)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 transition-colors hover:text-zinc-300">
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirm((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500"
+                      >
                         {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                    {passwordMismatch && <p className="mt-1 text-xs text-red-400">Password tidak cocok</p>}
-                    {passwordMatch && <p className="mt-1 flex items-center gap-1 text-xs text-green-400"><CheckCircle2 className="h-3 w-3" />Password cocok</p>}
-                  </FieldWrapper>
+                    {passwordMismatch && <p className="mt-2 text-xs text-red-300">Konfirmasi password belum sama.</p>}
+                  </div>
                 </div>
-                <p className="mt-2 text-xs text-zinc-600">Password minimal 8 karakter agar akun Anda lebih aman.</p>
-              </div>
 
-              <div className="h-px bg-white/8" />
+                <label className="flex items-start gap-3 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-100">
+                  <input
+                    type="checkbox"
+                    checked={agreed}
+                    onChange={(e) => setAgreed(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-yellow-500/40"
+                  />
+                  <span>
+                    Saya menyetujui{" "}
+                    <Link to="/privacy-policy" className="font-medium text-yellow-400 underline underline-offset-2 hover:text-yellow-300">
+                      Syarat dan Ketentuan
+                    </Link>{" "}
+                    NEWME dan memahami bahwa email saya akan diverifikasi sebelum akun aktif.
+                  </span>
+                </label>
 
-              <label className="flex cursor-pointer items-start gap-3">
-                <button
-                  type="button"
-                  onClick={() => setAgreed((prev) => !prev)}
-                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-all ${agreed ? "border-yellow-500 bg-yellow-500" : "border-white/20 bg-white/[0.04] hover:border-yellow-500/40"}`}
-                >
-                  {agreed && (
-                    <svg className="h-3 w-3 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-                <span className="text-sm text-zinc-400" style={{ lineHeight: 1.6 }}>
-                  Saya telah membaca dan menyetujui{" "}
-                  <Link to="/privacy-policy" target="_blank" className="text-yellow-500 underline-offset-2 transition-colors hover:text-yellow-400 hover:underline" style={{ fontWeight: 500 }}>
-                    Kebijakan Privasi
-                  </Link>{" "}
-                  NEWME CLASS.
-                </span>
-              </label>
+                <Button type="submit" disabled={busy === "start"} className="w-full bg-yellow-500 text-black hover:bg-yellow-400">
+                  {busy === "start" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                  {busy === "start" ? "Mengirim OTP..." : "Lanjut Verifikasi Email"}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={completeRegistration} className="space-y-5">
+                <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4">
+                  <p className="font-semibold text-white">{registrationSession?.fullName}</p>
+                  <p className="text-sm text-zinc-400">{registrationSession?.email}</p>
+                  <button type="button" onClick={clearSession} className="mt-2 text-xs text-yellow-400">Ganti email</button>
+                </div>
 
-              {error && <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>}
+                <div className="rounded-2xl border border-white/10 bg-[#111111] p-5">
+                  <div className="mb-3 flex items-center gap-2 text-sm text-yellow-500">
+                    <ShieldCheck className="h-4 w-4" />
+                    Verifikasi Email
+                  </div>
+                  <p className="mb-4 text-sm text-zinc-400">
+                    Masukkan OTP yang dikirim ke{" "}
+                    <span className="text-white">{registrationSession?.maskedEmail || registrationSession?.email}</span>.
+                  </p>
 
-              <Button type="submit" disabled={!agreed || loading} className="w-full bg-yellow-500 py-5 text-black hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-50" style={{ fontWeight: 600 }}>
-                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Memproses Pendaftaran...</> : <>Daftar Sekarang <ArrowRight className="ml-1 h-4 w-4" /></>}
-              </Button>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+                    <InputOTP maxLength={6} value={otp} onChange={setOtp} disabled={otpVerified}>
+                      <InputOTPGroup>
+                        {Array.from({ length: 6 }).map((_, index) => (
+                          <InputOTPSlot key={index} index={index} className="border-white/10 bg-white/[0.04] text-white" />
+                        ))}
+                      </InputOTPGroup>
+                    </InputOTP>
 
-              <p className="text-center text-sm text-zinc-500">
-                Sudah punya akun?{" "}
-                <Link to="/login" className="text-yellow-500 transition-colors hover:text-yellow-400" style={{ fontWeight: 500 }}>
-                  Login di sini
-                </Link>
-              </p>
-            </form>
+                    <div className="flex gap-3">
+                      <Button
+                        type="button"
+                        onClick={() => void verifyOtp()}
+                        disabled={busy === "verify" || otpVerified}
+                        className="bg-yellow-500 text-black hover:bg-yellow-400"
+                      >
+                        {busy === "verify" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {otpVerified ? "Terverifikasi" : "Verifikasi OTP"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void resendOtp()}
+                        disabled={busy === "resend" || countdown > 0}
+                        className="border-white/10 text-zinc-200"
+                      >
+                        {busy === "resend" ? "Mengirim..." : countdown > 0 ? `Kirim ulang ${Math.ceil(countdown / 1000)}s` : "Kirim Ulang"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {!otpVerified ? (
+                  <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-100">
+                    Verifikasi OTP terlebih dahulu untuk membuka form biodata.
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                        <input
+                          value={form.phone}
+                          onChange={(e) => updateForm("phone", e.target.value)}
+                          placeholder="Nomor HP / WhatsApp"
+                          className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-10 pr-4 text-sm text-white"
+                          required
+                        />
+                      </div>
+
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                        <input
+                          type="date"
+                          value={form.birthdate}
+                          onChange={(e) => updateForm("birthdate", e.target.value)}
+                          className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-10 pr-4 text-sm text-white"
+                          required
+                        />
+                      </div>
+
+                      <div className="relative sm:col-span-2">
+                        <MapPin className="absolute left-3 top-4 h-4 w-4 text-zinc-500" />
+                        <textarea
+                          value={form.address}
+                          onChange={(e) => updateForm("address", e.target.value)}
+                          placeholder="Alamat lengkap"
+                          className="min-h-[88px] w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-10 pr-4 text-sm text-white"
+                          required
+                        />
+                      </div>
+
+                      <select
+                        value={form.provinceId}
+                        onChange={(e) => setForm((prev) => ({ ...prev, provinceId: e.target.value, cityId: "", districtId: "", villageId: "" }))}
+                        className="rounded-xl border border-white/10 bg-[#18181b] px-4 py-3 text-sm text-white"
+                        required
+                      >
+                        <option value="">Pilih provinsi</option>
+                        {selectOptions(provinceOptions)}
+                      </select>
+
+                      <select
+                        value={form.cityId}
+                        onChange={(e) => setForm((prev) => ({ ...prev, cityId: e.target.value, districtId: "", villageId: "" }))}
+                        className="rounded-xl border border-white/10 bg-[#18181b] px-4 py-3 text-sm text-white"
+                        required
+                      >
+                        <option value="">Pilih kota / kabupaten</option>
+                        {selectOptions(cityOptions)}
+                      </select>
+
+                      <select
+                        value={form.districtId}
+                        onChange={(e) => setForm((prev) => ({ ...prev, districtId: e.target.value, villageId: "" }))}
+                        className="rounded-xl border border-white/10 bg-[#18181b] px-4 py-3 text-sm text-white"
+                        required
+                      >
+                        <option value="">Pilih kecamatan</option>
+                        {selectOptions(districtOptions)}
+                      </select>
+
+                      <select
+                        value={form.villageId}
+                        onChange={(e) => updateForm("villageId", e.target.value)}
+                        className="rounded-xl border border-white/10 bg-[#18181b] px-4 py-3 text-sm text-white"
+                        required
+                      >
+                        <option value="">Pilih kelurahan / desa</option>
+                        {selectOptions(villageOptions)}
+                      </select>
+
+                      <div className="sm:col-span-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {SOURCE_OPTIONS.map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            onClick={() => setForm((prev) => ({ ...prev, source: option, sourceOther: option === "Lainnya" ? prev.sourceOther : "" }))}
+                            className={`rounded-xl border px-3 py-2 text-left text-xs ${form.source === option ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-400" : "border-white/10 bg-white/[0.03] text-zinc-400"}`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+
+                      {form.source === "Lainnya" ? (
+                        <input
+                          value={form.sourceOther}
+                          onChange={(e) => updateForm("sourceOther", e.target.value)}
+                          placeholder="Sumber lainnya"
+                          className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white sm:col-span-2"
+                          required
+                        />
+                      ) : null}
+                    </div>
+
+                    <Button type="submit" disabled={busy === "complete"} className="w-full bg-yellow-500 text-black hover:bg-yellow-400">
+                      {busy === "complete" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                      {busy === "complete" ? "Menyelesaikan Registrasi..." : "Selesaikan Registrasi"}
+                    </Button>
+                  </>
+                )}
+              </form>
+            )}
           </div>
         </motion.div>
       </div>

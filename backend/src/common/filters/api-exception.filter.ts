@@ -69,6 +69,46 @@ export class ApiExceptionFilter implements ExceptionFilter {
       };
     }
 
+    if (status === HttpStatus.FORBIDDEN && lowerMessage.includes('registration_otp_attempts_exceeded')) {
+      return {
+        code: 'REGISTRATION_OTP_ATTEMPTS_EXCEEDED',
+        detail: 'Percobaan OTP sudah melebihi batas. Silakan kirim ulang OTP dan coba lagi.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.UNAUTHORIZED && lowerMessage.includes('registration_otp_expired')) {
+      return {
+        code: 'REGISTRATION_OTP_EXPIRED',
+        detail: 'Kode OTP sudah kedaluwarsa. Silakan kirim ulang OTP.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.UNAUTHORIZED && lowerMessage.includes('registration_otp_invalid')) {
+      return {
+        code: 'REGISTRATION_OTP_INVALID',
+        detail: 'Kode OTP belum sesuai. Periksa kembali 6 digit OTP Anda.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.FORBIDDEN && lowerMessage.includes('registration_otp_resend_cooldown')) {
+      return {
+        code: 'REGISTRATION_OTP_RESEND_COOLDOWN',
+        detail: 'Permintaan OTP terlalu cepat. Tunggu beberapa detik lalu kirim ulang.',
+        messages,
+      };
+    }
+
+    if (status === HttpStatus.FORBIDDEN && lowerMessage.includes('registration_email_not_verified')) {
+      return {
+        code: 'REGISTRATION_EMAIL_NOT_VERIFIED',
+        detail: 'Email belum terverifikasi. Selesaikan verifikasi OTP terlebih dahulu.',
+        messages,
+      };
+    }
+
     if (status === HttpStatus.UNAUTHORIZED && lowerMessage.includes('invalid credentials')) {
       return {
         code: 'AUTH_INVALID_CREDENTIALS',

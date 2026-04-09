@@ -7,6 +7,10 @@ on:
         description: "Git ref to deploy"
         required: true
         default: "main"
+      image_tag:
+        description: "Docker image tag to pull from Docker Hub"
+        required: true
+        default: "latest"
       run_seed:
         description: "Run production seed after deploy"
         required: true
@@ -24,6 +28,7 @@ env:
   REPO_URL: https://github.com/KirisakiRei/newmeclass.git
   DEPLOY_PATH: /opt/newme
   APP_DIR: /opt/newme/app
+  DOCKERHUB_USERNAME: favcreamyy
 
 jobs:
   deploy:
@@ -50,6 +55,7 @@ jobs:
       - name: Render production env file
         shell: bash
         env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
           APP_URL: ${{ vars.APP_URL }}
           PUBLIC_FRONTEND_URL: ${{ vars.PUBLIC_FRONTEND_URL }}
           DASHBOARD_FRONTEND_URL: ${{ vars.DASHBOARD_FRONTEND_URL }}
@@ -61,6 +67,7 @@ jobs:
           MIDTRANS_IRIS_PRODUCTION_BASE_URL: ${{ vars.MIDTRANS_IRIS_PRODUCTION_BASE_URL }}
           MIDTRANS_IRIS_PAYOUTS_PATH: ${{ vars.MIDTRANS_IRIS_PAYOUTS_PATH }}
           FRONTEND_PORT_RAW: ${{ vars.FRONTEND_PORT }}
+          APP_FRONTEND_PORT_RAW: ${{ vars.APP_FRONTEND_PORT }}
           NODE_ENV: production
           PORT: 5000
           API_PREFIX: api
@@ -76,6 +83,16 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           DB_TX_TIMEOUT_MS: 8000
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          AUTH_COOKIE_SECURE: "true"
+          AUTH_COOKIE_SAME_SITE: lax
+          AUTH_ACCESS_TTL_USER: 20m
+          AUTH_ACCESS_TTL_STAFF: 15m
+          AUTH_REFRESH_TTL_DAYS: 30
+          AUTH_ENABLE_GOOGLE: "false"
+          AUTH_ENABLE_PASSWORD_RESET: "true"
+          AUTH_REGISTER_OTP_TTL_MINUTES: 10
+          AUTH_REGISTER_OTP_MAX_ATTEMPTS: 5
+          AUTH_REGISTER_RESEND_COOLDOWN_SECONDS: 60
           BCRYPT_ROUNDS: 12
           RATE_LIMIT_TTL: 60
           RATE_LIMIT_LIMIT: 120
@@ -131,8 +148,10 @@ jobs:
           SEED_SUPERADMIN_NAME: Super Admin
         run: |
           FRONTEND_PORT="${FRONTEND_PORT_RAW:-80}"
+          APP_FRONTEND_PORT="${APP_FRONTEND_PORT_RAW:-8080}"
           SMTP_PORT="${SMTP_PORT_RAW:-2525}"
           cat > .env.production.rendered <<EOF
+          APP_IMAGE_TAG=${IMAGE_TAG}
           APP_URL=${APP_URL}
           PUBLIC_FRONTEND_URL=${PUBLIC_FRONTEND_URL}
           DASHBOARD_FRONTEND_URL=${DASHBOARD_FRONTEND_URL}
@@ -140,6 +159,7 @@ jobs:
           CORS_ORIGINS=${CORS_ORIGINS}
           UPLOAD_PUBLIC_BASE_URL=${UPLOAD_PUBLIC_BASE_URL}
           FRONTEND_PORT=${FRONTEND_PORT}
+          APP_FRONTEND_PORT=${APP_FRONTEND_PORT}
           VITE_BACKEND_URL=
           VITE_DASHBOARD_URL=${DASHBOARD_FRONTEND_URL}
           NGINX_BACKEND_UPSTREAM=http://backend:5000
@@ -158,6 +178,16 @@ jobs:
           DIRECT_URL=${DIRECT_URL}
           DB_TX_TIMEOUT_MS=${DB_TX_TIMEOUT_MS}
           JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+          AUTH_COOKIE_SECURE=${AUTH_COOKIE_SECURE}
+          AUTH_COOKIE_SAME_SITE=${AUTH_COOKIE_SAME_SITE}
+          AUTH_ACCESS_TTL_USER=${AUTH_ACCESS_TTL_USER}
+          AUTH_ACCESS_TTL_STAFF=${AUTH_ACCESS_TTL_STAFF}
+          AUTH_REFRESH_TTL_DAYS=${AUTH_REFRESH_TTL_DAYS}
+          AUTH_ENABLE_GOOGLE=${AUTH_ENABLE_GOOGLE}
+          AUTH_ENABLE_PASSWORD_RESET=${AUTH_ENABLE_PASSWORD_RESET}
+          AUTH_REGISTER_OTP_TTL_MINUTES=${AUTH_REGISTER_OTP_TTL_MINUTES}
+          AUTH_REGISTER_OTP_MAX_ATTEMPTS=${AUTH_REGISTER_OTP_MAX_ATTEMPTS}
+          AUTH_REGISTER_RESEND_COOLDOWN_SECONDS=${AUTH_REGISTER_RESEND_COOLDOWN_SECONDS}
           BCRYPT_ROUNDS=${BCRYPT_ROUNDS}
           RATE_LIMIT_TTL=${RATE_LIMIT_TTL}
           RATE_LIMIT_LIMIT=${RATE_LIMIT_LIMIT}
@@ -220,7 +250,7 @@ jobs:
 
       - name: Validate compose config
         shell: bash
-        run: docker compose --env-file .env.production.rendered -f compose.yml config > /dev/null
+        run: docker compose --env-file .env.production.rendered -f compose.production.yml config > /dev/null
 
       - name: Upload env file to VPS
         shell: bash
@@ -233,6 +263,7 @@ jobs:
         env:
           DEPLOY_COMMIT: ${{ steps.meta.outputs.git_commit }}
           RUN_SEED: ${{ inputs.run_seed }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           ssh "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}" "
             set -e
@@ -244,9 +275,13 @@ jobs:
             git fetch --all --tags --prune
             git checkout --force '${DEPLOY_COMMIT}'
             cp '${{ env.DEPLOY_PATH }}/.env.production' .env
-            docker compose up -d --build
+            if [ -n '${DOCKERHUB_TOKEN}' ]; then
+              echo '${DOCKERHUB_TOKEN}' | docker login --username '${{ env.DOCKERHUB_USERNAME }}' --password-stdin
+            fi
+            docker compose --env-file .env -f compose.production.yml pull
+            docker compose --env-file .env -f compose.production.yml up -d
             if [ '${RUN_SEED}' = 'true' ]; then
-              docker compose --profile ops run --rm seed
+              docker compose --env-file .env -f compose.production.yml --profile ops run --rm seed
             fi
             docker image prune -f
           "

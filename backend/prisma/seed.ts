@@ -1,8 +1,9 @@
+import '../src/config/preload-env';
 import { Prisma, PrismaClient, Role, AccountStatus, CertificateType } from '@prisma/client';
 import { execFile } from 'child_process';
-import { createHash } from 'crypto';
 import { resolve } from 'path';
 import { promisify } from 'util';
+import { hashLocalPassword } from '../src/common/auth/password.utils';
 import {
   ensureDemoCertificateTemplate,
   ensureDemoPersonalityTemplates,
@@ -20,10 +21,6 @@ import { DEFAULT_QUESTION_CATALOG } from '../src/modules/questions/default-quest
 const prisma = new PrismaClient();
 const execFileAsync = promisify(execFile);
 const LEGACY_PREMIUM_PRICE = 100000;
-
-function hashPassword(password: string) {
-  return createHash('sha256').update(password).digest('hex');
-}
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -155,7 +152,7 @@ async function seedCore() {
       email: process.env.SEED_SUPERADMIN_EMAIL || 'admin@newme.id',
       username: process.env.SEED_SUPERADMIN_USERNAME || 'superadmin',
       fullName: process.env.SEED_SUPERADMIN_NAME || 'Super Admin',
-      passwordHash: hashPassword(process.env.SEED_SUPERADMIN_PASSWORD || 'ChangeMeNow123!'),
+      passwordHash: await hashLocalPassword(process.env.SEED_SUPERADMIN_PASSWORD || 'ChangeMeNow123!'),
       role: Role.SUPERADMIN,
       adminRoleId: protectedRole?.id || null,
       status: AccountStatus.ACTIVE,
@@ -196,7 +193,7 @@ async function seedCore() {
         email: developerEmail,
         username: developerUsername,
         fullName: developerName,
-        passwordHash: hashPassword(process.env.SEED_DEVELOPER_PASSWORD || 'udahlupa'),
+        passwordHash: await hashLocalPassword(process.env.SEED_DEVELOPER_PASSWORD || 'udahlupa'),
         role: Role.DEVELOPER,
         status: AccountStatus.ACTIVE,
         adminRoleId: developerRole?.id || null,

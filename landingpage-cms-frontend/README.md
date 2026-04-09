@@ -7,6 +7,8 @@ Frontend landing page and CMS for NewmeClass.
 
 Run `npm i` to install the dependencies.
 
+Copy `.env.example` to `.env` for direct local development.
+
 Run `npm run dev` to start the development server.
 
 ## Production Deployment

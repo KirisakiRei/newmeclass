@@ -21,6 +21,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { getDashboardFrontendBaseUrl, getPublicFrontendBaseUrl } from 'src/common/frontend-urls';
 import { AdminPermission } from '../admin-rbac/admin-permission.decorator';
 import { AdminPermissionGuard } from '../admin-rbac/admin-permission.guard';
+import { AdminActivityLogService } from '../admin-activity/admin-activity.service';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -33,6 +34,10 @@ import { ClaimMitraInviteDto } from './dto/claim-mitra-invite.dto';
 import { CreateBridgeTicketDto } from './dto/create-bridge-ticket.dto';
 import { ExchangeBridgeTicketDto } from './dto/exchange-bridge-ticket.dto';
 import { CompleteGoogleProfileDto } from './dto/complete-google-profile.dto';
+import { RegisterStartDto } from './dto/register-start.dto';
+import { RegisterVerifyOtpDto } from './dto/register-verify-otp.dto';
+import { RegisterResendOtpDto } from './dto/register-resend-otp.dto';
+import { RegisterCompleteDto } from './dto/register-complete.dto';
 
 const AUTH_RATE_LIMIT_TTL_MS = Number(process.env.AUTH_RATE_LIMIT_TTL || 60) * 1000;
 const AUTH_REGISTER_RATE_LIMIT = Number(process.env.AUTH_RATE_LIMIT_REGISTER_LIMIT || 20);
@@ -87,7 +92,42 @@ export class AuthController {
   @Post('register')
   register(@Body() body: RegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     assertTrustedMutationRequest(req);
+    this.authService.logLegacyRegistrationUsage(Role.USER, body, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    });
     return this.authService.register(body, Role.USER, false, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    }).then((payload) => applyAuthResponseCookies(res, payload));
+  }
+
+  @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('register/start')
+  registerStart(@Body() body: RegisterStartDto, @Req() req: Request) {
+    assertTrustedMutationRequest(req);
+    return this.authService.startRegistration(body, Role.USER);
+  }
+
+  @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('register/verify-otp')
+  registerVerifyOtp(@Body() body: RegisterVerifyOtpDto, @Req() req: Request) {
+    assertTrustedMutationRequest(req);
+    return this.authService.verifyRegistrationOtp(body.registrationToken, body.otp, Role.USER);
+  }
+
+  @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('register/resend-otp')
+  registerResendOtp(@Body() body: RegisterResendOtpDto, @Req() req: Request) {
+    assertTrustedMutationRequest(req);
+    return this.authService.resendRegistrationOtp(body.registrationToken, Role.USER);
+  }
+
+  @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('register/complete')
+  registerComplete(@Body() body: RegisterCompleteDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    assertTrustedMutationRequest(req);
+    return this.authService.completeRegistration(body, Role.USER, {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'] || null,
     }).then((payload) => applyAuthResponseCookies(res, payload));
@@ -261,7 +301,10 @@ export class AuthController {
 
 @Controller('admin')
 export class AdminAuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly adminActivityLogService: AdminActivityLogService,
+  ) {}
 
   @Throttle({ default: { limit: AUTH_ADMIN_LOGIN_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
   @Post('login')
@@ -311,6 +354,19 @@ export class AdminAuthController {
     }
     clearAuthCookies(res, AuthAudience.ADMIN);
     issueStandaloneCsrfCookie(res);
+    this.adminActivityLogService.record({
+      actorUserId: user?.sub || null,
+      action: 'ADMIN_LOGOUT',
+      category: 'auth',
+      targetType: 'auth',
+      targetId: user?.sub || null,
+      targetLabel: user?.email || user?.username || user?.sub || null,
+      summary: 'Admin logout dari dashboard.',
+      ipAddress: req.ip || null,
+      meta: {
+        sessionId: user?.sid || null,
+      },
+    });
     return this.authService.logout(user.sub, user.sid, AuthAudience.ADMIN);
   }
 
@@ -331,7 +387,42 @@ export class YayasanAuthController {
   @Post('register')
   register(@Body() body: RegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     assertTrustedMutationRequest(req);
+    this.authService.logLegacyRegistrationUsage(Role.YAYASAN, body, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    });
     return this.authService.register(body, Role.YAYASAN, false, {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    }).then((payload) => applyAuthResponseCookies(res, payload));
+  }
+
+  @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('register/start')
+  registerStart(@Body() body: RegisterStartDto, @Req() req: Request) {
+    assertTrustedMutationRequest(req);
+    return this.authService.startRegistration(body, Role.YAYASAN);
+  }
+
+  @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('register/verify-otp')
+  registerVerifyOtp(@Body() body: RegisterVerifyOtpDto, @Req() req: Request) {
+    assertTrustedMutationRequest(req);
+    return this.authService.verifyRegistrationOtp(body.registrationToken, body.otp, Role.YAYASAN);
+  }
+
+  @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('register/resend-otp')
+  registerResendOtp(@Body() body: RegisterResendOtpDto, @Req() req: Request) {
+    assertTrustedMutationRequest(req);
+    return this.authService.resendRegistrationOtp(body.registrationToken, Role.YAYASAN);
+  }
+
+  @Throttle({ default: { limit: AUTH_REGISTER_RATE_LIMIT, ttl: AUTH_RATE_LIMIT_TTL_MS } })
+  @Post('register/complete')
+  registerComplete(@Body() body: RegisterCompleteDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    assertTrustedMutationRequest(req);
+    return this.authService.completeRegistration(body, Role.YAYASAN, {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'] || null,
     }).then((payload) => applyAuthResponseCookies(res, payload));

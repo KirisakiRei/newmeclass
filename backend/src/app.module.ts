@@ -40,13 +40,19 @@ import { RunningInfoModule } from './modules/running-info/running-info.module';
 import { QueueModule } from './modules/queue/queue.module';
 import { ScoringModule } from './modules/scoring/scoring.module';
 import { AdminRbacModule } from './modules/admin-rbac/admin-rbac.module';
+import { AdminActivityLogModule } from './modules/admin-activity/admin-activity.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { SmartThrottlerGuard } from './common/guards/smart-throttler.guard';
+import { resolveBackendEnvFilePaths } from './config/backend-env';
 import { validateEnv } from './config/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate: validateEnv,
+      envFilePath: resolveBackendEnvFilePaths(),
+    }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
@@ -63,6 +69,7 @@ import { validateEnv } from './config/env.validation';
       },
       prefix: process.env.BULLMQ_PREFIX || 'newme',
     }),
+    AdminActivityLogModule,
     AdminRbacModule,
     PrismaModule,
     QueueModule,

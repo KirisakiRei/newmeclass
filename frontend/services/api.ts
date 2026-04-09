@@ -456,6 +456,8 @@ export const adminAPI = {
   updateAdminUser: (adminId, data) => apiClient.put(`/admin/users/${adminId}`, data),
   changeAdminPassword: (adminId, data) => apiClient.put(`/admin/users/${adminId}/change-password`, data),
   deleteAdminUser: (adminId) => apiClient.delete(`/admin/users/${adminId}`),
+  getActivityLogs: (params) => apiClient.get('/admin/activity-logs', { params }),
+  getActivityLogDetail: (id) => apiClient.get(`/admin/activity-logs/${id}`),
 };
 
 // Users API
@@ -600,6 +602,7 @@ export const certificatesAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
+  getEligible: () => apiClient.get('/certificates/eligible'),
   getIssued: (params) => apiClient.get('/certificates/issued', { params }),
   issue: (data) => apiClient.post('/certificates/issue', data),
   verify: (certificateNumber) => apiClient.get(`/certificates/verify/${certificateNumber}`),
@@ -662,7 +665,12 @@ export const locationAPI = {
 
 // User Auth API
 export const authAPI = {
+  /** @deprecated Use registerStart -> verifyRegisterOtp -> completeRegister for new flows. */
   register: (data) => apiClient.post('/auth/register', data),
+  registerStart: (data) => apiClient.post('/auth/register/start', data),
+  verifyRegisterOtp: (data) => apiClient.post('/auth/register/verify-otp', data),
+  resendRegisterOtp: (data) => apiClient.post('/auth/register/resend-otp', data),
+  completeRegister: (data) => apiClient.post('/auth/register/complete', data),
   login: (data) => apiClient.post('/auth/login', data),
   getSession: () => apiClient.get('/auth/session'),
   getProfile: () => apiClient.get('/auth/me'),
@@ -794,7 +802,12 @@ export const walletAPI = {
 };
 
 export const yayasanAPI = {
+  /** @deprecated Use registerStart -> verifyRegisterOtp -> completeRegister for new flows. */
   register: (data) => apiClient.post('/yayasan/register', data),
+  registerStart: (data) => apiClient.post('/yayasan/register/start', data),
+  verifyRegisterOtp: (data) => apiClient.post('/yayasan/register/verify-otp', data),
+  resendRegisterOtp: (data) => apiClient.post('/yayasan/register/resend-otp', data),
+  completeRegister: (data) => apiClient.post('/yayasan/register/complete', data),
   login: (data) => apiClient.post('/yayasan/login', data),
   logout: () => apiClient.post('/yayasan/logout'),
   refresh: () => apiClient.post('/yayasan/refresh'),

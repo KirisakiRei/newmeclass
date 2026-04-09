@@ -10,8 +10,10 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AccountStatus, AuthAudience, AuthProvider, DisbursementStatus, MitraInviteStatus, PaymentOpsAlertStatus, PaymentStatus, Role, YayasanApprovalStatus } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import axios from 'axios';
 import { createHash, randomBytes, randomInt } from 'crypto';
+import { hashLocalPassword, verifyLocalPassword } from 'src/common/auth/password.utils';
 import {
   getAccessTokenExpiresIn as resolveAccessTokenExpiresIn,
   getAccessTokenTtlMs as resolveAccessTokenTtlMs,
@@ -24,9 +26,11 @@ import { resolveAudienceFromRole } from 'src/common/auth/auth-cookie.utils';
 import { mapUserForClient } from 'src/common/mappers/client-shapes';
 import { buildPaginatedResult, resolvePagination } from 'src/common/pagination';
 import { DEVELOPER_ROOT_ROLE_SLUG } from '../admin-rbac/admin-permission-catalog';
+import { AdminActivityLogService } from '../admin-activity/admin-activity.service';
 import { AdminRbacService } from '../admin-rbac/admin-rbac.service';
 import { MailService } from '../mail/mail.service';
 import { buildPasswordResetEmailTemplate } from '../mail/templates/password-reset.template';
+import { buildRegisterOtpEmailTemplate } from '../mail/templates/register-otp.template';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ClaimMitraInviteDto } from './dto/claim-mitra-invite.dto';
@@ -44,6 +48,9 @@ const GOOGLE_STATE_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
+const REGISTER_OTP_TTL_MS = Number(process.env.AUTH_REGISTER_OTP_TTL_MINUTES || 10) * 60 * 1000;
+const REGISTER_OTP_MAX_ATTEMPTS = Number(process.env.AUTH_REGISTER_OTP_MAX_ATTEMPTS || 5);
+const REGISTER_OTP_RESEND_COOLDOWN_MS = Number(process.env.AUTH_REGISTER_RESEND_COOLDOWN_SECONDS || 60) * 1000;
 
 type AuditInput = {
   actorUserId?: string | null;
@@ -98,6 +105,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly adminRbacService: AdminRbacService,
     private readonly mailService: MailService,
+    private readonly adminActivityLogService: AdminActivityLogService,
   ) {}
 
   private isStaffRole(role: Role) {
@@ -277,8 +285,50 @@ export class AuthService {
     });
   }
 
+  private async revokeUserSessions(userId: string, excludeSessionId?: string | null) {
+    return this.prisma.authSession.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+        ...(excludeSessionId ? { id: { not: excludeSessionId } } : {}),
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+  }
+
   private hashValue(value: string): string {
     return createHash('sha256').update(value).digest('hex');
+  }
+
+  private async hashPassword(value: string) {
+    return hashLocalPassword(value);
+  }
+
+  private async verifyPassword(password: string, passwordHash?: string | null) {
+    return verifyLocalPassword(password, passwordHash);
+  }
+
+  logLegacyRegistrationUsage(
+    role: Role,
+    body: Record<string, any> = {},
+    meta: { ipAddress?: string | null; userAgent?: string | null } = {},
+  ) {
+    const email = this.normalizeEmail(String(body.email || ''));
+    const referralCode = String(body.referralCode || body.ref || body.mitra || '').trim() || null;
+    this.logger.warn(JSON.stringify({
+      event: 'LEGACY_PUBLIC_REGISTER_USED',
+      role,
+      email: email ? this.maskEmail(email) : null,
+      referralCode,
+      ipAddress: meta.ipAddress || null,
+      userAgent: meta.userAgent || null,
+    }));
+  }
+
+  private generateOtpCode() {
+    return String(randomInt(0, 1_000_000)).padStart(6, '0');
   }
 
   private randomCode(prefix: string): string {
@@ -301,6 +351,12 @@ export class AuthService {
       : `${localPart.slice(0, 2)}***`;
 
     return `${visibleLocal}@${domain}`;
+  }
+
+  private safeObject(value: unknown) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, any>)
+      : {};
   }
 
   private normalizeGoogleIntent(value?: string | null): 'login' | 'register' {
@@ -656,6 +712,240 @@ export class AuthService {
     return { message: 'Link reset password telah dikirim ke email pengguna.' };
   }
 
+  private buildPendingRegistrationResponse(
+    registrationToken: string,
+    row: {
+      email: string;
+      fullName: string;
+      verifiedAt?: Date | null;
+      expiresAt: Date;
+      resendAvailableAt: Date;
+      role: Role;
+    },
+  ) {
+    return {
+      registrationToken,
+      email: row.email,
+      maskedEmail: this.maskEmail(row.email),
+      fullName: row.fullName,
+      role: row.role,
+      verified: Boolean(row.verifiedAt),
+      verifiedAt: row.verifiedAt || null,
+      expiresAt: row.expiresAt,
+      resendAvailableAt: row.resendAvailableAt,
+    };
+  }
+
+  private async sendRegisterOtpEmail(email: string, fullName: string, otp: string) {
+    const template = buildRegisterOtpEmailTemplate({
+      otp,
+      recipientName: fullName,
+      expiresMinutes: Math.round(REGISTER_OTP_TTL_MS / 60000),
+    });
+
+    await this.mailService.sendMail({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  private async getPendingRegistrationOrThrow(registrationToken: string, expectedRole: Role) {
+    const token = String(registrationToken || '').trim();
+    if (!token) {
+      throw new BadRequestException('Registration token is required');
+    }
+
+    const row = await this.prisma.pendingRegistration.findUnique({
+      where: {
+        registrationTokenHash: this.hashValue(token),
+      },
+    });
+
+    if (!row || row.role !== expectedRole || row.consumedAt || row.expiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedException('REGISTRATION_SESSION_INVALID');
+    }
+
+    return { row, token };
+  }
+
+  async startRegistration(
+    body: Record<string, any>,
+    role: Role,
+  ) {
+    if (role !== Role.USER && role !== Role.YAYASAN) {
+      throw new BadRequestException('Unsupported registration role');
+    }
+
+    const email = this.normalizeEmail(body.email);
+    const fullName = String(body.fullName || body.name || '').trim();
+    if (!email || !fullName) {
+      throw new BadRequestException('Nama dan email wajib diisi.');
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const referralInput = body.referralCode || body.ref || body.mitra || null;
+    const referral = await this.resolveReferralContext(role, referralInput);
+    if (role === Role.YAYASAN && referral.referrer?.role === Role.MITRA) {
+      await this.assertMitraHasCapacity(
+        referral.referrer.id,
+        referral.referrer.mitraProfile?.inviteCode || referral.referrer.myReferralCode || referral.referredByCode,
+      );
+    }
+
+    const otp = this.generateOtpCode();
+    const registrationToken = randomBytes(32).toString('hex');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + REGISTER_OTP_TTL_MS);
+    const resendAvailableAt = new Date(now.getTime() + REGISTER_OTP_RESEND_COOLDOWN_MS);
+    const passwordHash = await this.hashPassword(body.password || 'ChangeMe123!');
+
+    await this.prisma.pendingRegistration.updateMany({
+      where: {
+        email,
+        role,
+        consumedAt: null,
+      },
+      data: {
+        consumedAt: now,
+      },
+    });
+
+    const row = await this.prisma.pendingRegistration.create({
+      data: {
+        role,
+        email,
+        fullName,
+        passwordHash,
+        referralContext: {
+          referralCode: referralInput || null,
+          referredByCode: referral.referredByCode || null,
+        },
+        registrationTokenHash: this.hashValue(registrationToken),
+        otpHash: this.hashValue(otp),
+        otpExpiresAt: expiresAt,
+        resendAvailableAt,
+        expiresAt,
+      },
+    });
+
+    try {
+      await this.sendRegisterOtpEmail(email, fullName, otp);
+    } catch (error) {
+      await this.prisma.pendingRegistration.update({
+        where: { id: row.id },
+        data: { consumedAt: new Date() },
+      });
+      this.logger.error(
+        `Failed to send registration OTP email to ${this.maskEmail(email)}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new HttpException('MAIL_DELIVERY_FAILED', HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    return this.buildPendingRegistrationResponse(registrationToken, row);
+  }
+
+  async verifyRegistrationOtp(registrationToken: string, otp: string, role: Role) {
+    const { row, token } = await this.getPendingRegistrationOrThrow(registrationToken, role);
+    if (row.verifiedAt) {
+      return this.buildPendingRegistrationResponse(token, row);
+    }
+
+    if (row.attemptCount >= REGISTER_OTP_MAX_ATTEMPTS) {
+      throw new ForbiddenException('REGISTRATION_OTP_ATTEMPTS_EXCEEDED');
+    }
+
+    if (row.otpExpiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedException('REGISTRATION_OTP_EXPIRED');
+    }
+
+    const normalizedOtp = String(otp || '').trim();
+    if (this.hashValue(normalizedOtp) !== row.otpHash) {
+      const nextAttempts = row.attemptCount + 1;
+      await this.prisma.pendingRegistration.update({
+        where: { id: row.id },
+        data: { attemptCount: nextAttempts },
+      });
+      if (nextAttempts >= REGISTER_OTP_MAX_ATTEMPTS) {
+        throw new ForbiddenException('REGISTRATION_OTP_ATTEMPTS_EXCEEDED');
+      }
+      throw new UnauthorizedException('REGISTRATION_OTP_INVALID');
+    }
+
+    const updated = await this.prisma.pendingRegistration.update({
+      where: { id: row.id },
+      data: {
+        verifiedAt: new Date(),
+      },
+    });
+
+    return this.buildPendingRegistrationResponse(token, updated);
+  }
+
+  async resendRegistrationOtp(registrationToken: string, role: Role) {
+    const { row, token } = await this.getPendingRegistrationOrThrow(registrationToken, role);
+    if (row.resendAvailableAt.getTime() > Date.now()) {
+      throw new ForbiddenException('REGISTRATION_OTP_RESEND_COOLDOWN');
+    }
+
+    const otp = this.generateOtpCode();
+    const now = new Date();
+    const otpExpiresAt = new Date(now.getTime() + REGISTER_OTP_TTL_MS);
+    const resendAvailableAt = new Date(now.getTime() + REGISTER_OTP_RESEND_COOLDOWN_MS);
+    const updated = await this.prisma.pendingRegistration.update({
+      where: { id: row.id },
+      data: {
+        otpHash: this.hashValue(otp),
+        otpExpiresAt,
+        resendAvailableAt,
+        attemptCount: 0,
+      },
+    });
+
+    await this.sendRegisterOtpEmail(updated.email, updated.fullName, otp);
+    return this.buildPendingRegistrationResponse(token, updated);
+  }
+
+  async completeRegistration(
+    body: Record<string, any> & { registrationToken?: string },
+    role: Role,
+    auditMeta: { ipAddress?: string | null; userAgent?: string | null } = {},
+  ) {
+    const { row } = await this.getPendingRegistrationOrThrow(body.registrationToken || '', role);
+    if (!row.verifiedAt) {
+      throw new ForbiddenException('REGISTRATION_EMAIL_NOT_VERIFIED');
+    }
+
+    const payload = {
+      ...body,
+      email: row.email,
+      fullName: row.fullName,
+      name: row.fullName,
+      referralCode: body.referralCode || body.ref || body.mitra || this.safeObject(row.referralContext).referralCode || null,
+    };
+
+    const response = await this.register(payload, role, false, auditMeta, {
+      passwordHash: row.passwordHash,
+      emailVerifiedAt: row.verifiedAt,
+    });
+
+    await this.prisma.pendingRegistration.update({
+      where: { id: row.id },
+      data: {
+        consumedAt: new Date(),
+        payload: payload,
+      },
+    });
+
+    return response;
+  }
+
   private buildMitraInviteResponse(invite: any, plainToken?: string | null) {
     const status = this.resolveInviteStatus(invite);
     return {
@@ -788,6 +1078,17 @@ export class AuthService {
 
   private async createAuditLog(input: AuditInput) {
     try {
+      if (String(input.action || '').trim().toUpperCase().startsWith('ADMIN_')) {
+        this.adminActivityLogService.recordRaw({
+          actorUserId: input.actorUserId || null,
+          action: input.action,
+          targetType: input.targetType,
+          targetId: input.targetId || null,
+          payload: (input.payload || {}) as Prisma.InputJsonValue,
+          ipAddress: input.ipAddress || null,
+        });
+        return;
+      }
       await this.prisma.auditLog.create({
         data: {
           actorUserId: input.actorUserId || null,
@@ -1243,10 +1544,11 @@ export class AuthService {
   }
 
   async register(
-    body: RegisterDto & Record<string, any>,
+    body: Record<string, any>,
     role: Role,
     _adminShape = false,
     auditMeta: { ipAddress?: string | null; userAgent?: string | null } = {},
+    options: { passwordHash?: string | null; emailVerifiedAt?: Date | null } = {},
   ) {
     const targetRole = role === Role.ADMIN ? this.resolveManagedAdminRole(body.role) : role;
     if (targetRole === Role.MITRA) {
@@ -1289,15 +1591,17 @@ export class AuthService {
     const birthDate = this.parseBirthDate(body.birthDate);
     const institutionName =
       targetRole === Role.YAYASAN ? body.institutionName || body.fullName || body.name || 'Yayasan' : undefined;
+    const passwordHash = options.passwordHash || await this.hashPassword(body.password || 'ChangeMe123!');
 
     const user = await this.prisma.user.create({
       data: {
         email,
         username: username || null,
         fullName: body.fullName || body.name || 'User',
-        passwordHash: this.hashValue(body.password || 'ChangeMe123!'),
+        passwordHash,
         phone,
         role: targetRole,
+        emailVerifiedAt: options.emailVerifiedAt || null,
         status:
           targetRole === Role.USER || this.isAdminPanelRole(targetRole) || targetRole === Role.YAYASAN
             ? AccountStatus.ACTIVE
@@ -1395,8 +1699,8 @@ export class AuthService {
       this.buildProviderMismatchError(AuthProvider.GOOGLE);
     }
 
-    const passHash = this.hashValue(body.password || '');
-    if (passHash !== user.passwordHash) {
+    const passwordCheck = await this.verifyPassword(body.password || '', user.passwordHash);
+    if (!passwordCheck.valid) {
       if (role === Role.ADMIN) {
         await this.createAuditLog({
           actorUserId: user.id,
@@ -1408,6 +1712,15 @@ export class AuthService {
         });
       }
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (passwordCheck.needsUpgrade) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash: await this.hashPassword(body.password || ''),
+        },
+      });
     }
 
     if (role === Role.MITRA) {
@@ -1492,8 +1805,8 @@ export class AuthService {
       this.buildProviderMismatchError(AuthProvider.GOOGLE);
     }
 
-    const passHash = this.hashValue(body.password || '');
-    if (passHash !== user.passwordHash) {
+    const passwordCheck = await this.verifyPassword(body.password || '', user.passwordHash);
+    if (!passwordCheck.valid) {
       await this.createAuditLog({
         actorUserId: user.id,
         action: 'ADMIN_LOGIN_FAILED',
@@ -1508,6 +1821,15 @@ export class AuthService {
         ipAddress: auditMeta.ipAddress || null,
       });
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (passwordCheck.needsUpgrade) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash: await this.hashPassword(body.password || ''),
+        },
+      });
     }
 
     const { session, refreshToken } = await this.createAuthSession(user, auditMeta, AuthAudience.ADMIN);
@@ -2011,7 +2333,11 @@ export class AuthService {
           },
         });
 
-        if (!sourceSession || sourceSession.expiresAt.getTime() <= Date.now()) {
+        if (
+          !sourceSession
+          || sourceSession.expiresAt.getTime() <= Date.now()
+          || sourceSession.absoluteExpiresAt.getTime() <= Date.now()
+        ) {
           throw new UnauthorizedException('Source session is no longer valid');
         }
       }
@@ -2166,16 +2492,33 @@ export class AuthService {
   async changePassword(userId: string, body: ChangePasswordDto) {
     const existing = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { primaryAuthProvider: true },
+      select: { primaryAuthProvider: true, passwordHash: true },
     });
     if (existing?.primaryAuthProvider === AuthProvider.GOOGLE) {
       throw new BadRequestException('AUTH_PROVIDER_MISMATCH_GOOGLE_ONLY');
     }
 
+    const currentPassword = String(body.currentPassword || '').trim();
+    const nextPassword = String(body.newPassword || body.password || '').trim();
+    if (!currentPassword || !nextPassword) {
+      throw new BadRequestException('Current password dan password baru wajib diisi.');
+    }
+
+    const currentCheck = await this.verifyPassword(currentPassword, existing?.passwordHash);
+    if (!currentCheck.valid) {
+      throw new UnauthorizedException('Current password is invalid');
+    }
+
+    const reusedPasswordCheck = await this.verifyPassword(nextPassword, existing?.passwordHash);
+    if (reusedPasswordCheck.valid) {
+      throw new BadRequestException('Password baru harus berbeda dari password saat ini.');
+    }
+
     await this.prisma.user.update({
       where: { id: userId },
-      data: { passwordHash: this.hashValue(body.newPassword || body.password || 'ChangeMe123!') },
+      data: { passwordHash: await this.hashPassword(nextPassword) },
     });
+    await this.revokeUserSessions(userId);
 
     return { message: 'Password updated' };
   }
@@ -2309,6 +2652,7 @@ export class AuthService {
         ? (invite.user.profile.extra as Record<string, any>)
         : {};
 
+    const passwordHash = await this.hashPassword(body.password || 'ChangeMe123!');
     const user = await this.prisma.$transaction(async (tx) => {
       const updatedUser = await tx.user.update({
         where: { id: invite.userId },
@@ -2316,7 +2660,7 @@ export class AuthService {
           fullName,
           email,
           phone: phone || null,
-          passwordHash: this.hashValue(body.password || 'ChangeMe123!'),
+          passwordHash,
           status: AccountStatus.ACTIVE,
           profile: {
             upsert: {
@@ -2414,7 +2758,7 @@ export class AuthService {
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: row.userId },
-        data: { passwordHash: this.hashValue(password || 'ChangeMe123!') },
+        data: { passwordHash: await this.hashPassword(password || 'ChangeMe123!') },
       }),
       this.prisma.passwordResetToken.updateMany({
         where: {
@@ -2426,6 +2770,13 @@ export class AuthService {
       this.prisma.passwordResetToken.update({
         where: { id: row.id },
         data: { usedAt: new Date() },
+      }),
+      this.prisma.authSession.updateMany({
+        where: {
+          userId: row.userId,
+          revokedAt: null,
+        },
+        data: { revokedAt: new Date() },
       }),
     ]);
 

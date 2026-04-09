@@ -31,31 +31,9 @@ const normalizeBooleanEnv = (value: string | undefined, fallback: boolean) => {
   return fallback;
 };
 
-const isLocalHttpOrigin = (value?: string | null) => {
-  const raw = String(value || '').trim();
-  if (!raw) return false;
-
-  try {
-    const url = new URL(raw);
-    if (url.protocol !== 'http:') return false;
-    return ['localhost', '127.0.0.1'].includes(url.hostname);
-  } catch {
-    return false;
-  }
-};
-
-const shouldRelaxSecureCookiesForLocalhost = () => ([
-  process.env.APP_URL,
-  process.env.PUBLIC_FRONTEND_URL,
-  process.env.DASHBOARD_FRONTEND_URL,
-  process.env.CMS_FRONTEND_URL,
-].some((value) => isLocalHttpOrigin(value)));
-
 const getCookieSecure = () => {
   const requestedSecure = normalizeBooleanEnv(process.env.AUTH_COOKIE_SECURE, process.env.NODE_ENV === 'production');
-  if (!requestedSecure) return false;
-  if (shouldRelaxSecureCookiesForLocalhost()) return false;
-  return true;
+  return requestedSecure;
 };
 
 const getCookieDomain = () => String(process.env.AUTH_COOKIE_DOMAIN || '').trim() || undefined;
